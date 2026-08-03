@@ -1,0 +1,166 @@
+# Example ESPHome config for the sundance_spa external component.
+# Copy this file, fill in substitutions / secrets, and adjust UART pins if needed.
+#
+# Required secrets (in secrets.yaml):
+#   wifi_ssid, wifi_password, wifi_fallback_password
+#   api_encryption_key, ota_password
+
+substitutions:
+  name: sundance-spa
+  friendly_name: Sundance Spa
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: false
+  platformio_options:
+    board_build.f_cpu: 160000000L
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+    advanced:
+      # Required for ESP32-WROOM-32E (and similar) chips used with this build.
+      minimum_chip_revision: "3.1"
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+safe_mode:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  power_save_mode: none
+  # Optional static IP — remove this block to use DHCP.
+  # manual_ip:
+  #   static_ip: 192.168.1.50
+  #   gateway: 192.168.1.1
+  #   subnet: 255.255.255.0
+  ap:
+    ssid: "${name}-fallback"
+    password: !secret wifi_fallback_password
+
+captive_portal:
+mdns:
+
+# Point this at your published repo once the component is on GitHub.
+# For local development, use: path: components
+external_components:
+  - source: github://YOUR_GITHUB_USER/YOUR_REPO@main
+    components: [sundance_spa]
+
+uart:
+  id: spa_uart_bus
+  # Match these to your ESP32 ↔ spa panel wiring.
+  tx_pin: GPIO23
+  rx_pin: GPIO22
+  baud_rate: 115200
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+  rx_buffer_size: 2048
+
+sundance_spa:
+  id: sundance_spa_id
+  uart_id: spa_uart_bus
+  temperature_scale: F
+  rx_invert: false
+  # Optional RS485 direction pin, if your transceiver needs it:
+  # flow_control_pin: GPIO4
+  communication_sensor:
+    name: "Spa Communication"
+    icon: "mdi:check-network"
+  heater_binary_sensor:
+    name: "Heater"
+    icon: "mdi:thermometer"
+  # Off / Running (Auto) / Running (Manual)
+  circ_status_text_sensor:
+    name: "Circulation Pump"
+    icon: "mdi:sync"
+  # Off / On / Seeking
+  light_status_text_sensor:
+    name: "Light Status"
+    icon: "mdi:lightbulb"
+  rest_binary_sensor:
+    name: "Rest Mode"
+    icon: "mdi:sleep"
+
+climate:
+  - platform: sundance_spa
+    name: "Spa"
+    sundance_spa_id: sundance_spa_id
+
+# Single ClearRay/circ press (same as topside). Not a switch: during filter/heat
+# the spa already runs circ in auto, and "manual" mode often will not latch.
+button:
+  - platform: sundance_spa
+    name: "Circulation"
+    sundance_spa_id: sundance_spa_id
+    button_datapoint: 3
+    icon: "mdi:sync"
+  - platform: restart
+    name: Restart
+    icon: "mdi:restart"
+    entity_category: diagnostic
+  - platform: safe_mode
+    name: Safe Mode Boot
+    icon: "mdi:restart"
+    entity_category: diagnostic
+
+switch:
+  - platform: sundance_spa
+    name: "Jet 1"
+    sundance_spa_id: sundance_spa_id
+    switch_datapoint: 1
+    icon: "mdi:fan"
+  - platform: sundance_spa
+    name: "Jet 2"
+    sundance_spa_id: sundance_spa_id
+    switch_datapoint: 2
+    icon: "mdi:fan"
+
+# Lights are cycle-only on the bus; selects seek by pressing until the target matches.
+select:
+  - platform: sundance_spa
+    type: lights
+    name: "Lights"
+    sundance_spa_id: sundance_spa_id
+    icon: "mdi:lightbulb"
+  - platform: sundance_spa
+    type: light_color
+    name: "Light Color"
+    sundance_spa_id: sundance_spa_id
+    icon: "mdi:palette"
+
+binary_sensor:
+  - platform: status
+    name: "Status"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "WiFi SSID"
+
+sensor:
+  - platform: uptime
+    name: Uptime
+    state_class: measurement
+    device_class: duration
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    state_class: measurement
+    device_class: SIGNAL_STRENGTH
