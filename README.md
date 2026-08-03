@@ -26,10 +26,10 @@ lightly "encrypted" (XOR-encoded) protocol. This project:
    the bus.
 
 ```
- ┌────────────┐   RS485    ┌────────────────────┐   Wi‑Fi    ┌────────────────┐
+ ┌────────────┐     RS485    ┌────────────────────┐    Wi‑Fi    ┌────────────────┐
  │  Spa main  │◀──────────▶│  ESP32 + TTL↔RS485 │◀─────────▶│  Home Assistant│
- │  board     │   bus      │  (this component)  │  ESPHome   │  (native API)  │
- └────────────┘            └────────────────────┘            └────────────────┘
+ │  board     │      bus     │  (this component)  │   ESPHome   │  (native API)  │
+ └────────────┘              └────────────────────┘             └────────────────┘
 ```
 
 ## Features
