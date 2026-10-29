@@ -17,8 +17,9 @@ CONFIG_SCHEMA = (
         {
             cv.GenerateID(): cv.declare_id(SundanceSwitch),
             cv.Required(CONF_SUNDANCE_SPA_ID): cv.use_id(SundanceSpa),
-            # 1=Jet1, 2=Jet2. Circ is a button (ClearRay), not a reliable switch target.
-            cv.Required(CONF_SWITCH_DATAPOINT): cv.int_range(min=1, max=2),
+            # 1=Jet1 (680: HIGH), 2=Jet2, 3=Circulation (680: manual Jet 1 LOW, no UV).
+            # 1 and 3 are mutually exclusive modes of the same pump.
+            cv.Required(CONF_SWITCH_DATAPOINT): cv.int_range(min=1, max=3),
         }
     )
     .extend(cv.COMPONENT_SCHEMA)

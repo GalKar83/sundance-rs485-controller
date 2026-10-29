@@ -14,17 +14,19 @@ SundanceLightColorSelect = sundance_spa_ns.class_(
 CONF_TYPE = "type"
 
 LIGHTS_OPTIONS = ["Off", "Low", "Medium", "High"]
+# 680: one "Light" select — Off plus the 10 modes in the manual's button order.
 LIGHT_COLOR_OPTIONS = [
-    "White",
-    "Blue",
-    "Green",
-    "Red",
-    "Violet",
-    "Amber",
-    "Aqua",
-    "Slow Blend",
-    "Fast Blend",
+    "Off",
+    "High Speed Blend",
+    "Low Speed Blend",
     "Frozen Blend",
+    "Blue",
+    "Violet",
+    "Red",
+    "Amber",
+    "Green",
+    "Aqua",
+    "Near White",
 ]
 
 BASE_SCHEMA = select._SELECT_SCHEMA.extend(

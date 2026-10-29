@@ -71,7 +71,9 @@ void SundanceClimate::setup() {
 climate::ClimateTraits SundanceClimate::traits() {
   auto traits = climate::ClimateTraits();
   traits.add_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE | climate::CLIMATE_SUPPORTS_ACTION);
-  traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
+  // Heat only: the spa has no heater-off mode, and ESPHome's traits start out with OFF already in the
+  // set, so replace the set rather than add to it (OFF showed up in HA and did nothing, 2026-10-29).
+  traits.set_supported_modes(climate::ClimateModeMask{climate::CLIMATE_MODE_HEAT});
 
   if (this->parent_ != nullptr && this->parent_->get_temperature_scale() == TempScale::FAHRENHEIT) {
     traits.set_visual_min_temperature(f_to_c_(this->parent_->get_min_temperature()));

@@ -1,3 +1,18 @@
+> ## Sundance 680 series support (this branch)
+>
+> This fork adds support for the **Sundance 680 series** (tested on a 2020 680 Peyton, Balboa-based
+> controller P/N 6600-158, board PN 24168_C) on top of the original 780 component by
+> [Iraithium](https://github.com/Iraithium/sundance-rs485-controller). The 680 logic is mostly in
+> `sundance_680.cpp`; the rest of the changes are small hooks in the existing files.
+>
+> - **Decoding notes, entities, protocol and open questions:** [docs/SUNDANCE-680.md](docs/SUNDANCE-680.md)
+> - **Example configuration:** [example-680.yaml](example-680.yaml)
+> - Everything here is still being tested; the open questions are listed in the notes.
+>
+> All credit for the original component goes to the upstream author.
+
+---
+
 # Sundance Spa — ESPHome RS485 Component
 
 Local control and monitoring for **"encrypted" Sundance and Jacuzzi spas** (Sundance 780 series and

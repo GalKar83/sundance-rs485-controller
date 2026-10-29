@@ -14,8 +14,9 @@ CONFIG_SCHEMA = (
     .extend(
         {
             cv.GenerateID(CONF_SUNDANCE_SPA_ID): cv.use_id(SundanceSpa),
-            # 3 = Circulation (ClearRay). Jets use the switch platform; lights use select.
-            cv.Required(CONF_BUTTON_DATAPOINT): cv.int_range(min=3, max=3),
+            # 3 = Circulation (ClearRay); 4 = sync the spa clock/date from Home Assistant (680);
+            # 5 = read ClearRay Bulb + Primary Filter settings from the topside menu now (680).
+            cv.Required(CONF_BUTTON_DATAPOINT): cv.int_range(min=3, max=5),
         }
     )
     .extend(cv.COMPONENT_SCHEMA)

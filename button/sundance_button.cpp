@@ -16,6 +16,16 @@ void SundanceButton::press_action() {
     this->parent_->on_toggle_circ();
     return;
   }
+  if (this->button_id_ == 4) {
+    ESP_LOGI(TAG, "Sync Clock pressed");
+    this->parent_->request_clock_sync(true);
+    return;
+  }
+  if (this->button_id_ == 5) {
+    ESP_LOGI(TAG, "Read Spa Settings pressed");
+    this->parent_->request_settings_read(false);
+    return;
+  }
   ESP_LOGW(TAG, "Unknown button id %u", this->button_id_);
 }
 

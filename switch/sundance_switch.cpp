@@ -16,6 +16,8 @@ void SundanceSwitch::setup() {
     dp = DP_JET1;
   else if (this->switch_id_ == 2)
     dp = DP_JET2;
+  else if (this->switch_id_ == 3)
+    dp = DP_CIRC;
 
   if (dp != 0) {
     this->parent_->register_binary_sensor_callback(dp, [this](bool state) { this->publish_state(state); });
@@ -33,6 +35,10 @@ void SundanceSwitch::write_state(bool state) {
       break;
     case 2:
       this->parent_->set_pump(1, state);
+      break;
+    case 3:
+      // Circulation = manual Jet 1 low. Off returns Jet 1 to Off (never to High).
+      this->parent_->set_jet1_mode(state ? JET1_LOW : JET1_OFF);
       break;
     default:
       ESP_LOGW(TAG, "Unknown switch id %u", this->switch_id_);
