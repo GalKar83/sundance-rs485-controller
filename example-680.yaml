@@ -209,7 +209,8 @@ switch:
     sundance_spa_id: sundance_spa_id
     switch_datapoint: 1
     icon: "mdi:fan"
-  # 680: Jet 1 = high speed; Circulation = manual Jet 1 low (no UV). Mutually exclusive.
+  # 680: Jet 1 = high speed; Circulation = manual Jet 1 low. Mutually exclusive. ClearRay is on whenever
+  # the Jet 1 pump runs, at either speed.
   - platform: sundance_spa
     name: "Circulation (Manual)"
     sundance_spa_id: sundance_spa_id

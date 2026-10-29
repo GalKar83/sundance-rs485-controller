@@ -49,7 +49,7 @@ Contents
 13. [Open questions / help wanted](#13-open-questions--help-wanted)
 14. [Known issues and limitations](#14-known-issues-and-limitations)
 15. [How to test / reproduce](#15-how-to-test--reproduce)
-16. [Patch history](#16-patch-history)
+16. [Development history](#16-development-history)
 
 ---
 
@@ -129,8 +129,8 @@ topside:
 | Climate modes | heat/off | **Heat only** — the 680 has no heater-off mode (ESPHome's traits start with OFF, so the set is replaced) |
 | Temperature min | 80 °F-ish | 18 °C / 65 °F (680 manual) |
 
-All changes are kept as a series of patches against upstream (see §16). The bulk of the 680 logic is
-in a new file `sundance_680.cpp`.
+The bulk of the 680 logic is in a new file `sundance_680.cpp`; the existing files only get small
+hooks (§16 lists the order in which things were added).
 
 ## 4. Home Assistant entities
 
@@ -580,33 +580,17 @@ Each test is short; note the time and what the panel showed.
 | Power cut | spa breaker off 1 min, on, do not touch the panel for 5 min | boot messages, purge, clock reset, automatic sync, boot read |
 | Light from HA | select Red, then Off | light seek logic |
 
-## 16. Patch history
+## 16. Development history
 
-All patches apply on top of upstream in order (`git apply --ignore-whitespace`; upstream files are LF).
+What was added and verified on the test spa, in order:
 
-| # | Patch | Content |
-|---|---|---|
-| 01 | diag-logging | `[DIAG]` decoded status/lights with per-byte bit diffs, first-seen message types, bus stats |
-| 02 | diag-periodic-dump | full decoded dump every 30 s |
-| 03 | service-counters-clock | Water Refresh, Filter Change, ClearRay (placeholder), spa time |
-| 04 | diag-panel-presses | log topside 0xCC presses |
-| 05 | diag-panel-press-on-change | log presses only on change (the panel sends 0xCC continuously) |
-| 06 | jet1-circulation | Jet 1 high + Circulation switches, mutually exclusive |
-| 07 | 680-lights-heatmode-date-clocksync | `sundance_680.cpp`: light select, heater mode, date, HA→spa clock/date sync, min 18 °C |
-| 08 | nightly-routine-uv-pf-filteroff | 00:05 routine, ClearRay + PF menu reads, Read Spa Settings, passive capture, FC Off |
-| 09 | primary-filter-states-date-fix | screen-key normalization, PF states incl. Heating, date formula fix, Auto/Eco/Day, Temperature Format (+°F→°C), Lock, Language, Clearray Bulb, UV formula fix, Diagnostics switch, Logger Level |
-| 10 | raw-status-diagnostics | raw status/lights/message-type/screen-key/panel-button diagnostic entities |
-| 11 | clock-sync-edit-screens | accept menu "editing" state (f2 bit 5) during sync; settings read ~2 min after boot |
-| 12 | panel-button-hold | Panel Button as named text, presses held 1 s; Primary Filter requires f1 bit 5 (no end-of-cycle "Heating" blip) |
-| 13 | raw-other-messages | Raw Other Messages diagnostic |
-| 14 | menu-task-command-deadlock | HA commands no longer wait behind a menu task that is still waiting for the main screen |
-| 15 | run-time-counters | Jet 1 / Jet 2 / Light / Circulation / Heater Run Time |
-| 16 | activity-sessions | `activity:` list — *Item* Active / Session binary sensors with a per-item minimum |
-| 17 | screen-key-locks-counters-cleanup | screen key 0–7; Settings/Service Lock tracking (flash-persisted); counters as text with `Off` / `Change Now` + FC menu read; Primary Filter `Cleanup`; Panel Button `Idle` and Clock Sync `Not synced yet` from boot |
-| 18 | purge-auto-pumps-running | purge counted as automatic circulation; Pumps Running + Circulation (Auto) binary sensors in the ESP; entity renames; sessions only for In Use; `Temperature Lock` |
-| 19–20 | clock-offset, clock-sync-minute-tolerance | offset measured at the minute rollover; sync only from ≥ 60 s |
-| 21 | primary-filter-purge | Primary Filter `Purge` for the whole power-up / unlock sequence |
-| 22–23 | v1 | Circulation (Auto) only while a pump runs; Decoder Notice |
-| 24 | debounce-clock-sync-offset | 2 s confirmation of derived states; sync from the measured offset (clock stands still while editing), short way round for hour/minute, offset measured only after 2 s on the main screen |
-| 25 | clock-date-ddmmyyyy | Clock Date as DD/MM/YYYY; YAML renames (Remaining Days …, Clock …, Primary Filter Active, Read Settings) |
-| 26 | screen-key-4-bits, climate-heat-only | key 0–15; climate offers Heat only |
+| Date (2026) | Added |
+|---|---|
+| 22 Oct | Decoding diagnostics; Water Refresh / Filter Change counters and the spa clock; Jet 1 high and manual Circulation as two switches |
+| 22–23 Oct | `sundance_680.cpp`: single-button light with 10 modes, Auto / Eco / Day heater mode, date, Home Assistant → spa clock/date sync; nightly and boot menu reads (ClearRay days, Primary Filter settings, language); Primary Filter states; temperature format, lock, language |
+| 23–24 Oct | Raw decoding entities; Panel Button; sync accepts the menu's "editing" state; run time counters; activity (Active / Session) sensors |
+| 25 Oct | Screen-key learning; Settings / Service Lock tracking (kept in flash); counters with `Off` / `Change Now`; Primary Filter `Cleanup` |
+| 26 Oct | Pumps Running and Circulation (Auto) in the ESP; spa clock offset measured to the second; Primary Filter `Purge`; Decoder Notice |
+| 27 Oct | 2-second confirmation of derived states; clock sync from the measured offset (the clock stands still while editing) |
+| 28 Oct | Clock Date as DD/MM/YYYY; entity names grouped by first word |
+| 29 Oct | 4-bit screen key; climate offers Heat only; electrical power measured (§11) |
