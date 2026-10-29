@@ -1,264 +1,612 @@
-> ## Sundance 680 series support (this branch)
+# Sundance 680 series — ESPHome RS-485 component
+
+ESPHome component and decoding notes for **Sundance 680 series** spas (Balboa-based controller),
+based on the Sundance 780 component by [Iraithium](https://github.com/Iraithium/sundance-rs485-controller)
+— all credit for the original work goes to him. For the 780, see the original repository.
+Example configuration: [example-680.yaml](example-680.yaml).
+
+> **Tested on:** Sundance **680 series Peyton model year 2020** — *680 Series Controller & Heater,
+> assembly P/N 6600-158*, main board marked *Jacuzzi Products Co. PN 24168_C* (230 VAC 50 Hz single
+> service, 2-speed pump 1, pump 2, 2.7 kW heater, ClearRay UV, SD680 topside). The same board family
+> is also used in **Jacuzzi J100 / J200** spas, so this work may apply to them as well (untested).
 >
-> This fork adds support for the **Sundance 680 series** (tested on a 2020 680 Peyton, Balboa-based
-> controller P/N 6600-158, board PN 24168_C) on top of the original 780 component by
-> [Iraithium](https://github.com/Iraithium/sundance-rs485-controller). The 680 logic is mostly in
-> `sundance_680.cpp`; the rest of the changes are small hooks in the existing files.
->
-> - **Decoding notes, entities, protocol and open questions:** [docs/SUNDANCE-680.md](docs/SUNDANCE-680.md)
-> - **Example configuration:** [example-680.yaml](example-680.yaml)
-> - Everything here is still being tested; the open questions are listed in the notes.
->
-> All credit for the original component goes to the upstream author.
+> **Connection:** the RS-485 module is connected to header **J15** on the controller board, at the
+> top edge of the board next to J13 (MAIN PANEL, the SD680 topside).
+
+| Controller board (J15 at the top) | Wiring diagram from the controller lid |
+|---|---|
+| <img src="docs/images/controller-board.jpg" alt="Sundance 680 controller board, P/N 6600-158 / PN 24168_C, J15 at the top" width="380"> | <img src="docs/images/wiring-diagram.jpg" alt="680 series controller and heater wiring diagram, assembly P/N 6600-158" width="380"> |
+
+This document describes how the ESPHome `sundance_spa` component (originally written for the
+**Sundance 780 series**) was adapted to a **Sundance 680 series Peyton** (2 pumps, Balboa
+controller), what was decoded on the RS-485 bus, how sure we are about each part, and what is still
+unknown. It is meant for anyone who wants to continue the work, reproduce it on another 680, or
+spot mistakes.
+
+> Status (2026-10-29): running daily on one spa. Temperature, set point, heater, both jets,
+> circulation, lights, heater mode, clock/date (read + automatic sync to within a minute, incl. DST
+> changes), service counters (with Off / Change Now), Primary Filter settings and states (incl.
+> Cleanup and Purge), language, all four lock modes, temperature unit, run timers, activity
+> sessions and a Decoder Notice are exposed to Home Assistant. Derived states are confirmed for 2 s
+> before they are published, so the controller's flag hand-overs never show as blips. Electrical
+> power was measured against the house load (§11). A few status bits are still unknown — see
+> [Open questions](#13-open-questions--help-wanted).
+
+Contents
+
+1. [Credits and upstream](#1-credits-and-upstream)
+2. [Hardware and wiring](#2-hardware-and-wiring)
+3. [What is different from the 780 code](#3-what-is-different-from-the-780-code)
+4. [Home Assistant entities](#4-home-assistant-entities)
+5. [Bus protocol basics](#5-bus-protocol-basics)
+6. [Status frame (0xC4) field map](#6-status-frame-0xc4-field-map)
+7. [Topside button codes (0xCC)](#7-topside-button-codes-0xcc)
+8. [Lights frame (0xCA) and the 680 light cycle](#8-lights-frame-0xca-and-the-680-light-cycle)
+9. [Topside menu: screens, masking and values](#9-topside-menu-screens-masking-and-values)
+10. [Driving the menu from the ESP32](#10-driving-the-menu-from-the-esp32)
+11. [Observed spa behaviour](#11-observed-spa-behaviour)
+12. [Diagnostics entities](#12-diagnostics-entities)
+13. [Open questions / help wanted](#13-open-questions--help-wanted)
+14. [Known issues and limitations](#14-known-issues-and-limitations)
+15. [How to test / reproduce](#15-how-to-test--reproduce)
+16. [Patch history](#16-patch-history)
 
 ---
 
-# Sundance Spa — ESPHome RS485 Component
+## 1. Credits and upstream
 
-Local control and monitoring for **"encrypted" Sundance and Jacuzzi spas** (Sundance 780 series and
-compatible Jacuzzi models) over their RS485 bus — exposed to [Home Assistant](https://www.home-assistant.io/)
-via native [ESPHome](https://esphome.io/) integration. It is a free replacement for the expensive
-Jacuzzi/Sundance **cellular (ProLink) or Wi‑Fi (SmartTub) modules**, with no cloud dependency.
+- Base component: [Iraithium/sundance-rs485-controller](https://github.com/Iraithium/sundance-rs485-controller)
+  (ESPHome external component for the Sundance 780). The upstream repository has its files at the
+  repository root (not under `components/`), so it cannot be used with `source: github://…`
+  directly; here it is cloned into `config/esphome/components/sundance_spa` and used with
+  `source: type: local`.
+- Protocol background: HyperActiveJ `sundanceRS485` decoding notes (the 780 bit names in the code
+  come from there).
+- Upstream has **no LICENSE file** at the time of writing — keep that in mind before republishing
+  derived code.
+- Reference manual: Sundance *2020 680 Series Owner's Manual* (menu order, value ranges, heat modes,
+  lock modes, error codes).
 
-Unlike RS485→TCP→MQTT bridges, this component runs **on an ESP32 wired directly to the spa bus**.
-Home Assistant talks to the device over the ESPHome API — no MQTT broker or serial gateway required.
+## 2. Hardware and wiring
 
----
+| Item | Used here | Notes |
+|---|---|---|
+| Spa side | header **J15** on the 680 controller board (P/N 6600-158, board PN 24168_C) | see the photo at the top |
+| MCU | ESP32-WROOM-32UE DevKit (chip rev 3.1, external antenna) | `minimum_chip_revision: "3.1"`, `esp32dev` 4 MB layout is plenty |
+| RS-485 transceiver | TTL↔RS-485 module with **automatic direction control** | no DE/RE pin needed (`flow_control_pin` unused) |
+| UART pins | **TX = GPIO1, RX = GPIO3** (UART0) | therefore `logger: baud_rate: 0` (serial logging off, use API logs) |
+| Baud rate | 115200 8N1 | same as the 780 |
+| Power | 5 V buck converter **fed from the spa** | the ESP32 power-cycles together with the spa (useful: it sees the spa's boot) |
+| Framework | ESPHome 2026.10, Arduino | `sram1_as_iram: true` |
 
-## What it does
+Minimal YAML (secrets and keys omitted; the full example is [example-680.yaml](example-680.yaml)):
 
-The spa's topside panel talks to the mainboard over a multi-drop **RS485** bus using a Balboa-derived,
-lightly "encrypted" (XOR-encoded) protocol. This project:
+```yaml
+external_components:
+  - source:
+      type: local
+      path: components
 
-1. **Connects** to the spa's RS485 bus through a TTL↔RS485 transceiver on an ESP32.
-2. **Joins the bus** as a virtual panel — it performs the Balboa channel-assignment handshake so the
-   mainboard treats it like another control panel.
-3. **Decodes** the status traffic (current/set temperature, heater state, jets, circulation pump,
-   lights/colors, rest mode, etc.).
-4. **Exposes** that state as ESPHome entities (climate, switches, selects, sensors) that appear in
-   Home Assistant automatically.
-5. **Accepts commands** from Home Assistant and applies them by emulating panel button presses on
-   the bus.
+logger:
+  baud_rate: 0        # UART0 is used by the RS-485 module
+  level: DEBUG
+
+uart:
+  id: spa_uart
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  baud_rate: 115200
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+sundance_spa:
+  id: sundance_spa_id
+  uart_id: spa_uart
+  temperature_scale: C
+  time_id: ha_time
+  clock_auto_sync: true
+  # ... sensors, see section 4
+```
+
+## 3. What is different from the 780 code
+
+The 680 uses the **same framing, CRC and XOR-folded payloads** as the 780 (CRC init 0xB5 works,
+zero CRC errors over millions of frames). The differences are in what the bits mean and in the
+topside:
+
+| Topic | 780 (upstream) | 680 (this work) |
+|---|---|---|
+| Pumps | Pump 1, Pump 2, separate circulation pump | **No separate circ pump.** Jet 1 is a **two-speed** pump: low speed = circulation/filtration, high speed = jets. Jet 2 single speed. |
+| Jet 1 control | on/off | Two HA switches, mutually exclusive: **Jet 1** (high) and **Circulation** (manual low). Panel cycle is Off→Low→High→Off; during automatic filtration Jets 1 goes High→back to circulation. |
+| Lights | brightness levels + colour select | **One Light button, 10 modes, no brightness.** Selecting a mode = pressing Light N times within ≤3 s; a press after ≥5 s turns the light off. |
+| Heater mode | rest/ready | **Auto / Eco / Day** (f6 = 32/34/36) |
+| Clock | time only | time **and date** decoded; HA→spa sync by navigating the menu |
+| Service counters | not mapped | Water Refresh, Filter Change (status frame), ClearRay bulb (menu read); each as days / `Change Now` / `Off` |
+| Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu) |
+| Screen codes | — | **XOR-masked by a 4-bit key that changes every midnight** (see §9) |
+| Climate modes | heat/off | **Heat only** — the 680 has no heater-off mode (ESPHome's traits start with OFF, so the set is replaced) |
+| Temperature min | 80 °F-ish | 18 °C / 65 °F (680 manual) |
+
+All changes are kept as a series of patches against upstream (see §16). The bulk of the 680 logic is
+in a new file `sundance_680.cpp`.
+
+## 4. Home Assistant entities
+
+**Updated live** (from the status/lights broadcast, several times per second):
+
+| Entity | Values | Source |
+|---|---|---|
+Names are chosen so that related entities sort together (same first word).
+
+| Entity | Values | Source |
+|---|---|---|
+| Sundance Spa (climate) | **Heat only**; target 18–40 °C step 0.5, current temp, action heating/idle | f5, f8, f10 bit6 |
+| Heater | on/off | f10 bit6 |
+| Jet 1 (switch) | on/off — high speed | f2 bit4 |
+| Circulation (Manual) (switch) | on/off — manual low speed | f1 bit7 without the purge |
+| Jet 2 (switch) | on/off | f1 bit2 |
+| Light (select) | Off, High Speed Blend, Low Speed Blend, Frozen Blend, Blue, Violet, Red, Amber, Green, Aqua, Near White | lights frame |
+| Light Status | same list | lights frame |
+| Primary Filter | Purge / Running / Cleanup / Circulation (Manual) / Circulation (Auto) / Circulation (Heating) / Off | f1, f2, f10 bit7, see below |
+| Primary Filter Active (binary) | scheduled filtration cycle | f10 bit7 |
+| Pumps Running (binary) | any pump running | f1, f2 |
+| Circulation (Auto) (binary) | circulation the controller runs itself (schedule, heat, purge) — only while a pump runs | f1, f10 bit7 |
+| ClearRay Bulb | On / Off (inferred: Jet 1 pump running at any speed) | f1 bit6, f2 bit4 |
+| Heater Mode | Auto / Eco / Day / Unknown (n) | f6 |
+| Lock | Off / Access Lock / Temperature Lock / Settings Lock / Service Lock | AL f1 bit3, TL f10 bit4; SL/SVL tracked from panel events (§6) |
+| Temperature Format | °C / °F | f14 bit6 |
+| Clock Time | HH:MM (24 h) | f0, f11 |
+| Clock Date | DD/MM/YYYY | f7, f9 + HA date |
+| Remaining Days Water Refresh | days / `Change Now` / `Off` (text) | f12, f2 bit7 |
+| Remaining Days Filter Change | days / `Change Now` / `Off` (text) | f3 (+ FC menu when 0, §6) |
+| Jet 1 / Jet 2 / Light / Circulation / Heater Run Time | minutes since it turned on (0 when off) | computed in the ESP |
+| *Item* Active (binary), In Use Session | Active = running now (In Use = Jet 2 or Jet 1 high); In Use Session = on once a use has lasted 10 min | computed; items: In Use, Jet 1, Jet 2, Heating Run, Primary Filter Active |
+| Communication | on/off | frames received |
+| Decoder Notice | `OK`, or the last thing the decoder could not handle (see below); back to `OK` after an hour | ESP |
+
+**Primary Filter states** (in this order of precedence):
+`Purge` — the 2-minute sequence after power-up or a Service Lock unlock (Jet 1 low, then Jet 2):
+the controller keeps the manual-circulation bit (f1 bit 7) set for all of it although nobody pressed
+Circulation; presses made meanwhile do not change the state. `Running` — Jet 1 high or Jet 2 started
+by someone. `Cleanup` — Jet 2 started by the controller itself (no press in the previous 5 s; the
+daily cleanup). `Circulation (Manual)` — Jet 1 low started by hand. `Circulation (Auto)` — scheduled
+filtration. `Circulation (Heating)` — the pump runs for heat demand. Otherwise `Off`.
+
+**2-second confirmation.** Primary Filter, ClearRay Bulb, Heater, Pumps Running, Circulation (Auto)
+and every Active/Session sensor are published only after the new state has held for 2 s (run times
+are counted from when the change began). The controller hands its flags over one or two status
+frames apart — e.g. at the end of a filter cycle f1 reads 0x40 (looks like "Jet 1 low from the
+panel") for about a second, and once f10 bit 7 dropped 0.3 s before the pump stopped ("Heating") —
+which otherwise showed as 0.3–1.7 s blips. Switches, the light and Panel Button stay immediate.
+
+**Decoder Notice** reports, at most about once an hour each: clock sync failed or left the clock a
+minute or more off, settings read aborted, light or command not confirmed by the spa, ClearRay
+shown on an unmapped screen, no status for 30 s, and a quiet topside screen that fits no key for
+10 min (e.g. an error message — it caught the 4-bit key on 29 Oct, §9).
+
+**Updated only by reading the menu** (nightly at 00:05, ~2 min after every boot, on the *Read
+Settings* button) **or when someone saves the value at the panel**:
+
+| Entity | Values |
+|---|---|
+| Remaining Days ClearRay Bulb | days (text; also captured when someone just views it on the panel) |
+| Primary Filter Start | HH:00 (24 h) |
+| Primary Filter Cycles | 1–4 |
+| Primary Filter Duration | hours |
+| Language | English / French / Spanish / German |
+
+**Event-driven**: *Clock Sync* (`Not synced yet` after boot / `Waiting for main screen` /
+`OK HH:MM` / `OK (already within ±n s)` / `Failed: <reason>`).
+
+**Temperature units**: the climate entity and the temperature sensor always use the unit set in
+`temperature_scale` (here `C`). The panel can be switched to °F independently (f14 bit 6); the ESP
+converts, so Home Assistant keeps receiving °C (rounded to 0.5 °C). Users who want °F in HA set
+`temperature_scale: F`.
+
+**Buttons**: Read Settings, Clock Sync Now, Restart, Safe Mode Boot.
+**Config**: Diagnostics (verbose decoding logs on/off), Logger Level (runtime log level).
+
+## 5. Bus protocol basics
+
+Frame layout (unchanged from the 780):
 
 ```
- ┌────────────┐     RS485    ┌────────────────────┐    Wi‑Fi    ┌────────────────┐
- │  Spa main  │◀──────────▶│  ESP32 + TTL↔RS485 │◀─────────▶│  Home Assistant│
- │  board     │      bus     │  (this component)  │   ESPHome   │  (native API)  │
- └────────────┘              └────────────────────┘             └────────────────┘
+7E  LEN  CH  BF  TYPE  payload…  CRC  7E
 ```
 
-## Features
+- `LEN` counts from LEN to CRC inclusive.
+- `CRC` = CRC-8, polynomial 0x07, **init 0xB5**, final XOR 0x02, computed over `LEN … last payload byte`.
+- Payloads of status (0xC4), lights (0xCA) and button (0xCC) frames are **XOR-folded**: each pair of
+  bytes `(a, b)` decodes to one value `a ^ b ^ 0x01`. The field numbers below (f0…f15) refer to the
+  decoded values.
 
-- **No cloud, no subscription** — fully local control.
-- **Native ESPHome / Home Assistant** — entities appear when the device is adopted; no MQTT YAML.
-- **Temperature** monitoring and set-point control (climate entity, °F).
-- **Jets** — Jet 1 and Jet 2 as switches.
-- **Circulation** — single-press button (matches the topside ClearRay/circ button) plus a status
-  text sensor (`Off` / `Running (Auto)` / `Running (Manual)`).
-- **Lights** — brightness cycle (`Off` / `Low` / `Medium` / `High`) and color/effect select.
-- **Heater / rest-mode / communication** sensors.
-- Runs from spa accessory power via a buck converter (no separate wall wart in the cabinet).
+Message types seen on a 680 (sensor *Bus Message Types*):
 
-## Home Assistant entities
+| Type | Meaning (from the 780 code / Balboa) | Seen |
+|---|---|---|
+| 0x00 | client clear-to-send | always |
+| 0x01 | channel assignment request | at boot |
+| 0x02 | channel assignment response | at boot |
+| 0x03 | channel assignment ack | at boot |
+| 0x04 | existing client request | at boot (first frame after power-up) |
+| 0x06 | clear to send | always |
+| 0xC4 | status update | always |
+| 0xCA | lights update | always |
+| 0xCC | topside button state (sent continuously, idle code when nothing pressed) | always |
 
-From the included [`example.yaml`](example.yaml):
+0x00 and 0x06 frames carry **no payload** on the 680 (checked with the *Raw Other Messages*
+diagnostic). Channels: 0x10 = this ESP32, 0x11 = topside panel, 0x12 = offered but unused, 0xFE =
+broadcast.
 
-| Entity | Type | Notes |
-| --- | --- | --- |
-| Spa | `climate` | Current temp, set temp, heat action; °F |
-| Jet 1 / Jet 2 | `switch` | Jet pumps |
-| Circulation | `button` | One ClearRay/circ press (not a latching switch) |
-| Circulation Pump | `text_sensor` | `Off` / `Running (Auto)` / `Running (Manual)` |
-| Lights | `select` | `Off`, `Low`, `Medium`, `High` |
-| Light Color | `select` | Color / blend modes (see below) |
-| Light Status | `text_sensor` | `Off` / `On` / `Seeking` |
-| Heater | `binary_sensor` | Heater active |
-| Rest Mode | `binary_sensor` | Spa in rest mode |
-| Spa Communication | `binary_sensor` | Bus link healthy |
+The ESP32 requests its own channel (got 0x10 here) and sends button presses as 0xCC frames with the
+button code in byte 5 and 0x00 in byte 6.
 
-**Light colors:** White, Blue, Green, Red, Violet, Amber, Aqua, Slow Blend, Fast Blend, Frozen Blend.
+## 6. Status frame (0xC4) field map
 
-### Quirks worth knowing
+Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observations), ❓ unknown.
 
-- **Circulation is a button, not a switch.** During filter/heat cycles the spa already runs circ in
-  auto, and a "manual" mode often will not latch the way a simple on/off switch would. Pressing the
-  button mirrors the topside; watch the **Circulation Pump** text sensor for actual state.
-- **Lights are cycle-only on the bus.** The selects seek by issuing button presses until the
-  reported state matches the target. While that is in progress, **Light Status** shows `Seeking`.
-- **Climate is heat-only** — there is no cool mode on these spas.
+### Values
 
----
+| Field | Meaning | Encoding | Confidence |
+|---|---|---|---|
+| f0 | hour (24 h) | `f0 ^ 6` | ✅ |
+| f11 bits 0–6 | minute | plain | ✅ |
+| f11 bit 7 | ? | never seen set | ❓ |
+| f7 | day + month | `f7 = (((day ^ 1) << 3) + (month ^ 8)) & 0xFF` — ambiguous; the decoder tries `f7` and `f7 + 256` for all candidates and picks the one nearest the HA date | ✅ (all days of a year checked) |
+| f9 | year | `(year - 2000) ^ 1` (power-up default decodes to 2014-01-01) | ✅ |
+| f5 | water temperature | `f5 ^ 2`; °C mode: half degrees (69 → 34.5 °C); °F mode: whole °F | ✅ |
+| f8 | set point | plain; °C: half degrees, °F: whole °F | ✅ |
+| f6 | heater mode | 32 Auto, 34 Eco, 36 Day (16 for <1 s at power-up) | ✅ |
+| f12 | Water Refresh days remaining | plain, decrements at midnight; 0 = Off **or** due (told apart by f2 bit 7) | ✅ |
+| f3 | Filter Change days remaining | `f3 ^ 250`; raw 250 (= 0) both when the reminder is **Off** and when it is due (see below) | ✅ |
+| f4 | ? | always 6 so far | ❓ |
+| f13 | topside screen code | **XOR-masked**, see §9 | ✅ |
+| f14 | slow value + flags | see [f14](#f14) below | ✅ |
+| f15 | value shown in the current menu screen | plain, screen-specific encoding (§9) | ✅ |
 
-## Getting started
+### Bits
 
-1. Confirm your spa uses a Balboa-derived Sundance/Jacuzzi RS485 panel bus (developed against a
-   Sundance 780 series; other models with the same encrypted bus may work).
-2. Gather the parts below.
-3. Flash the ESP32 with ESPHome using [`example.yaml`](example.yaml) (or your own config).
-4. Wire the hardware and install it in a waterproof enclosure.
-5. Plug into an unused Micro-Fit panel/accessory connector on the spa (or a Y-cable if the port is
-   already occupied).
-6. Adopt the device in Home Assistant and get tubbin'.
+| Field.bit | Meaning | Confidence |
+|---|---|---|
+| f1.2 | Jet 2 running | ✅ |
+| f1.3 | **Access Lock (AL)** active | ✅ |
+| f1.5 | Jet 1 low speed commanded (set ~1 s before bit 6, cleared ~1 s before it) | 🟡 |
+| f1.6 | Jet 1 low speed running (any reason: filtration, heating, manual, purge) | ✅ |
+| f1.7 | manual Circulation (Jet 1 low started by the Circulation button / HA) | ✅ |
+| f1.0,1,4 | ? (never set so far) | ❓ |
+| f2.0–2 | **day of the week**, Sunday = 0 (Thu 4, Fri 5, Sat 6, Sun 0 on 22–25 Oct 2026); the power-up state matches the reset date | ✅ |
+| f2.3 | Jet 1 low speed (pump side) | ✅ |
+| f2.4 | Jet 1 high speed | ✅ |
+| f2.5 | a value is being **edited** in the menu | ✅ |
+| f2.6 | ? never set | ❓ |
+| f2.7 | set while **Water Refresh is Off**; also set after a power loss until the time is set | ✅ (H2O Off: set on Off, cleared on 150; FC Off does not set it) |
+| f10.4 | **Temperature Lock (TL)** active | ✅ |
+| f10.6 | heater on | ✅ |
+| f10.7 | set during the scheduled filtration cycle (whole cycle, also while the cleanup runs Jet 2) and during the power-up purge; clear when the pump runs for heat demand or manually | ✅ |
+| f10.0–3,5 | ? never set — maybe alerts/errors | ❓ |
 
----
+<a id="f14"></a>**f14.** Bits 0–5 are a slowly drifting value **V** XOR-ed with flags; bit 6 is °F:
 
-## Parts
+```
+f14 = (V ^ (SL << 1) ^ (SVL << 2) ^ (pump << 5)) & 0x3F | (fahrenheit << 6)
+```
 
-| Part | Notes |
-| --- | --- |
-| **ESP32 DevKit** | ESP32-WROOM DevKitC-style board (USB for first flash). Example config uses `esp32dev` with `minimum_chip_revision: "3.1"`. |
-| **TTL → RS485 module** | Hardware auto flow-control preferred (e.g. “TTL to RS485” modules with VCC/TXD/RXD/GND + A/B screw terminals). If your module needs DE/RE, wire a GPIO and set `flow_control_pin` in YAML. |
-| **DC-DC buck converter** | LM2596-style step-down. Spa bus accessory power is typically ~12–14 V; set the **output to 5 V** for ESP32 VIN / 5 V rail. |
-| **Solderable breadboard** | e.g. Treedix or similar proto board that fits a waterproof junction box. |
-| **Waterproof junction box** | Outdoor/wet-location box with cable gland/grommet for the spa cable. |
-| **Spa interconnect cable** | [NFHK ATX Molex Micro Fit 4-Pin Male–Male, 20 AWG, ~60 cm, 3.0 mm pitch](https://www.amazon.com/dp/B0CQC6PY1C) — plugs into an unused spa connector. |
-| **Hookup wire / jumpers** | For TTL UART and breadboard power rails. |
+- **V** behaves like a temperature (pipe or heater sensor?): idle it falls about 1 per hour
+  (33 → 30 over 3 h in the evening) and it rises while the pump runs (about +3 over a 2 h cycle);
+  it dithers ±1 (bit 0) for a few minutes at every step. Units unknown.
+- **bit 5** flips while the Jet 1 pump runs (idle 30 → 62 at pump start, 33 → 1 …). This is why
+  the "pump on" readings looked like 0/1 or 61–63 depending on V.
+- **bit 1 = Settings Lock**: SL confirmed 31 → 29, unlock 29 → 31 (2026-10-25, pump off).
+- **bit 2 = Service Lock**: SVL confirmed 31 → 27, unlock 27 → 63 (= 31 with the purge pump bit).
+- **bit 6 = °F**: 32 → 96 and back (2026-10-24).
 
-Hardware layout is essentially the same as [jrowny/ESPHomeSpa](https://github.com/jrowny/ESPHomeSpa)
-and [cribskip/esp8266_spa](https://github.com/cribskip/esp8266_spa), but built around an **ESP32**
-(5 V on VIN) instead of a 3.3 V Wemos.
+Because V is unknown, the absolute lock state cannot be read from f14 alone. The component tracks
+SL/SVL from the panel events that change them — **Jets 1 on the SL (98) or SVL (13) option screen**
+sets the lock, **Menu held (209)** clears it — and accepts the change only if the matching f14 bit
+flips (bits 0 and 5 ignored) within 5 s of the event. The state is stored in ESP flash so it
+survives an ESP restart. (Earlier notes about an f14 "baseline change" were V drifting across 32.)
 
-![Example ESP32 + RS485 + buck converter in a waterproof box](docs/hardware.png)
+**Filter Change 0 = Off or due?** Both send f3 = 250. The component reports `Change Now` when the
+counter reached 0 by counting down from 1, `Off` when someone saves Off in the FC menu (value 128 on
+the FC value screen), and otherwise — e.g. right after a boot — reads the FC menu once (Warmer shows
+the value, 128 = Off) during the boot / nightly routine.
 
----
+## 7. Topside button codes (0xCC)
 
-## Hardware connections
+Real code = `byte5 ^ byte6` of the 0xCC frame. (The diagnostic log prints `code ^ 1` — keep that
+in mind when reading old logs: logged 225 = idle 224, logged 229 = Jets 1 228.)
 
-Identify the four conductors on the spa side (power pair + RS485 A/B) before trusting wire colors.
-Colors vary by cable; use a multimeter. See also
-[ccutrer/balboa_worldwide_app — physical layer](https://github.com/ccutrer/balboa_worldwide_app/wiki#physical-layer).
+| Code | Button |
+|---|---|
+| 224 | idle (sent continuously) |
+| 225 | Warmer (▲) |
+| 226 | Cooler (▼) |
+| 228 | Jets 1 (also "confirm/next" in menus) |
+| 229 | Jets 2 |
+| 239 | Circulation (toggles manual Jet 1 low) |
+| 241 | 780 "light on" — also works on the 680 |
+| 242 | Light (the single 680 light button) |
+| 254 | Menu |
+| 209 | Menu **held** (sent once; unlocks locks — a slightly too short hold sends 254 and does nothing) |
 
-### Finding the wires
+Panel presses last ~0.1 s.
 
-1. With the cable plugged into the spa (other end unconnected and insulated), measure pairs with a
-   multimeter.
-2. One opposite pair should read roughly **12–14 V** — that is **VIN+** and **GND**.
-3. Keep the black probe on GND and measure the other two wires — both should sit around **2–3 V**.
-   The slightly higher is typically **RS485+ (A)**; the lower is **RS485− (B)**.
-4. Swapping A and B will not damage the bus; you will just get garbage (or a topside **NO COMM**).
-   Swap them if that happens.
+## 8. Lights frame (0xCA) and the 680 light cycle
 
-### Power
+Decoded lights frame: L1 = 100 on / 0 off, L4 = mode, L9 = blend speed (2 fast, 4 slow). L0 = 189
+and L5 = 255 constant so far; the rest has always been 0 (❓).
 
-| From | To |
-| --- | --- |
-| Spa VIN+ (~12–14 V) | Buck converter **IN+** |
-| Spa GND | Buck converter **IN−** |
-| Buck **OUT+** (set to **5 V**) | Breadboard `+` rail → ESP32 **VIN** (or 5 V) and RS485 module **VCC** |
-| Buck **OUT−** | Breadboard `−` rail → ESP32 **GND** and RS485 module **GND** |
+Panel cycle (press Light repeatedly, ≤3.4 s apart):
 
-> **Important:** Set the buck output to **5 V** for a typical ESP32 DevKit on VIN.
-> (The classic Wemos/ESP8266 guides use 3.3 V — do **not** copy that voltage for DevKit VIN.)
+| # | Mode | L4 | L9 |
+|---|---|---|---|
+| 1 | High Speed Blend | 128 | 2 |
+| 2 | Low Speed Blend | 128 | 4 |
+| 3 | Frozen Blend | 255 | |
+| 4 | Blue | 2 | |
+| 5 | Violet | 7 | |
+| 6 | Red | 6 | |
+| 7 | Amber | 8 | |
+| 8 | Green | 3 | |
+| 9 | Aqua | 9 | |
+| 10 | Near White | 1 | |
 
-### RS485 data
+After 10 it wraps to 1. A press **≥5.2 s** after the previous one turns the light off; between
+3.4 s and 5.2 s the behaviour was not pinned down, so the code never presses in that window. The
+light select seeks a mode by pressing within 3 s and verifying each step from L4/L9; Off waits
+≥6 s then presses once.
 
-| From | To |
-| --- | --- |
-| Spa RS485 A (+) | RS485 module **A** |
-| Spa RS485 B (−) | RS485 module **B** |
-| ESP32 **GPIO23** (TX) | RS485 module **TXD** / DI |
-| ESP32 **GPIO22** (RX) | RS485 module **RXD** / RO |
-| ESP32 GND | RS485 module GND (shared with power rail) |
+## 9. Topside menu: screens, masking and values
 
-Pins above match [`example.yaml`](example.yaml). Change the UART `tx_pin` / `rx_pin` if you wire
-differently (some builds use GPIO17/16).
+### Screen code masking
 
-Optional: if your transceiver needs direction control, connect DE/RE to a free GPIO and uncomment
-`flow_control_pin` under `sundance_spa:` in the YAML.
+`f13` is not the screen code itself: `f13 = screen ^ k`, where **k is a key that changes once a
+day at midnight**: k = 0, 3, 2, 5, 4, 7, 6, 9 on 22–29 Oct 2026 (main screen raw 78, 77, 76, 75, 74,
+73, 72, 71). It did **not** change at a power cycle, at a Filter Change reset or when Water Refresh
+was set to Off / 150. With k = 5 every menu screen (PF, HEAT, FC, UV, H2O, TIME, DATE, TEMP, LANG,
+LOCK and the lock option screens) matched `normalized ^ 5`, so the model is XOR, not an offset.
 
-### Spa connector
+The key comes from the **ClearRay counter**: `k = (ClearRayDays & 15) ^ 14` (334 → 0, 333 → 3,
+332 → 2, 331 → 5, 330 → 4, 329 → 7, 328 → 6, 327 → 9). Until 29 Oct only keys 0–7 had occurred and
+the formula was written `(days & 7) ^ 6` — the same low 3 bits; 327 days was the first value that
+needed bit 3. Water Refresh was ruled out on 26 Oct: after it was set to 150 (149 at midnight) its
+formula predicted k = 7, but the key became 4 as the ClearRay formula predicted. The counter is
+persistent, which is why a power cut does not change the key. All days seen so far (320–335) have
+bits 4–5 equal, so whether the key has a 5th bit is still open (it shows at 319 days, §13).
 
-Plug the Micro-Fit male–male cable into an **unused** 4-pin accessory/panel connector on the spa
-control box. If the only port is already occupied (Wi‑Fi module, second panel, etc.), use a Balboa
-Y-splitter so both devices stay on the bus.
+The component learns k when nobody has pressed anything (panel or ESP) for 60 s: the spa is then on
+the main screen, so `k = f13 ^ 78` (accepted if ≤ 15). All codes below are **normalized** (k = 0).
+A key the ESP cannot accept makes it treat the main screen as unknown: menu reads, the clock offset
+and the date stop until it is learned (that is how the 4th bit was found — the Decoder Notice
+reported "Unknown topside screen code 71").
 
----
+### Menu order (Menu button)
 
-## Software setup
+```
+main 78 → PF 73 → HEAT 64 → FC 95 → UV 90 → H2O 89 → TIME 84 → DATE 81 → TEMP 106 → LANG 105 → LOCK 100 → main
+```
 
-1. Install [ESPHome](https://esphome.io/guides/getting_started_command_line.html) (or use the HA
-   add-on).
-2. Copy [`example.yaml`](example.yaml) into your ESPHome config directory.
-3. Create `secrets.yaml` with:
+The menu times out (≈5–25 s) without saving. **Each Jets 1 press saves the step just confirmed**
+(for example, confirming the hour saves the hour even if the minutes are never confirmed).
 
-   ```yaml
-   wifi_ssid: "..."
-   wifi_password: "..."
-   wifi_fallback_password: "..."
-   api_encryption_key: "..."   # esphome -q new-key
-   ota_password: "..."
-   ```
+### Screens inside each menu and f15 encodings
 
-4. Point `external_components` at this repository (or use a local `path:` during development):
+| Menu | Screens (normalized) | f15 |
+|---|---|---|
+| PF (Primary Filter) | Warmer → 70 start (display) / 71 start (editing) → Jets 1 → 113 cycles → Jets 1 → 68 duration → Jets 1 → 73 | start = hour **24 h**; cycles; duration in hours |
+| HEAT | Warmer/Cooler → 65 (shows current) → 94 while changing → Jets 1 saves → 64 | 0 Auto, 1 Eco, 2 Day; Cooler cycles Auto→Day→Eco |
+| FC (Filter Change) | Warmer/Cooler → 92 / 93 (value screens; the first press only shows the current value) → Jets 1 saves → 95 | 128 = Off, otherwise days; steps of 10 (Off–180) |
+| UV (ClearRay) | Warmer → 91 (≥256 days) | `days = (f15 ^ 1) + 256` (334 → 79, 333 → 76). **<256 days: screen/encoding unknown** |
+| H2O (Water Refresh) | Warmer/Cooler → 86 / 87 (value screens; the first press shows the current value, e.g. 143) → Jets 1 saves → 89 | days; Cooler steps 120, 90, 60, 30, Off (128), 180, 150 — steps of 30 |
+| TIME | Warmer → 85 hour (display) / **82 hour (editing)** → Jets 1 → 83 minute → Jets 1 → 80 AM/PM → Jets 1 saves → 84 | hour and minute are XOR-masked like f13 (the mask changes); AM/PM: 1 = PM. **Hour (1–12) and minute (0–59) each wrap on their own** — 59 → 00 does not change the hour, 12 → 1 does not change AM/PM (owner's panel tests, 27 Oct) |
+| DATE | Warmer → 110 (scroll) → Warmer → 111 year → Jets 1 → 108 month → Jets 1 → 109 day → Jets 1 saves → 81 | year as yy; month; day |
+| TEMP | Warmer → 104/107 | 0/1 (°C/°F, not fully mapped) |
+| LANG | Warmer → 102 (shows current) → further presses 103 | 0 English, 1 French, 2 Spanish, 3 German |
+| LOCK | Cooler → 101 AL → 13 SVL → 15 TL → 98 SL (option screens) → Jets 1 saves | — (option is in the screen code) |
 
-   ```yaml
-   external_components:
-     - source: github://YOUR_GITHUB_USER/YOUR_REPO@main
-       components: [sundance_spa]
-   ```
+Other screens seen: 114 when Menu is pressed while Settings Lock is on; 10 right after an unlock;
+12 / 9 / 15 / 113 / 112 for a few seconds after a lock is released (message screens); 72/73/79
+during power-up.
 
-5. Flash over USB the first time, then OTA afterward:
+## 10. Driving the menu from the ESP32
 
-   ```bash
-   esphome run your-config.yaml
-   ```
+The ESP32 can only send **short** presses, so it never sets or releases locks (it only follows them,
+§6).
 
-6. In Home Assistant → **Settings → Devices & services → ESPHome**, adopt the device.
+**How the spa clock behaves** (four syncs and two owner panel tests, 26–28 Oct):
 
-### UART / component options
+- The status frame only carries hours and minutes, but the moment the minute rolls over the spa
+  clock is exactly at hh:mm:00, so HA's time at that moment gives the **offset to the second**.
+  The ESP re-measures it at every rollover — only after the main screen has been up for 2 s,
+  because **while a menu is open the reported time does not advance** and jumps to the current
+  minute on return (which would look like a rollover at the wrong second).
+- **The clock stands still from entering the time edit until the save** (~3.6 s for the ESP) and
+  keeps its seconds; only a changed value is applied. A save therefore moves the offset by
+  **60 s per minute changed, minus the edit time**. An unchanged save does nothing, even after a
+  32 s edit. (26 Oct 09:37: +58 s, −1 min → −5 s; 27 Oct 05:27: −4 s, +1 min → +52 s; 27 Oct 07:12:
+  +50 s, −1 min → −14 s.)
 
-| Option | Default | Notes |
-| --- | --- | --- |
-| UART baud | `115200` 8N1 | Required by the bus |
-| `tx_pin` / `rx_pin` | `GPIO23` / `GPIO22` | Match your wiring |
-| `temperature_scale` | `F` | Fahrenheit |
-| `rx_invert` | `false` | Try `true` only if RX levels are inverted on your transceiver |
-| `flow_control_pin` | unset | Only for modules without auto direction |
+**Clock/date sync** (`Clock Sync Now` button, nightly routine, and automatically when the offset is
+**≥ 60 s** — 120 s after two syncs in a row did not get it under a minute — or the date is wrong,
+on two consecutive 30-second checks, at most every 30 min):
 
----
+1. Pick the change from the measured offset: `delta = round((4 − offset) / 60)` minutes, and only
+   if that leaves the clock at least 5 s closer (`|offset + 60·delta − 4| ≤ |offset| − 5`);
+   otherwise report `OK (already within ±n s)` and do not touch the spa. Result after a sync:
+   at most ~34 s ahead or ~30 s behind. Without a measured offset yet (just after boot), aim at
+   HA's time.
+2. Wait until the spa is idle on the main screen (no panel press for 6 s, no pending command).
+3. Menu × 6 → TIME; Warmer (shows hour); step the hour (1–12, the short way round) with
+   Warmer/Cooler; Jets 1; step the minutes (the short way round); Jets 1; toggle AM/PM until f15
+   matches; Jets 1 (saves time).
+4. Menu → DATE; Warmer; Warmer; step year/month/day, **verifying each value in f15** before
+   confirming with Jets 1.
+5. Every press is sent only when the last reported screen is the one the step expects (or the panel
+   reports "editing", f2 bit 5). Any mismatch, timeout or a panel press aborts; the menu then times
+   out without saving the unconfirmed step.
 
-## Debug
+**Settings read** (ClearRay days, PF settings, language, and Filter Change only while it reads 0):
+enter the menu, press Warmer once to display the value and read f15; PF values are confirmed
+unchanged with Jets 1 (the observer publishes each confirmed value); UV, language and FC are left to
+time out without saving.
 
-- **Voltages first** — confirm ~12–14 V into the buck and a stable **5 V** on the ESP32/RS485 rail.
-- **RS485 LEDs** — on many TTL↔RS485 boards, RX (and sometimes TX) LEDs blink when the bus is alive.
-  That means RS485→TTL conversion is working even before Wi‑Fi is up.
-- **Spa Communication** sensor — should go on once the component completes channel negotiation and
-  receives status frames. If it stays off, check UART pins, baud, and A/B polarity.
-- **Swap A and B** — wrong polarity often garbles the bus; the topside may show **NO COMM**.
-  Power down, swap A/B, power up again.
-- **ESPHome logs** — `logger:` at `DEBUG` temporarily if you need frame-level detail; return to
-  `INFO` for normal use.
-- **Wi‑Fi** — keep the ESP32 in range of 2.4 GHz; metal spa cabinets can be harsh RF environments.
-  An external antenna DevKit helps if reception is marginal.
+The spa clock does **not** follow daylight-saving changes; the automatic sync corrects it within a
+few minutes (seen at the end of DST on 2026-10-25).
 
----
+**When it runs**: ~2 min after every boot (so a power cut is fully recovered: clock, date, menu
+values), nightly at 00:05 (after the midnight counter decrement), and on the *Read Settings*
+button. **Passive capture**: when someone confirms PF/language/FC Off or views the UV counter at
+the panel, the value is published without any ESP action.
 
-## How the protocol works (brief)
+## 11. Observed spa behaviour
 
-Status frames are framed by `0x7E`, checksummed with the Balboa CRC, and the payload is XOR-decoded.
-The component negotiates a panel channel on the RS485 bus, then parses status updates and light
-status messages. Commands are sent as panel-style button-press messages on the assigned channel.
+- **Power-up**: clock 00:00, date 2014-01-01, f2 bit 7 and bit 1 set; message types 0x04, 0x02,
+  0x06, 0x00, 0x01, 0xCA, 0x03, 0xC4, 0xCC within 2 s; heater mode reads 16 for <1 s; then a
+  **purge cycle**: ~1 min Jet 1 low with the manual-circulation bits (f1 160 → 224), then ~1 min
+  Jet 2, then normal automatic circulation. The same purge runs after a Service Lock is released.
+  Outside a filter cycle Jet 1 low stops while Jet 2 runs (f1 224 → 196 → 132 → 0, f10 = 0); inside
+  a cycle it keeps running (f1 160 → 224 → 228 → 96, f10 bit 7 throughout). In both cases f1 bit 7
+  stays set for the whole purge with no Circulation press — that is how `Purge` is detected.
+- **Heat demand**: when the water drops ~1 °C below the set point the pump starts on low (f1 0x60,
+  f2 bit 3) **without** f10 bit 7, and the heater (f10 bit 6) comes on ~60 s later.
+- **Scheduled filtration** (here 12:00, 4 cycles × 2 h → 12/18/00/06): pump low + f10 bit 7.
+- **Daily cleanup**: one minute after the **first** filtration cycle of the day starts (12:00 here),
+  Jet 2 runs for exactly 1 minute with no press (f1 96 → 100 → 96). The other cycles do not do it.
+  The component shows Primary Filter = `Cleanup` for that minute.
+- **ClearRay UV indicator** is on whenever the Jet 1 pump runs (low or high, any reason), per the
+  owner's observation.
+- **Counters**: Water Refresh, Filter Change and ClearRay days drop by one at 00:00 only. They are
+  persistent: a power cut (which resets the clock and date) does not change them, and changing the
+  date does not either — only a midnight rollover counts.
+- **Jets**: manual jets switch off after **exactly 20 min** from activation (the light after 2 h);
+  pressing the jet button while it runs turns it off. No countdown is broadcast anywhere (Jet 2 on for
+  5 min changed nothing but its own bit), so the component shows elapsed run time instead.
+- **Locks** (owner's tests, 2026-10-24/25): Settings Lock still lets you open and view the menu but
+  rejects every save, and it **also blocks changing the set point** (not only the settings, as the
+  manual says). Service Lock stops the pumps and does **not** block the set point. Unlock = hold Menu;
+  after a Service Lock unlock the purge runs (≈1 min Jet 1 low, ≈1 min Jet 2).
+- **Service Lock** also stops a running filter cycle; f10 bit 7 stays set meanwhile.
+- **Overnight** (outdoor 20.5–21 °C, set point 35 °C): the filtration cycles alone kept the water at
+  35–35.5 °C; the heater did not run (still not seen running by 29 Oct).
+- **Spa clock drift**: a few seconds to ~12 s per day, not constant.
 
-For the broader Balboa bus background see
-[ccutrer/balboa_worldwide_app protocol notes](https://github.com/ccutrer/balboa_worldwide_app/blob/master/doc/protocol.md).
-Sundance/Jacuzzi “encrypted” variants build on the same framing with additional XOR and channel
-handshake behavior documented by community bridges such as
-[HyperActiveJ/sundance780-jacuzzi-balboa-rs485-tcp](https://github.com/HyperActiveJ/sundance780-jacuzzi-balboa-rs485-tcp).
+### Electrical power (measured)
 
----
+Measured against the house load reported by the solar inverter (export 50 Hz model, 3-phase
+hookup, so the heater and the pumps can run together):
 
-## Credits
+| Load | Power | How |
+|---|---|---|
+| Pump 1 low + ClearRay (circulation) | **≈ 370 W** | 10 nights, house average 00:05–01:55 (filter cycle) minus 02:05–03:55 (idle) |
+| Both pumps high + ClearRay (soak) | **≈ 3.28 kW** | a 20-min soak against the minutes before and after |
+| One pump high | ≈ 1.63 kW (≈ 7.1 A; spec 2.0 HP, 8.0 A max) | the two pumps are the same model; Pump 2 has no low speed |
+| Heater | 2.7 kW (spec, resistive) | not measured yet |
+| Controller, light | ≈ 15 W, ≈ 5 W | estimate |
 
-- Protocol lineage: [garbled1/pybalboa](https://github.com/garbled1/pybalboa),
-  [ccutrer/balboa_worldwide_app](https://github.com/ccutrer/balboa_worldwide_app)
-- Sundance/Jacuzzi RS485 decoding and MQTT bridge reference:
-  [HyperActiveJ/sundance780-jacuzzi-balboa-rs485-tcp](https://github.com/HyperActiveJ/sundance780-jacuzzi-balboa-rs485-tcp)
-- Hardware approach inspired by [cribskip/esp8266_spa](https://github.com/cribskip/esp8266_spa) and
-  [jrowny/ESPHomeSpa](https://github.com/jrowny/ESPHomeSpa)
+Low speed draws about 21 % of high speed, typical for a two-speed motor. On the Home Assistant side
+a template sensor multiplies the ESP states by these values (Spa Power), an integration helper turns
+it into kWh (Spa Energy, day/week/month/year), and two automations re-calibrate the circulation and
+jet values from the house load every night and after every soak.
 
-## Disclaimer
+## 12. Diagnostics entities
 
-This is an unofficial, community project and is not affiliated with Balboa Water Group, Sundance, or
-Jacuzzi. Modifying or wiring into your spa's control bus may void warranties and carries risk of
-damage or injury. Use entirely at your own risk. Verify voltages and pinouts with a meter before
-connecting power to the ESP32.
+Temporary, `entity_category: diagnostic`, numeric where possible so they stay out of the logbook:
+
+| Entity | Purpose |
+|---|---|
+| Raw F1, F2, F4, F10, F11, F13, F14, F15 | raw decoded status bytes in HA history (correlate with events without a live log) |
+| Screen Key | the learned k |
+| Panel Button | last topside button (name, `Idle` from boot), held 1 s so short presses survive API state batching |
+| Raw Lights | decoded lights frame |
+| Bus Message Types | sorted list of message types seen since boot |
+| Raw Other Messages | payload of every message type other than status/lights/buttons, per type and channel, on change |
+
+A `Diagnostics` switch turns the verbose `[DIAG]` log lines (decoded diffs, bus stats, panel
+presses) on/off without reflashing; `Logger Level` changes the log level at runtime.
+
+## 13. Open questions / help wanted
+
+If you have a 680 (or another Balboa-based Sundance) and can check any of these, please open an
+issue with timestamps and what the panel showed.
+
+1. **Does the screen key have a 5th bit** (first visible at 319 days, here around 6 Nov 2026), and
+   does it follow the ClearRay counter below 256 days and when it is Off? (§9)
+2. **What is V in f14?** Which sensor, which units? Does it track the water or outdoor temperature?
+3. **f10 bits 0–3, 5** — alerts? (CHANGE FILTER, COOL, ICE, SN, FL, T-OH, H-OH have not occurred yet.)
+4. **f4** (always 6), **f11 bit 7**, remaining lights-frame bytes.
+5. **ClearRay counter below 256 days** — which screen and encoding? (This spa reaches 255 in early
+   January 2027.) How does ClearRay Off look?
+6. **f1 bit 5 vs bit 6** — command vs. confirmation?
+7. **Light behaviour for presses 3.4–5.2 s apart.**
+8. Does the f7 date formula hold for every day (only verified against samples and by reasoning)?
+9. Does Jets 1 low → high restart the 20 min jet timer?
+10. The heater's real power and how Auto / Eco / Day change when it runs.
+
+## 14. Known issues and limitations
+
+- SL/SVL are followed from panel events. A lock set or released while the ESP is offline is missed
+  until the next lock event (the state saved in flash is then out of date).
+- Water Refresh at 0 right after a power cut reads `Off` until the clock is set (f2 bit 7 has both
+  meanings); the automatic sync sets the clock within minutes.
+- Filter Change at 0 after an ESP boot stays `unknown` until the boot read has checked the FC menu.
+- The service counters are text sensors (to show `Off` / `Change Now`), so HA cannot use them in
+  numeric conditions or graphs.
+- After an ESP reboot the menu-only values are `unknown` for ~2–4 minutes until the boot read runs.
+- The `Clock Time` sensor changes every minute; exclude it from the logbook in `configuration.yaml`
+  (it still appears in the device's Activity panel).
+- ClearRay Bulb is inferred from the pump state, not read from the spa.
+- A sync can only move the clock in whole minutes, so after a sync it is within ~±30 s, not exact.
+- Derived states appear in HA 2 s after the change (by design, see §4).
+- Old diagnostic logs print button codes XOR 1 (see §7).
+- The ESPHome web log viewer disconnects occasionally; that is why raw values are now recorded as
+  entities.
+
+## 15. How to test / reproduce
+
+Each test is short; note the time and what the panel showed.
+
+| Test | Procedure | What it shows |
+|---|---|---|
+| PF browse | Menu → PF → Warmer, Cooler, Warmer ×2, wait (no save) | start-hour encoding |
+| Heater mode | Menu → HEAT → select ECO, save; DAY, save; AUTO, save | f6 values |
+| Jet timer | Jet 2 on ≥5 min | whether a countdown exists |
+| Jet 1 / Circulation | HA: Circulation on/off, Jet 1 on/off, each while the other is on | mutual exclusion |
+| °C/°F | Menu → TEMP → °F, save, 30 s, °C, save (do not touch the set point meanwhile) | unit bit |
+| Locks | pump off; Menu → LOCK → SL, Jets 1, 1 min on the main screen, hold Menu; repeat for SVL | Lock entity + f14 bit 1 / bit 2 flips |
+| Service counter Off | Menu → H2O (or FC) → Off, Jets 1, wait, set the value back, Jets 1 | `Off` vs `Change Now`, f2 bit 7 |
+| Language | Menu → LANG → Warmer ×4, wait (no save) | language codes |
+| Power cut | spa breaker off 1 min, on, do not touch the panel for 5 min | boot messages, purge, clock reset, automatic sync, boot read |
+| Light from HA | select Red, then Off | light seek logic |
+
+## 16. Patch history
+
+All patches apply on top of upstream in order (`git apply --ignore-whitespace`; upstream files are LF).
+
+| # | Patch | Content |
+|---|---|---|
+| 01 | diag-logging | `[DIAG]` decoded status/lights with per-byte bit diffs, first-seen message types, bus stats |
+| 02 | diag-periodic-dump | full decoded dump every 30 s |
+| 03 | service-counters-clock | Water Refresh, Filter Change, ClearRay (placeholder), spa time |
+| 04 | diag-panel-presses | log topside 0xCC presses |
+| 05 | diag-panel-press-on-change | log presses only on change (the panel sends 0xCC continuously) |
+| 06 | jet1-circulation | Jet 1 high + Circulation switches, mutually exclusive |
+| 07 | 680-lights-heatmode-date-clocksync | `sundance_680.cpp`: light select, heater mode, date, HA→spa clock/date sync, min 18 °C |
+| 08 | nightly-routine-uv-pf-filteroff | 00:05 routine, ClearRay + PF menu reads, Read Spa Settings, passive capture, FC Off |
+| 09 | primary-filter-states-date-fix | screen-key normalization, PF states incl. Heating, date formula fix, Auto/Eco/Day, Temperature Format (+°F→°C), Lock, Language, Clearray Bulb, UV formula fix, Diagnostics switch, Logger Level |
+| 10 | raw-status-diagnostics | raw status/lights/message-type/screen-key/panel-button diagnostic entities |
+| 11 | clock-sync-edit-screens | accept menu "editing" state (f2 bit 5) during sync; settings read ~2 min after boot |
+| 12 | panel-button-hold | Panel Button as named text, presses held 1 s; Primary Filter requires f1 bit 5 (no end-of-cycle "Heating" blip) |
+| 13 | raw-other-messages | Raw Other Messages diagnostic |
+| 14 | menu-task-command-deadlock | HA commands no longer wait behind a menu task that is still waiting for the main screen |
+| 15 | run-time-counters | Jet 1 / Jet 2 / Light / Circulation / Heater Run Time |
+| 16 | activity-sessions | `activity:` list — *Item* Active / Session binary sensors with a per-item minimum |
+| 17 | screen-key-locks-counters-cleanup | screen key 0–7; Settings/Service Lock tracking (flash-persisted); counters as text with `Off` / `Change Now` + FC menu read; Primary Filter `Cleanup`; Panel Button `Idle` and Clock Sync `Not synced yet` from boot |
+| 18 | purge-auto-pumps-running | purge counted as automatic circulation; Pumps Running + Circulation (Auto) binary sensors in the ESP; entity renames; sessions only for In Use; `Temperature Lock` |
+| 19–20 | clock-offset, clock-sync-minute-tolerance | offset measured at the minute rollover; sync only from ≥ 60 s |
+| 21 | primary-filter-purge | Primary Filter `Purge` for the whole power-up / unlock sequence |
+| 22–23 | v1 | Circulation (Auto) only while a pump runs; Decoder Notice |
+| 24 | debounce-clock-sync-offset | 2 s confirmation of derived states; sync from the measured offset (clock stands still while editing), short way round for hour/minute, offset measured only after 2 s on the main screen |
+| 25 | clock-date-ddmmyyyy | Clock Date as DD/MM/YYYY; YAML renames (Remaining Days …, Clock …, Primary Filter Active, Read Settings) |
+| 26 | screen-key-4-bits, climate-heat-only | key 0–15; climate offers Heat only |

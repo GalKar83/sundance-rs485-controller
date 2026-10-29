@@ -1,8 +1,8 @@
-# Sundance spa RS485 controller (based on Iraithium/sundance-rs485-controller example.yaml)
+# Sundance 680 spa — ESPHome RS-485 controller (example)
 #
-# Prerequisite: the repo keeps the component files at its root (no components/ folder),
-# so it can't be pulled with github:// — clone it locally first (HA terminal):
-#   git clone --depth 1 https://github.com/Iraithium/sundance-rs485-controller /config/esphome/components/sundance_spa
+# The component files are at the repository root (no components/ folder), so clone the repository
+# into the ESPHome config folder first (HA terminal):
+#   git clone --depth 1 <this repository> /config/esphome/components/sundance_spa
 #
 # secrets.yaml must contain: wifi_ssid, wifi_password, api_encryption_key, ota_password, fallback_ap_password
 
@@ -141,7 +141,7 @@ sundance_spa:
   clearray_text_sensor:
     name: "ClearRay Bulb"
   # Optional decoding aids: raw_status_sensors (field/name list), screen_key_sensor,
-  # raw_lights_text_sensor, msg_types_text_sensor, raw_other_text_sensor — see docs/SUNDANCE-680.md §12.
+  # raw_lights_text_sensor, msg_types_text_sensor, raw_other_text_sensor — see README.md §12.
   panel_button_sensor:
     name: "Panel Button"
   # 680 service counters and spa clock
