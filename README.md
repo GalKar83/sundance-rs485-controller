@@ -6,8 +6,8 @@ based on the Sundance 780 component by [Iraithium](https://github.com/Iraithium/
 Example configuration: [example-680.yaml](example-680.yaml).
 
 > **Tested on:** Sundance **680 series Peyton model year 2020** — *680 Series Controller & Heater,
-> assembly P/N 6600-158*, main board marked *Jacuzzi Products Co. PN 24168_C* (230 VAC 50 Hz single
-> service, 2-speed pump 1, pump 2, 2.7 kW heater, ClearRay UV, SD680 topside). The same board family
+> assembly P/N 6600-158*, main board marked *Jacuzzi Products Co. PN 24168_C* (export 50 Hz model, 3-phase hookup,
+> 2-speed pump 1, pump 2, 2.7 kW heater, ClearRay UV, SD680 topside). The same board family
 > is also used in **Jacuzzi J100 / J200** spas, so this work may apply to them as well (untested).
 >
 > **Connection:** the RS-485 module is connected to header **J15** on the controller board, at the
