@@ -149,6 +149,12 @@ hooks (§16 lists the order in which things were added).
 
 ## 4. Home Assistant entities
 
+<img src="docs/images/ha-hot-tub-page.jpg" alt="Home Assistant Hot Tub dashboard page: control panel with Jet 1, Jet 2, manual and auto circulation and the light mode selector, 24-hour spa temperature chart, energy tiles with a daily bar chart, soaking and maintenance counters" width="760">
+
+*The owner's Hot Tub page in Home Assistant (top of the page). The tiles are this component's
+entities; the energy, soaking/maintenance and run-time figures are Home Assistant helpers built on
+them, and the chart and light card use the apexcharts and mushroom custom cards.*
+
 **Updated live** (from the status/lights broadcast, several times per second):
 
 Names are chosen so that related entities sort together (same first word).
