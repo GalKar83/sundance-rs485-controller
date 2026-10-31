@@ -72,7 +72,7 @@ Contents
 | Item | Used here | Notes |
 |---|---|---|
 | Spa side | header **J15** on the 680 controller board (P/N 6600-158, board PN 24168_C) | see the photo at the top |
-| MCU | **ESP32-WROOM-32UE** DevKit (chip rev 3.1) with an **external antenna** (U.FL) | upstream uses an ESP32-WROOM DevKitC with the PCB antenna. `minimum_chip_revision: "3.1"`, `esp32dev` 4 MB layout is plenty |
+| MCU | **ESP32-WROOM-32UE** DevKit (chip rev 3.1) + a separate **external antenna** on its U.FL connector | upstream uses an ESP32-WROOM DevKitC with the PCB antenna. `minimum_chip_revision: "3.1"`, `esp32dev` 4 MB layout is plenty |
 | RS-485 transceiver | TTL↔RS-485 module with **automatic direction control** | no DE/RE pin needed (`flow_control_pin` unused) |
 | UART pins | **TX = GPIO1, RX = GPIO3** (UART0) | upstream uses GPIO23/22. UART0 means `logger: baud_rate: 0` (serial logging off, use API logs) |
 | Spa cable | Molex Micro-Fit 3.0, 4-pin male–male (12 V, GND, A, B) | upstream lists a ~60 cm cable — see the recommendations below |
@@ -82,12 +82,11 @@ Contents
 
 **Recommendations from this build:**
 
-- **Use an ESP32 with an external antenna** (WROOM-32U / 32UE) and put the antenna outside the
-  equipment bay if you can. The spa stands outdoors and the box sits inside the spa cabinet, behind
-  the side panels: here the signal is about −75 to −88 dBm even with the external antenna. A PCB
-  antenna inside the cabinet is likely to drop off the network.
+- **Use an external antenna.** The spa stands outdoors, so the Wi-Fi signal is weak — about −75 to
+  −88 dBm here even with an external antenna. This build uses an ESP32-WROOM-32UE, which has a U.FL
+  connector instead of a PCB antenna; the antenna is bought separately and connected by its lead.
 - **Get a Micro-Fit cable longer than 60 cm** (1–1.5 m). 60 cm ties the box to the controller and
-  limits where it — and its antenna — can go in the cabinet.
+  limits where it — and its antenna — can be placed.
 
 <img src="docs/images/esp32-box.webp" alt="ESP32-WROOM-32UE DevKit with external antenna, auto-direction TTL to RS-485 module and LM2596 buck converter set to 5.00 V on a proto board in a junction box" width="380">
 
