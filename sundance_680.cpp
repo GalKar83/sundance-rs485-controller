@@ -206,11 +206,12 @@ bool SundanceSpa::decode_spa_date_(int &year, int &month, int &day) const {
   return true;
 }
 
-// The topside screen code (f13) arrives XOR-masked by a 3-bit key that changes once a day at
-// midnight (keys 0, 3, 2, 5 on 22-25 Oct 2026; every menu code shifted the same way, verified
-// across the whole menu with key 5). The key tracks a persistent service counter (it survived a
-// power cut). Learn it whenever nobody has pressed anything for a minute: the panel is then
-// guaranteed to be back on the main screen (menus time out after 5-25 s).
+// The topside screen code (f13) arrives XOR-masked by a key = (ClearRay days & 0xFF) ^ 78, so the main
+// screen (78) reads as the low byte of the ClearRay counter (verified 2026-10-31 by setting the counter:
+// 325 -> 11, 320 -> 14, 250 -> 180, Off -> 78; and 22-25 Oct the main screen read 78..75 at 334..331).
+// It changes at midnight when the counter counts down and when the counter is set in the UV menu (followed
+// in observe_menu_values_). Learn it whenever nobody has pressed anything for a minute: the panel is then
+// back on the main screen (menus time out after 5-25 s).
 // f2 bit5: set while the panel is editing a value in a menu (verified 2026-10-22/23).
 bool SundanceSpa::menu_editing_() const {
   return this->prior_status_.size() >= 16 && (this->prior_status_[2] & 0x20) != 0;
@@ -220,31 +221,54 @@ int SundanceSpa::screen_() const {
   return this->prior_status_.size() < 16 ? -1 : (this->prior_status_[13] ^ this->screen_key_);
 }
 
-static const int MAX_SCREEN_KEY = 15;
-
 void SundanceSpa::learn_screen_key_() {
   const uint32_t now = millis();
+  const int raw = this->prior_status_[13];
+  if (raw != this->f13_steady_raw_) {
+    this->f13_steady_raw_ = raw;
+    this->f13_steady_ms_ = now;
+  }
   const uint32_t last = std::max(this->last_panel_press_ms_, this->last_own_press_ms_);
   if (now < 60000 && last == 0)
     return;  // just booted: wait a minute of quiet first
   if (now - last < 60000)
     return;
-  // The key is 4 bits: (ClearRay days & 15) ^ 14 — 330 -> 4, 329 -> 7, 328 -> 6, 327 -> 9 (29 Oct; the
-  // earlier 0..7 limit rejected 9 and the ESP took the main screen for an unknown one).
-  const int k = this->prior_status_[13] ^ SCREEN_MAIN;
-  if (k <= MAX_SCREEN_KEY && k != this->screen_key_) {
-    ESP_LOGI(TAG, "Screen code key %d -> %d (main screen reads %d)", this->screen_key_, k, this->prior_status_[13]);
-    this->screen_key_ = k;
-  }
-  // After a quiet minute the topside should be on the main screen; if what it shows fits no key for 10 min,
-  // it is on a screen we don't know (an error message, for example).
-  if (k <= MAX_SCREEN_KEY) {
+  // Any key 0..255 is possible, so a quiet screen is only taken for the main one when it has been steady
+  // for 20 s (the main screen is static) and its low byte fits the ClearRay counter we know: the same day,
+  // or one less (the midnight countdown, published from here without opening the menu).
+  const int k = raw ^ SCREEN_MAIN;
+  const bool steady = now - this->f13_steady_ms_ >= 20000;
+  const int d = this->uv_days_;
+  if (steady && k == this->screen_key_) {
     this->bad_main_screen_ms_ = 0;
-  } else if (this->bad_main_screen_ms_ == 0) {
+    return;
+  }
+  if (steady && (d < 0 || raw == (d & 0xFF) || (d > 0 && raw == ((d - 1) & 0xFF)))) {
+    ESP_LOGI(TAG, "Screen code key %d -> %d (main screen reads %d)", this->screen_key_, k, raw);
+    this->screen_key_ = k;
+    this->bad_main_screen_ms_ = 0;
+    if (d > 0 && raw == ((d - 1) & 0xFF))
+      this->publish_uv_days_(d - 1);
+    return;
+  }
+  // Quiet but not the main screen we expect. After 10 min: a steady code means the counter was set while
+  // we did not see it (take the key, re-read the counter); a changing one is a screen we don't know (an
+  // error message, for example).
+  if (this->bad_main_screen_ms_ == 0) {
     this->bad_main_screen_ms_ = now;
-  } else if (now - this->bad_main_screen_ms_ > 600000) {
-    this->bad_main_screen_ms_ = now;  // at most every 10 min while it lasts
-    this->decoder_notice_("Unknown topside screen code " + std::to_string(this->prior_status_[13]));
+    return;
+  }
+  if (now - this->bad_main_screen_ms_ < 600000)
+    return;
+  this->bad_main_screen_ms_ = now;  // at most every 10 min while it lasts
+  if (steady) {
+    ESP_LOGW(TAG, "Screen code key %d -> %d (ClearRay counter changed unseen)", this->screen_key_, k);
+    this->screen_key_ = k;
+    this->uv_days_ = -1;
+    this->decoder_notice_("Screen key jumped to " + std::to_string(k) + " (ClearRay counter changed unseen); re-reading");
+    this->request_settings_read(false);
+  } else {
+    this->decoder_notice_("Unknown topside screen code " + std::to_string(raw));
   }
 }
 
@@ -352,9 +376,18 @@ void SundanceSpa::update_680_status_() {
 // The spa only exposes PF settings and the ClearRay counter while their menu screen is open.
 // Watch every screen transition (ours or someone at the topside) and publish what was shown
 // or saved:  PF 73 -> 70/71 start hour -Jets1-> 113 cycles -Jets1-> 68 duration -Jets1-> 73
-//            UV 90 -> 91 days (f15 = (days - 256) ^ 1 on this screen) -Jets1-> 90
-// ClearRay counter >= 256 days: f15 = low byte XOR 1 (334 -> 79, 333 -> 76; verified 2026-10-22/23).
-static int uv_days_hi_(int f15) { return (f15 ^ 1) + 256; }
+//            UV 90 -> 91 days shown -> 88 days being chosen -Jets1-> 90 (under the new counter's key)
+// ClearRay counter on screens 91/88: f15 = (days & 0xFF) ^ (days >> 8), 128 = Off (verified 2026-10-31:
+// 325 -> 68, 320 -> 65, 250 -> 250, Off -> 128; earlier 334 -> 79, 333 -> 76). The low byte is also in
+// the screen key (key ^ 78), which tells the ranges apart. -1 if f15 does not fit the key (a frame where
+// the value byte lags the screen code).
+static int uv_days_from_(int f15, int key) {
+  const int low = key ^ SCREEN_MAIN;
+  if (f15 == 128 && low == 0)
+    return UV_OFF;
+  const int hi = f15 ^ low;
+  return hi == 0 || hi == 1 ? hi * 256 + low : -1;
+}
 
 static void publish_text_(text_sensor::TextSensor *s, const char *v) {
   if (s != nullptr && (!s->has_state() || s->state != v))
@@ -362,8 +395,14 @@ static void publish_text_(text_sensor::TextSensor *s, const char *v) {
 }
 
 void SundanceSpa::publish_uv_days_(int days) {
+  if (days == UV_OFF) {
+    this->uv_days_ = 0;
+    publish_text_(this->uv_change_sensor_, "Off");
+    return;
+  }
   if (days < 0 || days > 400)
     return;
+  this->uv_days_ = days;
   char buf[8];
   snprintf(buf, sizeof(buf), "%d", days);
   publish_text_(this->uv_change_sensor_, days == 0 ? "Change Now" : buf);
@@ -465,16 +504,33 @@ void SundanceSpa::publish_language_(int value) {
 }
 
 void SundanceSpa::observe_menu_values_() {
-  const int screen = this->screen_();
-  const int value = this->prior_status_[15];
   const int prev = this->menu_prev_screen_;
   const int prev_value = this->menu_prev_value_;
+  // Jets 1 on a UV days screen saves the counter, and from that frame on the screen codes use the new
+  // counter's key: back on the UV screen under a key whose low byte fits the value just shown.
+  if ((prev == SCREEN_UV_DAYS || prev == SCREEN_UV_EDIT) && this->prior_status_.size() >= 16) {
+    const int now_screen = this->screen_();
+    if (now_screen != prev && now_screen != SCREEN_UV_DAYS && now_screen != SCREEN_UV_EDIT &&
+        now_screen != SCREEN_UV && now_screen != SCREEN_MAIN) {
+      const int k = this->prior_status_[13] ^ SCREEN_UV;
+      const int days = uv_days_from_(prev_value, k);
+      if (days != -1) {
+        ESP_LOGI(TAG, "ClearRay Bulb set to %d days (screen code key %d -> %d)", days, this->screen_key_, k);
+        this->screen_key_ = k;
+      }
+    }
+  }
+  const int screen = this->screen_();
+  const int value = this->prior_status_[15];
   if (screen != prev) {
     // UV counter: value shown on entering the display screen, final value on confirm.
-    if (screen == SCREEN_UV_DAYS_HI && prev != SCREEN_UV_DAYS_HI)
+    if (screen == SCREEN_UV_DAYS && prev != SCREEN_UV_DAYS)
       this->uv_display_pending_ = true;
-    if (prev == SCREEN_UV_DAYS_HI && screen == SCREEN_UV)
-      this->publish_uv_days_(uv_days_hi_(prev_value));
+    if ((prev == SCREEN_UV_DAYS || prev == SCREEN_UV_EDIT) && screen == SCREEN_UV) {
+      const int days = uv_days_from_(prev_value, this->screen_key_);
+      if (days != -1)
+        this->publish_uv_days_(days);
+    }
     // PF settings: published on each Jets 1 confirm (unconfirmed edits time out and are discarded).
     if ((prev == SCREEN_PF_START || prev == SCREEN_PF_START_EDIT) && screen == SCREEN_PF_CYCLES &&
         this->pf_start_text_sensor_ != nullptr) {
@@ -496,12 +552,15 @@ void SundanceSpa::observe_menu_values_() {
       this->publish_counters_();
     }
   }
-  // The value byte can lag the screen code by a frame; take the first non-zero value shown.
-  if (this->uv_display_pending_ && screen == SCREEN_UV_DAYS_HI && value != 0) {
-    this->publish_uv_days_(uv_days_hi_(value));
-    this->uv_display_pending_ = false;
+  // The value byte can lag the screen code by a frame; take the first value that fits the key.
+  if (this->uv_display_pending_ && screen == SCREEN_UV_DAYS) {
+    const int days = uv_days_from_(value, this->screen_key_);
+    if (days != -1) {
+      this->publish_uv_days_(days);
+      this->uv_display_pending_ = false;
+    }
   }
-  if (screen != SCREEN_UV_DAYS_HI)
+  if (screen != SCREEN_UV_DAYS)
     this->uv_display_pending_ = false;
   this->menu_prev_screen_ = screen;
   this->menu_prev_value_ = value;
@@ -1036,13 +1095,12 @@ void SundanceSpa::service_clock_sync_() {
       return;
     }
     case READ_UV_SHOW: {
-      if (screen == SCREEN_UV_DAYS_HI && value != 0) {
-        this->publish_uv_days_(uv_days_hi_(value));
-        ESP_LOGI(TAG, "ClearRay Bulb: %d days", uv_days_hi_(value));
+      const int days = screen == SCREEN_UV_DAYS ? uv_days_from_(value, this->screen_key_) : -1;
+      if (days != -1) {
+        this->publish_uv_days_(days);
+        ESP_LOGI(TAG, "ClearRay Bulb: %d days", days);
         this->sync_goto_(TASK_WAIT_MAIN);  // no further presses: the menu times out unsaved
-      } else if (screen != SCREEN_UV && screen != SCREEN_UV_DAYS_HI && value != 0) {
-        // Below 256 days the counter is presumably shown on another screen code — log it so
-        // the encoding can be confirmed, but do not guess a value.
+      } else if (screen != SCREEN_UV && screen != SCREEN_UV_DAYS && value != 0) {
         char buf[64];
         snprintf(buf, sizeof(buf), "ClearRay Bulb shown on unmapped screen %d with value %d", screen, value);
         this->decoder_notice_(buf);

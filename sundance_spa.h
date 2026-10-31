@@ -68,7 +68,9 @@ static const int SCREEN_PF_START_EDIT = 71;
 static const int SCREEN_PF_CYCLES = 113;
 static const int SCREEN_PF_DURATION = 68;
 static const int SCREEN_UV = 90;
-static const int SCREEN_UV_DAYS_HI = 91;  // ClearRay days shown as (f15 ^ 1) + 256
+static const int SCREEN_UV_DAYS = 91;  // ClearRay days shown (first Warmer/Cooler); f15 see uv_days_from_()
+static const int SCREEN_UV_EDIT = 88;  // further presses: days being chosen
+static const int UV_OFF = -2;          // ClearRay timer set to Off (publish_uv_days_ / uv_days_from_)
 static const int SCREEN_LANG = 105;
 static const int SCREEN_LANG_SHOW = 102;  // first Warmer/Cooler: current language in f15
 static const int SCREEN_LANG_EDIT = 103;  // further presses: language being chosen in f15
@@ -313,7 +315,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   text_sensor::TextSensor *raw_other_text_sensor_{nullptr};
   std::map<uint16_t, std::string> raw_other_last_;
   uint32_t raw_other_pub_ms_{0};
-  text_sensor::TextSensor *uv_change_sensor_{nullptr};  // read from the UV menu (>= 256 days only)
+  text_sensor::TextSensor *uv_change_sensor_{nullptr};  // read from the UV menu, then counted down by the screen key
   text_sensor::TextSensor *time_text_sensor_{nullptr};
   text_sensor::TextSensor *heater_mode_text_sensor_{nullptr};
   text_sensor::TextSensor *clearray_text_sensor_{nullptr};
@@ -369,6 +371,9 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   bool clock_needs_sync_() const;
   void start_next_task_();
   int screen_key_{0};
+  int uv_days_{-1};  // ClearRay counter as last known (0 = Off or due, -1 = unknown)
+  int f13_steady_raw_{-1};  // raw screen code and since when it has not changed
+  uint32_t f13_steady_ms_{0};
   uint32_t last_own_press_ms_{0};
   int screen_() const;
   bool menu_editing_() const;
@@ -414,7 +419,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   // Something the decoder could not handle: logged, published, and cleared to "OK" after an hour, so the
   // same problem can notify again later but not more than about once an hour.
   void decoder_notice_(const std::string &s);
-  uint32_t bad_main_screen_ms_{0};  // since when the quiet topside screen fits no key (0 = it fits)
+  uint32_t bad_main_screen_ms_{0};  // since when the quiet topside screen disagrees with the key (0 = it fits)
   void abort_clock_sync_(const char *why);
   void sync_press_(uint8_t btn);
   void sync_goto_(int step);

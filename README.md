@@ -125,7 +125,7 @@ topside:
 | Clock | time only | time **and date** decoded; HA→spa sync by navigating the menu |
 | Service counters | not mapped | Water Refresh, Filter Change (status frame), ClearRay bulb (menu read); each as days / `Change Now` / `Off` |
 | Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu) |
-| Screen codes | — | **XOR-masked by a 4-bit key that changes every midnight** (see §9) |
+| Screen codes | — | **XOR-masked by a key derived from the ClearRay counter** — it changes every midnight (see §9) |
 | Climate modes | heat/off | **Heat only** — the 680 has no heater-off mode (ESPHome's traits start with OFF, so the set is replaced) |
 | Temperature min | 80 °F-ish | 18 °C / 65 °F (680 manual) |
 
@@ -136,8 +136,6 @@ hooks (§16 lists the order in which things were added).
 
 **Updated live** (from the status/lights broadcast, several times per second):
 
-| Entity | Values | Source |
-|---|---|---|
 Names are chosen so that related entities sort together (same first word).
 
 | Entity | Values | Source |
@@ -183,15 +181,16 @@ which otherwise showed as 0.3–1.7 s blips. Switches, the light and Panel Butto
 
 **Decoder Notice** reports, at most about once an hour each: clock sync failed or left the clock a
 minute or more off, settings read aborted, light or command not confirmed by the spa, ClearRay
-shown on an unmapped screen, no status for 30 s, and a quiet topside screen that fits no key for
-10 min (e.g. an error message — it caught the 4-bit key on 29 Oct, §9).
+shown on an unmapped screen, no status for 30 s, and a quiet topside screen that does not fit the
+known ClearRay counter for 10 min — a steady one means the counter was set while the ESP did not
+see it (the key is taken and the settings re-read), a changing one is a screen we don't know (§9).
 
 **Updated only by reading the menu** (nightly at 00:05, ~2 min after every boot, on the *Read
 Settings* button) **or when someone saves the value at the panel**:
 
 | Entity | Values |
 |---|---|
-| Remaining Days ClearRay Bulb | days (text; also captured when someone just views it on the panel) |
+| Remaining Days ClearRay Bulb | days / `Change Now` / `Off` (text). Also captured when someone views or saves it at the panel, and counted down at midnight from the screen key without opening the menu (§9) |
 | Primary Filter Start | HH:00 (24 h) |
 | Primary Filter Cycles | 1–4 |
 | Primary Filter Duration | hours |
@@ -368,19 +367,29 @@ day at midnight**: k = 0, 3, 2, 5, 4, 7, 6, 9 on 22–29 Oct 2026 (main screen r
 was set to Off / 150. With k = 5 every menu screen (PF, HEAT, FC, UV, H2O, TIME, DATE, TEMP, LANG,
 LOCK and the lock option screens) matched `normalized ^ 5`, so the model is XOR, not an offset.
 
-The key comes from the **ClearRay counter**: `k = (ClearRayDays & 15) ^ 14` (334 → 0, 333 → 3,
-332 → 2, 331 → 5, 330 → 4, 329 → 7, 328 → 6, 327 → 9). Until 29 Oct only keys 0–7 had occurred and
-the formula was written `(days & 7) ^ 6` — the same low 3 bits; 327 days was the first value that
-needed bit 3. Water Refresh was ruled out on 26 Oct: after it was set to 150 (149 at midnight) its
-formula predicted k = 7, but the key became 4 as the ClearRay formula predicted. The counter is
-persistent, which is why a power cut does not change the key. All days seen so far (320–335) have
-bits 4–5 equal, so whether the key has a 5th bit is still open (it shows at 319 days, §13).
+The key is the **low byte of the ClearRay counter**:
 
-The component learns k when nobody has pressed anything (panel or ESP) for 60 s: the spa is then on
-the main screen, so `k = f13 ^ 78` (accepted if ≤ 15). All codes below are **normalized** (k = 0).
-A key the ESP cannot accept makes it treat the main screen as unknown: menu reads, the clock offset
-and the date stop until it is learned (that is how the 4th bit was found — the Decoder Notice
-reported "Unknown topside screen code 71").
+```
+k = (ClearRayDays & 0xFF) ^ 78        so on the main screen   f13 = ClearRayDays & 0xFF
+```
+
+It was pinned down on 31 Oct by setting the ClearRay timer in the UV menu: 325 → k 11, 320 → 14,
+250 → 180, Off → 78 (the counter reads 0), each confirmed over the whole menu. It also fits every
+day seen before (334 → 0, 333 → 3, 332 → 2, 331 → 5, 330 → 4, 329 → 7, 328 → 6, 327 → 9). Earlier
+versions of this document had `(days & 15) ^ 14`, which is the same thing only while the counter is
+between 320 and 335. Water Refresh was ruled out on 26 Oct (set to 150, the key followed ClearRay).
+The counter is persistent, which is why a power cut does not change the key.
+
+The key changes at midnight when the counter counts down, and **immediately when the counter is
+saved in the UV menu** — from the confirming frame on, every screen code uses the new key.
+
+The component learns k when nobody has pressed anything (panel or ESP) for 60 s and f13 has been
+steady for 20 s (the main screen is static): `k = f13 ^ 78`. Because any value 0–255 is possible,
+the low byte must also fit the ClearRay counter it knows — the same day, or one less (the midnight
+countdown, which is then published without opening the menu). A save in the UV menu is followed
+directly. If the quiet screen still disagrees after 10 min, a steady code is taken as the new key
+(the counter was set while the ESP was offline) and the settings are re-read; a changing one is
+reported as an unknown screen. All codes below are **normalized** (k = 0).
 
 ### Menu order (Menu button)
 
@@ -398,7 +407,7 @@ The menu times out (≈5–25 s) without saving. **Each Jets 1 press saves the s
 | PF (Primary Filter) | Warmer → 70 start (display) / 71 start (editing) → Jets 1 → 113 cycles → Jets 1 → 68 duration → Jets 1 → 73 | start = hour **24 h**; cycles; duration in hours |
 | HEAT | Warmer/Cooler → 65 (shows current) → 94 while changing → Jets 1 saves → 64 | 0 Auto, 1 Eco, 2 Day; Cooler cycles Auto→Day→Eco |
 | FC (Filter Change) | Warmer/Cooler → 92 / 93 (value screens; the first press only shows the current value) → Jets 1 saves → 95 | 128 = Off, otherwise days; steps of 10 (Off–180) |
-| UV (ClearRay) | Warmer → 91 (≥256 days) | `days = (f15 ^ 1) + 256` (334 → 79, 333 → 76). **<256 days: screen/encoding unknown** |
+| UV (ClearRay) | Warmer/Cooler → 91 (shows current) → further presses 88 → Jets 1 saves → 90 (under the new key) | `f15 = (days & 0xFF) ^ (days >> 8)`, **128 = Off**; steps of 10 up to 365, then Off (325 → 68, 320 → 65, 250 → 250, 10 → 10). f15 alone is ambiguous (68 = 325 or 68 days); the low byte from the key decides: `days = 256·(f15 ^ low) + low` with `low = k ^ 78`. Off and 0 days both give low = 0; Off shows f15 = 128 |
 | H2O (Water Refresh) | Warmer/Cooler → 86 / 87 (value screens; the first press shows the current value, e.g. 143) → Jets 1 saves → 89 | days; Cooler steps 120, 90, 60, 30, Off (128), 180, 150 — steps of 30 |
 | TIME | Warmer → 85 hour (display) / **82 hour (editing)** → Jets 1 → 83 minute → Jets 1 → 80 AM/PM → Jets 1 saves → 84 | hour and minute are XOR-masked like f13 (the mask changes); AM/PM: 1 = PM. **Hour (1–12) and minute (0–59) each wrap on their own** — 59 → 00 does not change the hour, 12 → 1 does not change AM/PM (owner's panel tests, 27 Oct) |
 | DATE | Warmer → 110 (scroll) → Warmer → 111 year → Jets 1 → 108 month → Jets 1 → 109 day → Jets 1 saves → 81 | year as yy; month; day |
@@ -457,8 +466,8 @@ few minutes (seen at the end of DST on 2026-10-25).
 
 **When it runs**: ~2 min after every boot (so a power cut is fully recovered: clock, date, menu
 values), nightly at 00:05 (after the midnight counter decrement), and on the *Read Settings*
-button. **Passive capture**: when someone confirms PF/language/FC Off or views the UV counter at
-the panel, the value is published without any ESP action.
+button. **Passive capture**: when someone confirms PF/language/FC Off, or views or saves the UV
+counter at the panel, the value is published without any ESP action.
 
 ## 11. Observed spa behaviour
 
@@ -470,13 +479,21 @@ the panel, the value is published without any ESP action.
   a cycle it keeps running (f1 160 → 224 → 228 → 96, f10 bit 7 throughout). In both cases f1 bit 7
   stays set for the whole purge with no Circulation press — that is how `Purge` is detected.
 - **Heat demand**: when the water drops ~1 °C below the set point the pump starts on low (f1 0x60,
-  f2 bit 3) **without** f10 bit 7, and the heater (f10 bit 6) comes on ~60 s later.
+  f2 bit 3) **without** f10 bit 7, and the heater (f10 bit 6) comes on ~60 s later; the pump runs on
+  ~60 s after the heater stops. The first runs (set point 35 °C, outdoor 15–25 °C): 30 Oct 04:35 and
+  31 Oct 08:19, each started by a 34.0 °C reading that lasted only 1–3 s and heated to 35.5 °C in
+  33–35 min.
 - **Scheduled filtration** (here 12:00, 4 cycles × 2 h → 12/18/00/06): pump low + f10 bit 7.
 - **Daily cleanup**: one minute after the **first** filtration cycle of the day starts (12:00 here),
   Jet 2 runs for exactly 1 minute with no press (f1 96 → 100 → 96). The other cycles do not do it.
   The component shows Primary Filter = `Cleanup` for that minute.
-- **ClearRay UV indicator** is on whenever the Jet 1 pump runs (low or high, any reason), per the
-  owner's observation.
+- **ClearRay UV indicator** on the topside is on whenever the Jet 1 pump runs — low or high, from the
+  panel or from HA, inside or outside a filter cycle, and also with the water 2 °C above the set
+  point (owner's panel tests 30–31 Oct); it goes off at once when only Jet 2 runs. The 2020 manual
+  says ClearRay runs **only** when pump 1 is on low speed for an automatic reason (heat call or filter
+  cycle). Whether the bulb itself follows the icon or the manual is open — only the red LED on the
+  ClearRay ballast can tell (§13). No status bit distinguishes it: f1 bit 6, f2 bits 3/4 and f14 bit 5
+  all just follow the pump.
 - **Counters**: Water Refresh, Filter Change and ClearRay days drop by one at 00:00 only. They are
   persistent: a power cut (which resets the clock and date) does not change them, and changing the
   date does not either — only a midnight rollover counts.
@@ -489,7 +506,7 @@ the panel, the value is published without any ESP action.
   after a Service Lock unlock the purge runs (≈1 min Jet 1 low, ≈1 min Jet 2).
 - **Service Lock** also stops a running filter cycle; f10 bit 7 stays set meanwhile.
 - **Overnight** (outdoor 20.5–21 °C, set point 35 °C): the filtration cycles alone kept the water at
-  35–35.5 °C; the heater did not run (still not seen running by 29 Oct).
+  35–35.5 °C for the first week; the heater first ran on 30 Oct with the nights down to ~15 °C.
 - **Spa clock drift**: a few seconds to ~12 s per day, not constant.
 
 ### Electrical power (measured)
@@ -502,7 +519,7 @@ hookup, so the heater and the pumps can run together):
 | Pump 1 low + ClearRay (circulation) | **≈ 370 W** | 10 nights, house average 00:05–01:55 (filter cycle) minus 02:05–03:55 (idle) |
 | Both pumps high + ClearRay (soak) | **≈ 3.28 kW** | a 20-min soak against the minutes before and after |
 | One pump high | ≈ 1.63 kW (≈ 7.1 A; spec 2.0 HP, 8.0 A max) | the two pumps are the same model; Pump 2 has no low speed |
-| Heater | 2.7 kW (spec, resistive) | not measured yet |
+| Heater | **≈ 2.65 kW** (spec 2.7 kW, resistive) | the house-load step when the heater switched on and off in the 30 Oct heating run |
 | Controller, light | ≈ 15 W, ≈ 5 W | estimate |
 
 Low speed draws about 21 % of high speed, typical for a two-speed motor. On the Home Assistant side
@@ -531,18 +548,19 @@ presses) on/off without reflashing; `Logger Level` changes the log level at runt
 If you have a 680 (or another Balboa-based Sundance) and can check any of these, please open an
 issue with timestamps and what the panel showed.
 
-1. **Does the screen key have a 5th bit** (first visible at 319 days, here around 6 Nov 2026), and
-   does it follow the ClearRay counter below 256 days and when it is Off? (§9)
+1. **Does the ClearRay bulb really run whenever the icon is on** (Jet 1 at any speed), or only for
+   an automatic reason as the manual says? Check the red LED on the ClearRay ballast with Jet 1 high
+   started by hand, outside a filter cycle and with no heat call. (§11)
 2. **What is V in f14?** Which sensor, which units? Does it track the water or outdoor temperature?
-3. **f10 bits 0–3, 5** — alerts? (CHANGE FILTER, COOL, ICE, SN, FL, T-OH, H-OH have not occurred yet.)
+3. **f10 bits 0–3, 5** — alerts? (CHANGE FILTER, CHANGE CLEARRAY BULB, CHANGE WATER, COOL, ICE, SN,
+   FL, T-OH, H-OH have not occurred yet.) How do these message screens look in f13?
 4. **f4** (always 6), **f11 bit 7**, remaining lights-frame bytes.
-5. **ClearRay counter below 256 days** — which screen and encoding? (This spa reaches 255 in early
-   January 2027.) How does ClearRay Off look?
-6. **f1 bit 5 vs bit 6** — command vs. confirmation?
-7. **Light behaviour for presses 3.4–5.2 s apart.**
-8. Does the f7 date formula hold for every day (only verified against samples and by reasoning)?
-9. Does Jets 1 low → high restart the 20 min jet timer?
-10. The heater's real power and how Auto / Eco / Day change when it runs.
+5. **f1 bit 5 vs bit 6** — command vs. confirmation?
+6. **Light behaviour for presses 3.4–5.2 s apart.**
+7. Does the f7 date formula hold for every day (only verified against samples and by reasoning)?
+8. Does Jets 1 low → high restart the 20 min jet timer?
+9. How Auto / Eco / Day change when the heater runs.
+10. The TEMP menu value screens (104/107) are only partly mapped.
 
 ## 14. Known issues and limitations
 
@@ -576,6 +594,7 @@ Each test is short; note the time and what the panel showed.
 | °C/°F | Menu → TEMP → °F, save, 30 s, °C, save (do not touch the set point meanwhile) | unit bit |
 | Locks | pump off; Menu → LOCK → SL, Jets 1, 1 min on the main screen, hold Menu; repeat for SVL | Lock entity + f14 bit 1 / bit 2 flips |
 | Service counter Off | Menu → H2O (or FC) → Off, Jets 1, wait, set the value back, Jets 1 | `Off` vs `Change Now`, f2 bit 7 |
+| ClearRay counter / key | Menu → UV → Warmer/Cooler to a value (e.g. 250, then Off), Jets 1, 15 s on the main screen, set it back, Jets 1 (steps of 10: the old value is only restored to ±5 days) | f15 encoding, the new key from the confirming frame on |
 | Language | Menu → LANG → Warmer ×4, wait (no save) | language codes |
 | Power cut | spa breaker off 1 min, on, do not touch the panel for 5 min | boot messages, purge, clock reset, automatic sync, boot read |
 | Light from HA | select Red, then Off | light seek logic |
@@ -594,3 +613,4 @@ What was added and verified on the test spa, in order:
 | 27 Oct | 2-second confirmation of derived states; clock sync from the measured offset (the clock stands still while editing) |
 | 28 Oct | Clock Date as DD/MM/YYYY; entity names grouped by first word |
 | 29 Oct | 4-bit screen key; climate offers Heat only; electrical power measured (§11) |
+| 31 Oct | Screen key = ClearRay counter low byte ^ 78 (any value 0–255), learned only when it fits the counter; ClearRay days decoded below 256 days and Off, followed at midnight and on a save at the panel |
