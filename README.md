@@ -23,13 +23,15 @@ controller), what was decoded on the RS-485 bus, how sure we are about each part
 unknown. It is meant for anyone who wants to continue the work, reproduce it on another 680, or
 spot mistakes.
 
-> Status (2026-10-29): running daily on one spa. Temperature, set point, heater, both jets,
+> Status (2026-11-02): running daily on one spa. Temperature, set point, heater, both jets,
 > circulation, lights, heater mode, clock/date (read + automatic sync to within a minute, incl. DST
 > changes), service counters (with Off / Change Now), Primary Filter settings and states (incl.
 > Cleanup and Purge), language, all four lock modes, temperature unit, run timers, activity
 > sessions and a Decoder Notice are exposed to Home Assistant. Derived states are confirmed for 2 s
 > before they are published, so the controller's flag hand-overs never show as blips. Electrical
-> power was measured against the house load (§11). A few status bits are still unknown — see
+> power was measured against the house load (§11); the power value of each load is a setting on
+> the device. The Home Assistant side (helpers, automations, dashboard) is documented in
+> [`homeassistant/`](homeassistant/README.md). A few status bits are still unknown — see
 > [Open questions](#13-open-questions--help-wanted).
 
 Contents
@@ -171,6 +173,7 @@ Names are chosen so that related entities sort together (same first word).
 | Primary Filter | Purge / Running / Cleanup / Circulation (Manual) / Circulation (Auto) / Circulation (Heating) / Off | f1, f2, f10 bit7, see below |
 | Primary Filter Active (binary) | scheduled filtration cycle | f10 bit7 |
 | Pumps Running (binary) | any pump running | f1, f2 |
+| Pump 1 Running / Pump 2 Running (binary) | Pump 1 = Jet 1 pump at either speed (incl. circulation), Pump 2 = Jet 2 | f1, f2 |
 | Circulation (Auto) (binary) | circulation the controller runs itself (schedule, heat, purge) — only while a pump runs | f1, f10 bit7 |
 | ClearRay Bulb | On / Off (inferred: Jet 1 pump running at any speed) | f1 bit6, f2 bit4 |
 | Heater Mode | Auto / Eco / Day / Unknown (n) | f6 |
@@ -193,7 +196,7 @@ by someone. `Cleanup` — Jet 2 started by the controller itself (no press in th
 daily cleanup). `Circulation (Manual)` — Jet 1 low started by hand. `Circulation (Auto)` — scheduled
 filtration. `Circulation (Heating)` — the pump runs for heat demand. Otherwise `Off`.
 
-**2-second confirmation.** Primary Filter, ClearRay Bulb, Heater, Pumps Running, Circulation (Auto)
+**2-second confirmation.** Primary Filter, ClearRay Bulb, Heater, Pumps Running, Pump 1 / Pump 2 Running, Circulation (Auto)
 and every Active/Session sensor are published only after the new state has held for 2 s (run times
 are counted from when the change began). The controller hands its flags over one or two status
 frames apart — e.g. at the end of a filter cycle f1 reads 0x40 (looks like "Jet 1 low from the
@@ -226,7 +229,23 @@ converts, so Home Assistant keeps receiving °C (rounded to 0.5 °C). Users who 
 `temperature_scale: F`.
 
 **Buttons**: Read Settings, Clock Sync Now, Restart, Safe Mode Boot.
-**Config**: Diagnostics (verbose decoding logs on/off), Logger Level (runtime log level).
+**Config**: Diagnostics (verbose decoding logs on/off), Logger Level (runtime log level), and the
+six **Power** values below.
+
+**Power values** (`number`, *Configuration* on the device page, slider): the electrical power of
+each load, for estimating the spa's consumption in Home Assistant (the spa does not report it).
+They are plain template numbers in the YAML (`restore_value: true`), kept in the ESP's flash
+across reboots and power cuts — the component itself does not use them. Defaults are this spa's
+(§11); change them if you can measure your own.
+
+| Entity | Default | Range |
+|---|---|---|
+| Power Controller | 15 W | 0–50 |
+| Power ClearRay | 20 W (extra while Jet 1 runs at high; at low it is part of Circulation) | 0–60 |
+| Power Light | 5 W | 0–50 |
+| Power Circulation | 370 W (Pump 1 low + ClearRay) | 200–600 |
+| Power Jet Pump | 1630 W (one pump at high) | 1000–2500, step 10 |
+| Power Heater | 2700 W | 1500–4000, step 10 |
 
 ## 5. Bus protocol basics
 
@@ -543,10 +562,12 @@ hookup, so the heater and the pumps can run together):
 | Heater | **≈ 2.65 kW** (spec 2.7 kW, resistive) | the house-load step when the heater switched on and off in the 30 Oct heating run |
 | Controller, light | ≈ 15 W, ≈ 5 W | estimate |
 
-Low speed draws about 21 % of high speed, typical for a two-speed motor. On the Home Assistant side
-a template sensor multiplies the ESP states by these values (Spa Power), an integration helper turns
-it into kWh (Spa Energy, day/week/month/year), and two automations re-calibrate the circulation and
-jet values from the house load every night and after every soak.
+Low speed draws about 21 % of high speed, typical for a two-speed motor. These values are the
+defaults of the device's Power settings (§4). On the Home Assistant side a template sensor
+multiplies the running loads by them (Spa Power) and an integration helper turns it into kWh; two
+automations keep measuring the circulation and the jet pump against the house load and only log
+the result — the readings vary from night to night, so the values stay fixed settings and are
+changed by hand only if the measurements show a consistent gap. See [`homeassistant/`](homeassistant/README.md#3-electrical-power-and-energy).
 
 ## 12. Diagnostics entities
 
@@ -635,3 +656,4 @@ What was added and verified on the test spa, in order:
 | 28 Oct | Clock Date as DD/MM/YYYY; entity names grouped by first word |
 | 29 Oct | 4-bit screen key; climate offers Heat only; electrical power measured (§11) |
 | 31 Oct | Screen key = ClearRay counter low byte ^ 78 (any value 0–255), learned only when it fits the counter; ClearRay days decoded below 256 days and Off, followed at midnight and on a save at the panel |
+| 2 Nov | Pump 1 Running / Pump 2 Running; the six Power values as settings on the device; the Home Assistant side published in `homeassistant/` |

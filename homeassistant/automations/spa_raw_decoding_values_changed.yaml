@@ -1,0 +1,44 @@
+# Optional, only while the raw decoding entities (Raw F4, Raw F10, Bus Message Types) are configured.
+alias: Spa - Raw decoding values changed (diagnostic)
+description: >-
+  Notifies once per NEW unknown value seen on the spa bus: f10 bits 0-3/5 (probably alerts),
+  f4 other than 6, a new message type, an unknown heater mode. Each key is remembered in
+  input_text.spa_decoder_seen so it is reported only once; clear that text to re-arm. When it
+  fires, look at the topside display and note what it shows - that is how unknown bits get decoded.
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.sundance_spa_raw_f10
+      - sensor.sundance_spa_raw_f4
+      - sensor.sundance_spa_bus_message_types
+      - sensor.sundance_spa_heater_mode
+    not_from: ["unavailable", "unknown"]
+    not_to: ["unavailable", "unknown"]
+actions:
+  - variables:
+      seen: "{{ states('input_text.spa_decoder_seen').split(',') | reject('eq', '') | list }}"
+      new_keys: >-
+        {% set f10 = states('sensor.sundance_spa_raw_f10') | int(0) %}
+        {% set f4 = states('sensor.sundance_spa_raw_f4') | int(6) %}
+        {% set types = states('sensor.sundance_spa_bus_message_types').split(' ') %}
+        {% set hm = states('sensor.sundance_spa_heater_mode') %}
+        {% set ns = namespace(k=[]) %}
+        {% for b in [0,1,2,3,5] %}{% if f10 // (2 ** b) % 2 == 1 %}{% set ns.k = ns.k + ['f10b' ~ b] %}{% endif %}{% endfor %}
+        {% if f4 != 6 %}{% set ns.k = ns.k + ['f4=' ~ f4] %}{% endif %}
+        {% for t in types %}{% if t not in ['00','01','02','03','04','06','C4','CA','CC','unknown','unavailable',''] %}{% set ns.k = ns.k + ['msg' ~ t] %}{% endif %}{% endfor %}
+        {% if hm.startswith('Unknown') and hm != 'Unknown (16)' %}{% set ns.k = ns.k + ['heat' ~ hm[9:-1]] %}{% endif %}
+        {{ ns.k | reject('in', seen) | list }}
+  - condition: template
+    value_template: "{{ new_keys | length > 0 }}"
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_decoder_seen
+    data:
+      value: "{{ ((seen + new_keys) | join(','))[-255:] }}"
+  - action: script.spa_notify
+    data:
+      title: "Spa decoder: new value"
+      message: "{{ new_keys | join(', ') }} at {{ now().strftime('%H:%M') }}. Check the panel display."
+      tag: spa_decoder_new_value
+mode: queued
+max: 10

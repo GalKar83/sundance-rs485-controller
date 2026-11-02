@@ -1,0 +1,90 @@
+# Optional: needs a whole-house power sensor (here sensor.load_power from the solar inverter).
+alias: "Spa - Power measurement: jet pump (after a soak)"
+description: >-
+  Measures one jet pump at high speed from the house load and writes it to the logbook next to the
+  setting number.sundance_spa_power_jet_pump. MEASUREMENT ONLY - it never changes the setting.
+  When the pumps start after 10+ min idle with only jets on high (Primary Filter "Running", no
+  heater): house load during the jets (sensor.house_load_energy_spa_calibration) minus the
+  average of the 10 min before and the 10 min after (sensor.house_load_mean_10_min_spa_calibration)
+  = jet power; minus the ClearRay value when Jet 1 is on, divided by the number of jets (both pumps
+  are the same model). Skipped if the run lasted under 5 min, the jets changed, the heater came on,
+  or the house load before and after differs by 200 W or more.
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.sundance_spa_pumps_running
+    from: "off"
+    to: "on"
+conditions:
+  # Idle for 10 min before, so the 10-min mean is a clean base.
+  - condition: template
+    value_template: "{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 600 }}"
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_heater
+    state: "off"
+actions:
+  - variables:
+      before: "{{ states('sensor.house_load_mean_10_min_spa_calibration') }}"
+  - delay:
+      seconds: 30
+  - variables:
+      j1: "{{ is_state('switch.sundance_spa_jet_1', 'on') }}"
+      j2: "{{ is_state('switch.sundance_spa_jet_2', 'on') }}"
+      e_s: "{{ states('sensor.house_load_energy_spa_calibration') }}"
+      t_s: "{{ as_timestamp(now()) }}"
+  - condition: template
+    value_template: "{{ (j1 or j2) and is_state('sensor.sundance_spa_primary_filter', 'Running') and is_number(before) and is_number(e_s) }}"
+  # Until a jet or the heater changes (or an hour).
+  - wait_for_trigger:
+      - trigger: state
+        entity_id:
+          - switch.sundance_spa_jet_1
+          - switch.sundance_spa_jet_2
+          - binary_sensor.sundance_spa_heater
+    timeout:
+      hours: 1
+    continue_on_timeout: true
+  - variables:
+      e_e: "{{ states('sensor.house_load_energy_spa_calibration') }}"
+      t_e: "{{ as_timestamp(now()) }}"
+  - condition: template
+    value_template: "{{ t_e - t_s >= 300 and is_number(e_e) }}"
+  - variables:
+      during: "{{ ((e_e | float - e_s | float) * 1000 * 3600 / (t_e - t_s)) | round(0) }}"
+  - wait_template: "{{ is_state('binary_sensor.sundance_spa_pumps_running', 'off') }}"
+    timeout:
+      minutes: 30
+    continue_on_timeout: false
+  - delay:
+      minutes: 10
+  - condition: template
+    value_template: >-
+      {{ is_state('binary_sensor.sundance_spa_pumps_running', 'off')
+         and (now() - states.binary_sensor.sundance_spa_pumps_running.last_changed).total_seconds() >= 595
+         and is_state('binary_sensor.sundance_spa_heater', 'off') }}
+  - variables:
+      after: "{{ states('sensor.house_load_mean_10_min_spa_calibration') }}"
+      old: "{{ states('number.sundance_spa_power_jet_pump') | float(1630) }}"
+      n: "{{ (1 if j1 else 0) + (1 if j2 else 0) }}"
+  - variables:
+      base: "{{ ((before | float + after | float) / 2) | round(0) }}"
+      measured: >-
+        {{ ((during | float - (before | float + after | float) / 2
+             - (states('number.sundance_spa_power_clearray') | float(20) if j1 else 0)) / n) | round(0) }}
+  - if:
+      - condition: template
+        value_template: "{{ (before | float - after | float) | abs < 200 and 1000 <= measured | float <= 2500 }}"
+    then:
+      - action: logbook.log
+        data:
+          name: Spa power measurement
+          entity_id: number.sundance_spa_power_jet_pump
+          message: >-
+            jet pump measured {{ measured }} W ({{ n }} jet(s), house {{ during }} W, base {{ base }} W);
+            setting {{ old | round(0) }} W, difference {{ ((measured | float - old) / old * 100) | round(1) }}%
+    else:
+      - action: logbook.log
+        data:
+          name: Spa power measurement
+          entity_id: number.sundance_spa_power_jet_pump
+          message: "soak skipped: before {{ before }} W, after {{ after }} W, during {{ during }} W, measured {{ measured }} W"
+mode: single

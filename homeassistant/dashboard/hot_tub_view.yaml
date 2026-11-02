@@ -1,0 +1,339 @@
+# The "Hot Tub" dashboard view (sections layout). Add it as a new view in the dashboard's raw
+# configuration editor. Custom cards: apexcharts-card and mushroom (HACS).
+# The owner's page also has an "Outdoor" section (temperature, wind, daily min/max) that comes
+# from a local weather station and is not part of this project; it is left out here.
+title: Hot Tub
+path: hot-tub
+icon: mdi:hot-tub
+type: sections
+max_columns: 4
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Control Panel
+        heading_style: title
+        icon: mdi:camera-control
+      - type: tile
+        entity: switch.sundance_spa_jet_1
+        name: Jet 1
+        grid_options: {columns: 6}
+      - type: tile
+        entity: switch.sundance_spa_jet_2
+        name: Jet 2
+        grid_options: {columns: 6}
+      - type: tile
+        entity: switch.sundance_spa_circulation
+        name: Manual
+        grid_options: {columns: 6}
+      - type: tile
+        entity: binary_sensor.sundance_spa_circulation_auto
+        name: Auto
+        icon: mdi:sync
+        color: blue
+        grid_options: {columns: 6}
+      # Light on one row: name + current mode + the mode list inline.
+      - type: custom:mushroom-template-card
+        entity: select.sundance_spa_light
+        primary: Light
+        secondary: "{{ states('select.sundance_spa_light') }}"
+        icon: mdi:lightbulb
+        icon_color: >-
+          {% set s = states('select.sundance_spa_light') %}
+          {% set colors = {'Blue':'blue','Violet':'purple','Red':'red','Amber':'amber','Green':'green','Aqua':'cyan','Near White':'white','High Speed Blend':'pink','Low Speed Blend':'pink','Frozen Blend':'light-blue'} %}
+          {{ colors.get(s, 'grey') }}
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action: {action: more-info}
+        grid_options: {columns: full, rows: 1}
+      # Water temperature, target, and the heating runs drawn in red over the water line.
+      - type: custom:apexcharts-card
+        grid_options: {columns: full}
+        graph_span: 24h
+        header:
+          show: true
+          title: Spa Temperature · Last 24 h
+          show_states: true
+          colorize_states: true
+        yaxis:
+          - id: temp
+            min: "~33"
+            max: "~37"
+            decimals: 1
+            apex_config: {forceNiceScale: true, tickAmount: 8}
+        apex_config:
+          chart: {height: 220}
+          legend: {show: false}
+          stroke: {width: 2}
+          xaxis: {labels: {datetimeUTC: false, format: "HH:mm"}}
+          tooltip: {x: {format: "dd/MM HH:mm"}}
+        series:
+          # The reading flips 35.0/35.5 for seconds at a time at a half-degree boundary; the last
+          # value of every 10 min keeps the line readable.
+          - entity: climate.sundance_spa
+            attribute: current_temperature
+            name: Water
+            unit: °C
+            color: "#ff9800"
+            curve: stepline
+            float_precision: 1
+            group_by: {func: last, duration: 10min}
+            yaxis_id: temp
+          # Water temperature only while binary_sensor.sundance_spa_heating_run is on (null between
+          # runs, so the segments are not joined).
+          - entity: climate.sundance_spa
+            name: Heating
+            unit: °C
+            color: "#f44336"
+            curve: stepline
+            stroke_width: 3
+            float_precision: 1
+            yaxis_id: temp
+            show: {in_header: false}
+            data_generator: |
+              const r = await hass.callWS({type: 'history/history_during_period', start_time: start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa', 'binary_sensor.sundance_spa_heating_run'], minimal_response: false, no_attributes: false, significant_changes_only: false});
+              const temps = (r['climate.sundance_spa'] || []).map(s => [(s.lu || s.lc) * 1000, (s.a || {}).current_temperature, (s.a || {}).hvac_action]);
+              const runs = []; let on = null;
+              for (const s of (r['binary_sensor.sundance_spa_heating_run'] || [])) {
+                const t = (s.lu || s.lc) * 1000;
+                if (s.s === 'on' && on === null) on = t;
+                else if (s.s !== 'on' && on !== null) { runs.push([on, t]); on = null; }
+              }
+              if (on !== null) runs.push([on, end.getTime()]);
+              const out = [];
+              for (const [a, b] of runs) {
+                const from = a - 10000;
+                const before = temps.filter(x => x[0] <= from);
+                if (before.length) out.push([from, before[before.length - 1][1]]);
+                for (const x of temps) if (x[0] > from && x[0] <= b) out.push([x[0], x[1]]);
+                const last = temps.filter(x => x[0] <= b);
+                if (last.length) out.push([b, last[last.length - 1][1]]);
+                out.push([b + 1, null]);
+              }
+              return out;
+          - entity: climate.sundance_spa
+            attribute: temperature
+            name: Target
+            unit: °C
+            color: "#2196f3"
+            curve: stepline
+            stroke_dash: 4
+            float_precision: 1
+            yaxis_id: temp
+  - type: grid
+    cards:
+      - type: heading
+        heading: Energy
+        heading_style: title
+        icon: mdi:lightning-bolt
+      - type: tile
+        entity: sensor.sundance_spa_power
+        name: Power Now
+        icon: mdi:flash
+      - type: tile
+        entity: sensor.sundance_spa_energy_today
+        name: Today
+        icon: mdi:lightning-bolt
+        grid_options: {columns: 3}
+      - type: tile
+        entity: sensor.sundance_spa_energy_week
+        name: This Week
+        icon: mdi:lightning-bolt
+        grid_options: {columns: 3}
+      - type: tile
+        entity: sensor.sundance_spa_energy_month
+        name: This Month
+        icon: mdi:lightning-bolt
+        grid_options: {columns: 3}
+      # One bar chart whose resolution follows the date picker (day -> hours, week/month -> days,
+      # year -> months), like the Energy dashboard, but for the spa only.
+      - type: energy-date-selection
+        grid_options: {columns: full}
+      - type: statistics-graph
+        title: Hot Tub Energy
+        entities:
+          - entity: sensor.sundance_spa_energy_total
+            name: Hot Tub
+        stat_types: [change]
+        chart_type: bar
+        energy_date_selection: true
+        hide_legend: true
+        grid_options: {columns: full}
+  - type: grid
+    cards:
+      - type: heading
+        heading: Soaking
+        heading_style: title
+        icon: mdi:hot-tub
+      - type: tile
+        entity: sensor.sundance_spa_last_soak
+        name: Last Soak
+        grid_options: {columns: full}
+      - type: tile
+        entity: sensor.sundance_spa_soaking_time_today
+        name: Today
+        grid_options: {columns: 6}
+      - type: tile
+        entity: sensor.sundance_spa_soaking_time_week
+        name: This Week
+        grid_options: {columns: 6}
+      - type: tile
+        entity: sensor.sundance_spa_soaking_time_month
+        name: This Month
+        grid_options: {columns: 6}
+      - type: tile
+        entity: sensor.sundance_spa_soaking_count_month
+        name: Sessions
+        icon: mdi:counter
+        grid_options: {columns: 6}
+  - type: grid
+    cards:
+      - type: heading
+        heading: Maintenance
+        heading_style: title
+        icon: mdi:flask-outline
+      - type: tile
+        entity: sensor.sundance_spa_last_maintenance
+        name: Last Maintenance
+        grid_options: {columns: full}
+      - type: tile
+        entity: sensor.sundance_spa_maintenance_count_week
+        name: This Week
+        icon: mdi:counter
+        grid_options: {columns: 6}
+      - type: tile
+        entity: sensor.sundance_spa_maintenance_count_month
+        name: This Month
+        icon: mdi:counter
+        grid_options: {columns: 6}
+  - type: grid
+    cards:
+      - type: heading
+        heading: Service
+        heading_style: title
+        icon: mdi:wrench
+      - type: heading
+        heading: Water
+        heading_style: subtitle
+      - type: tile
+        entity: sensor.sundance_spa_remaining_days_water_refresh
+        name: Remaining Days
+        icon: mdi:water-sync
+        grid_options: {columns: 6}
+      - type: tile
+        entity: sensor.sundance_spa_last_replacement_water_date
+        name: Last Replacement
+        icon: mdi:calendar-check
+        grid_options: {columns: 6}
+      - type: heading
+        heading: Filter
+        heading_style: subtitle
+      - type: tile
+        entity: sensor.sundance_spa_remaining_days_filter_change
+        name: Remaining Days
+        icon: mdi:air-filter
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_last_rinse_filter
+        name: Last Rinse
+        icon: mdi:shower-head
+        grid_options: {columns: 4}
+      - type: heading
+        heading: ClearRay Bulb
+        heading_style: subtitle
+      - type: tile
+        entity: sensor.sundance_spa_remaining_days_clearray_bulb
+        name: Remaining Days
+        icon: mdi:lightbulb-fluorescent-tube
+        grid_options: {columns: 6}
+      - type: tile
+        entity: sensor.sundance_spa_last_replacement_clearray_bulb_date
+        name: Last Replacement
+        icon: mdi:calendar-check
+        grid_options: {columns: 6}
+  - type: grid
+    cards:
+      - type: heading
+        heading: Run Time
+        heading_style: title
+        icon: mdi:timer-outline
+      - type: heading
+        heading: Heater
+        heading_style: subtitle
+      - type: tile
+        entity: sensor.sundance_spa_heater_count_today
+        name: Today
+        icon: mdi:counter
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_heater_time_today
+        name: Today
+        icon: mdi:fire
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_heater_count_week
+        name: This Week
+        icon: mdi:counter
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_heater_time_week
+        name: This Week
+        icon: mdi:fire
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_heater_count_month
+        name: This Month
+        icon: mdi:counter
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_heater_time_month
+        name: This Month
+        icon: mdi:fire
+        grid_options: {columns: 4}
+      - type: tile
+        entity: input_text.spa_last_heating
+        name: Last Heating
+        icon: mdi:fire
+        color: red
+        tap_action: {action: more-info}
+        grid_options: {columns: full}
+      # Two half-width subtitles side by side, then the tiles alternate Pump 1 / Pump 2.
+      - type: heading
+        heading: Pump 1 Time
+        heading_style: subtitle
+        grid_options: {columns: 6, rows: auto}
+      - type: heading
+        heading: Pump 2 Time
+        heading_style: subtitle
+        grid_options: {columns: 6, rows: auto}
+      - type: tile
+        entity: sensor.sundance_spa_pump_1_time_today
+        name: Today
+        icon: mdi:pump
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_pump_2_time_today
+        name: Today
+        icon: mdi:pump
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_pump_1_time_week
+        name: This Week
+        icon: mdi:pump
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_pump_2_time_week
+        name: This Week
+        icon: mdi:pump
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_pump_1_time_month
+        name: This Month
+        icon: mdi:pump
+        grid_options: {columns: 4}
+      - type: tile
+        entity: sensor.sundance_spa_pump_2_time_month
+        name: This Month
+        icon: mdi:pump
+        grid_options: {columns: 4}

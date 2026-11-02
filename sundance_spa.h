@@ -137,6 +137,8 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   void set_communication_binary_sensor(binary_sensor::BinarySensor *s) { this->communication_binary_sensor_ = s; }
   void set_pumps_running_binary_sensor(binary_sensor::BinarySensor *s) { this->pumps_running_sensor_ = s; }
   void set_circulation_auto_binary_sensor(binary_sensor::BinarySensor *s) { this->circ_auto_sensor_ = s; }
+  void set_pump1_running_binary_sensor(binary_sensor::BinarySensor *s) { this->pump1_running_db_.sensor = s; }
+  void set_pump2_running_binary_sensor(binary_sensor::BinarySensor *s) { this->pump2_running_db_.sensor = s; }
   void set_h2o_change_sensor(text_sensor::TextSensor *s) { this->h2o_change_sensor_ = s; }
   void set_filter_change_sensor(text_sensor::TextSensor *s) { this->filter_change_sensor_ = s; }
   void set_uv_change_sensor(text_sensor::TextSensor *s) { this->uv_change_sensor_ = s; }
@@ -304,6 +306,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   };
   DebounceText circ_status_db_, clearray_db_;
   DebounceBin heater_db_, pumps_running_db_, circ_auto_db_;
+  DebounceBin pump1_running_db_, pump2_running_db_;  // each pump on its own (Pump 1 at either speed)
   void debounce_(DebounceText &d, const std::string &v);
   void debounce_(DebounceBin &d, bool v);
   void flush_debounced_();

@@ -88,6 +88,11 @@ sundance_spa:
     name: "Pumps Running"
   circulation_auto_binary_sensor:
     name: "Circulation (Auto)"
+  # Each pump on its own (Pump 1 = Jet 1 at either speed, Pump 2 = Jet 2); Pumps Running = at least one
+  pump1_running_binary_sensor:
+    name: "Pump 1 Running"
+  pump2_running_binary_sensor:
+    name: "Pump 2 Running"
   heater_binary_sensor:
     name: "Heater"
     icon: "mdi:thermometer"
@@ -233,6 +238,97 @@ switch:
       - lambda: id(sundance_spa_id).set_diagnostics(true);
     turn_off_action:
       - lambda: id(sundance_spa_id).set_diagnostics(false);
+
+# Electrical power of each load, used by Home Assistant to estimate the spa's consumption (the spa does
+# not report power). Defaults: heater from the spec; pumps measured on the test spa against the house load
+# (one pump at high 1630 W ~ 8 A spec at PF ~0.9; Pump 1 low + ClearRay ~370 W); controller, ClearRay
+# (extra while Jet 1 runs at high - at low it is part of Circulation) and light are estimates. Kept in
+# flash, so they survive reboots and power cuts; change them if you can measure your own spa.
+number:
+  - platform: template
+    name: "Power Controller"
+    id: power_controller
+    icon: "mdi:chip"
+    unit_of_measurement: W
+    device_class: power
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 50
+    step: 1
+    initial_value: 15
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Power ClearRay"
+    id: power_clearray
+    icon: "mdi:lightbulb-fluorescent-tube"
+    unit_of_measurement: W
+    device_class: power
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 60
+    step: 1
+    initial_value: 20
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Power Light"
+    id: power_light
+    icon: "mdi:lightbulb"
+    unit_of_measurement: W
+    device_class: power
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 50
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Power Circulation"
+    id: power_circulation
+    icon: "mdi:sync"
+    unit_of_measurement: W
+    device_class: power
+    entity_category: config
+    mode: slider
+    min_value: 200
+    max_value: 600
+    step: 1
+    initial_value: 370
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Power Jet Pump"
+    id: power_jet_pump
+    icon: "mdi:pump"
+    unit_of_measurement: W
+    device_class: power
+    entity_category: config
+    mode: slider
+    min_value: 1000
+    max_value: 2500
+    step: 10
+    initial_value: 1630
+    optimistic: true
+    restore_value: true
+  - platform: template
+    name: "Power Heater"
+    id: power_heater
+    icon: "mdi:radiator"
+    unit_of_measurement: W
+    device_class: power
+    entity_category: config
+    mode: slider
+    min_value: 1500
+    max_value: 4000
+    step: 10
+    initial_value: 2700
+    optimistic: true
+    restore_value: true
 
 # 680: one Light button -> one select (Off + the 10 modes in the manual's order)
 select:

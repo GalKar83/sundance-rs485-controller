@@ -1,0 +1,34 @@
+alias: Spa - Deliver night alerts
+description: >-
+  At 06:30 (or when HA starts between 06:30 and 23:00, in case HA was down at 06:30) sends the
+  notifications queued overnight by script.spa_notify (input_text.spa_night_alerts) as one phone
+  notification, then clears the queue.
+triggers:
+  - trigger: time
+    at: "06:30:00"
+  - trigger: homeassistant
+    event: start
+conditions:
+  - condition: time
+    after: "06:30:00"
+    before: "23:00:00"
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: input_text.spa_night_alerts
+        state: ["", "unknown", "unavailable"]
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: "Spa: overnight alerts"
+      message: "{{ states('input_text.spa_night_alerts') | replace('; ', '\n') }}"
+      data:
+        tag: spa_night_alerts
+        ttl: 0
+        priority: high
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_night_alerts
+    data:
+      value: ""
+mode: single

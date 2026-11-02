@@ -30,6 +30,8 @@ CONF_RX_INVERT = "rx_invert"
 CONF_COMMUNICATION_SENSOR = "communication_sensor"
 CONF_PUMPS_RUNNING_SENSOR = "pumps_running_binary_sensor"
 CONF_CIRC_AUTO_SENSOR = "circulation_auto_binary_sensor"
+CONF_PUMP1_RUNNING_SENSOR = "pump1_running_binary_sensor"
+CONF_PUMP2_RUNNING_SENSOR = "pump2_running_binary_sensor"
 # 680-series service counters and clock (decoded from the C4 status frame)
 CONF_H2O_CHANGE_SENSOR = "h2o_change_sensor"
 CONF_FILTER_CHANGE_SENSOR = "filter_change_sensor"
@@ -106,6 +108,8 @@ CONFIG_SCHEMA = (
             # Any pump running (Jet 1 low/high, Jet 2) / circulation started by the controller itself
             cv.Optional(CONF_PUMPS_RUNNING_SENSOR): binary_sensor.binary_sensor_schema(icon="mdi:pump"),
             cv.Optional(CONF_CIRC_AUTO_SENSOR): binary_sensor.binary_sensor_schema(icon="mdi:sync"),
+            cv.Optional(CONF_PUMP1_RUNNING_SENSOR): binary_sensor.binary_sensor_schema(icon="mdi:pump"),
+            cv.Optional(CONF_PUMP2_RUNNING_SENSOR): binary_sensor.binary_sensor_schema(icon="mdi:pump"),
             # Service counters as text: days remaining, "Change Now" at 0, or "Off" when disabled.
             cv.Optional(CONF_H2O_CHANGE_SENSOR): text_sensor.text_sensor_schema(icon="mdi:water-sync"),
             cv.Optional(CONF_FILTER_CHANGE_SENSOR): text_sensor.text_sensor_schema(icon="mdi:air-filter"),
@@ -250,6 +254,14 @@ async def to_code(config):
     if CONF_CIRC_AUTO_SENSOR in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_CIRC_AUTO_SENSOR])
         cg.add(var.set_circulation_auto_binary_sensor(sens))
+
+    if CONF_PUMP1_RUNNING_SENSOR in config:
+        sens = await binary_sensor.new_binary_sensor(config[CONF_PUMP1_RUNNING_SENSOR])
+        cg.add(var.set_pump1_running_binary_sensor(sens))
+
+    if CONF_PUMP2_RUNNING_SENSOR in config:
+        sens = await binary_sensor.new_binary_sensor(config[CONF_PUMP2_RUNNING_SENSOR])
+        cg.add(var.set_pump2_running_binary_sensor(sens))
 
     if CONF_H2O_CHANGE_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_H2O_CHANGE_SENSOR])

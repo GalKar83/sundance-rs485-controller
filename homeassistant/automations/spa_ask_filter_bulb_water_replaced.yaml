@@ -1,0 +1,81 @@
+alias: "Spa - Ask: Filter/ClearRay Bulb/Water Replaced?"
+description: >-
+  When a service counter is reset at the panel (Remaining Days Filter Change / ClearRay Bulb /
+  Water Refresh: the days go up, or Off / Change Now -> days), ask the phone whether the item was
+  actually replaced. Yes -> the matching Last Replacement date is set to the reset date. No, or no
+  answer within 12 h -> nothing changes (covers test resets). unknown/unavailable (ESP reboot) are
+  ignored. No question in the quiet hours 23:00-06:30: it waits and asks at 06:30.
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_remaining_days_filter_change
+    id: filter
+  - trigger: state
+    entity_id: sensor.sundance_spa_remaining_days_clearray_bulb
+    id: clearray_bulb
+  - trigger: state
+    entity_id: sensor.sundance_spa_remaining_days_water_refresh
+    id: water
+conditions:
+  # A reset = the days go up (the normal daily change is -1), or a number appears after
+  # Off / Change Now. The counters are text sensors, so no native condition can compare them.
+  - condition: template
+    value_template: >-
+      {% set f = trigger.from_state.state %}{% set t = trigger.to_state.state %}
+      {{ is_number(t) and ((is_number(f) and t | float > f | float) or f in ['Off', 'Change Now']) }}
+actions:
+  - variables:
+      item: "{{ {'filter': 'Filter', 'clearray_bulb': 'ClearRay bulb', 'water': 'Water'}[trigger.id] }}"
+      target_entity: "{{ 'input_datetime.last_replacement_' ~ trigger.id ~ '_date' }}"
+      reset_date: "{{ now().date() | string }}"
+      tag: "spa_replace_{{ trigger.id }}_{{ as_timestamp(now()) | int }}"
+  - wait_template: "{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}"
+    timeout:
+      hours: 8
+    continue_on_timeout: true
+  - action: notify.mobile_app_your_phone
+    data:
+      title: Spa counter reset
+      message: >-
+        {{ item }} counter was reset to {{ trigger.to_state.state | int }} days.
+        Was the {{ item | lower }} replaced?
+      data:
+        tag: "{{ tag }}"
+        actions:
+          - action: "YES_{{ tag }}"
+            title: "Yes"
+          - action: "NO_{{ tag }}"
+            title: "No"
+        sticky: true
+        persistent: true
+        clickAction: noAction
+        priority: high
+        ttl: 0
+  - wait_for_trigger:
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "YES_{{ tag }}"
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: "NO_{{ tag }}"
+    timeout:
+      hours: 12
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: "{{ wait.trigger is not none and wait.trigger.event.data.action == 'YES_' ~ tag }}"
+    then:
+      # The date of the reset, not of the answer.
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: "{{ target_entity }}"
+        data:
+          date: "{{ reset_date }}"
+  - action: notify.mobile_app_your_phone
+    data:
+      message: clear_notification
+      data:
+        tag: "{{ tag }}"
+mode: parallel
+max: 5

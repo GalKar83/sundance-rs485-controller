@@ -1,0 +1,21 @@
+alias: Spa - Decoder notice
+description: >-
+  Sends the ESP's Decoder Notice (sensor.sundance_spa_decoder_notice) to the phone. The ESP
+  publishes "OK" normally, or a short English message when something it could not handle happened
+  (clock sync or settings read failed, unknown topside screen, light or command not confirmed, no
+  status from the spa...). It returns to "OK" after an hour, so the same problem notifies at most
+  about once an hour. not_from unknown/unavailable: an HA-ESP reconnect restores the last notice
+  and must not send it again.
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_decoder_notice
+    not_to: ["OK", "unknown", "unavailable"]
+    not_from: ["unknown", "unavailable"]
+actions:
+  - action: script.spa_notify
+    data:
+      title: Spa decoder notice
+      message: "{{ trigger.to_state.state }} ({{ now().strftime('%d/%m/%Y %H:%M') }})"
+      tag: spa_decoder_notice
+mode: queued
+max: 5

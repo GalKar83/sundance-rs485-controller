@@ -1235,7 +1235,8 @@ void SundanceSpa::flush_debounced_() {
       d->sensor->publish_state(d->want);
     }
   }
-  for (DebounceBin *d : {&this->heater_db_, &this->pumps_running_db_, &this->circ_auto_db_}) {
+  for (DebounceBin *d : {&this->heater_db_, &this->pumps_running_db_, &this->circ_auto_db_, &this->pump1_running_db_,
+                         &this->pump2_running_db_}) {
     if (d->pending && now - d->since >= DEBOUNCE_MS) {
       d->pending = false;
       d->sensor->publish_state(d->want);

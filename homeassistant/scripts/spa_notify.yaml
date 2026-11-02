@@ -1,0 +1,52 @@
+# Script: script.spa_notify — paste into Settings → Automations & scenes → Scripts → new → Edit in YAML.
+# Information notifications go through here; the 23:00–06:30 quiet hours are applied in one place.
+alias: Spa - Notify (quiet hours aware)
+description: >-
+  Sends a spa information notification to the phone, except in the spa quiet hours 23:00-06:30:
+  then the message is appended to input_text.spa_night_alerts ('HH:MM title: message; ...',
+  255 chars max, oldest dropped) and "Spa - Deliver night alerts" sends them all as one
+  notification at 06:30. Questions with Yes/No buttons do not use this script - they wait for
+  06:30 inside their own automation, so the answer buttons stay attached to the question.
+mode: queued
+max: 10
+fields:
+  title:
+    description: Notification title
+    required: true
+    selector:
+      text: {}
+  message:
+    description: Notification text
+    required: true
+    selector:
+      text: {}
+  tag:
+    description: Optional notification tag
+    required: false
+    selector:
+      text: {}
+sequence:
+  - if:
+      - condition: time
+        after: "06:30:00"
+        before: "23:00:00"
+    then:
+      - action: notify.mobile_app_your_phone
+        data:
+          title: "{{ title }}"
+          message: "{{ message }}"
+          data:
+            tag: "{{ tag | default('spa_info', true) }}"
+            ttl: 0
+            priority: high
+    else:
+      # Quiet hours: queue it. input_text holds at most 255 characters, so keep the newest part.
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_night_alerts
+        data:
+          value: >-
+            {% set old = states('input_text.spa_night_alerts') %}
+            {% set item = now().strftime('%H:%M') ~ ' ' ~ title ~ ': ' ~ message %}
+            {% set all = (old ~ '; ' ~ item) if old not in ['', 'unknown', 'unavailable'] else item %}
+            {{ all[-255:] }}

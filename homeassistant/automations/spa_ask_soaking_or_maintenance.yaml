@@ -1,0 +1,202 @@
+alias: "Spa - Ask: Soaking or Maintenance"
+description: >-
+  When a spa run of 10+ minutes ends (Jet 2 on or Jet 1 high = binary_sensor.sundance_spa_in_use),
+  wait 5 min: any further run (any length) starting within 5 min of the last end is added to the
+  same session (up to 6 runs). Then ask the phone once - Soaking / Maintenance / Soaking (edit time)
+  - with the total minutes: from the start of the first run to the end of the last one, gaps
+  included (time in the water with the pump off counts; the 5-min wait itself is never added).
+  "Soaking (edit time)" lets you type the minutes actually spent in the water.
+  Soaking -> soaking counter + minutes + Last Soak; Maintenance -> maintenance counter + minutes +
+  Last Maintenance. No answer within 12 h -> counted in neither. Runs under 10 min that are not
+  follow-ups are ignored. No question in the quiet hours 23:00-06:30: it waits and asks at 06:30
+  (the recorded times stay those of the session).
+triggers:
+  # Any change to off, also via unavailable (a Wi-Fi blip just when the jets stop). The run start
+  # comes from input_datetime.spa_in_use_since, not from the trigger.
+  - trigger: state
+    entity_id: binary_sensor.sundance_spa_in_use
+    not_from: "off"
+    to: "off"
+conditions:
+  # A run that ends while an earlier session is still collecting follow-ups is merged into it.
+  - condition: state
+    entity_id: input_boolean.spa_session_merging
+    state: "off"
+actions:
+  - variables:
+      start_ts: "{{ state_attr('input_datetime.spa_in_use_since', 'timestamp') | float(0) }}"
+  # Close the run, so a later reconnect (unavailable -> off with no run open) does not ask.
+  - action: input_datetime.set_datetime
+    target:
+      entity_id: input_datetime.spa_in_use_since
+    data:
+      datetime: "1970-01-01 00:00:00"
+  # A run was open and lasted 10+ minutes.
+  - condition: template
+    value_template: "{{ start_ts > 1000000000 and as_timestamp(now()) - start_ts >= 600 }}"
+  - variables:
+      minutes: "{{ ((as_timestamp(now()) - start_ts) / 60) | round(1) }}"
+      tag: "spa_session_{{ as_timestamp(now()) | int }}"
+      ended: "{{ as_timestamp(now()) | int }}"
+      more: true
+      first_start: "{{ start_ts }}"
+      done: false
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.spa_session_merging
+  # Collect follow-up runs (at most 6).
+  - repeat:
+      sequence:
+        - wait_for_trigger:
+            - trigger: state
+              entity_id: binary_sensor.sundance_spa_in_use
+              to: "on"
+          timeout:
+            minutes: 5
+          continue_on_timeout: true
+        - if:
+            - condition: template
+              value_template: "{{ wait.trigger is not none }}"
+          then:
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id: binary_sensor.sundance_spa_in_use
+                  to: "off"
+              timeout:
+                hours: 3
+              continue_on_timeout: true
+            - variables:
+                minutes: "{{ ((as_timestamp(now()) - first_start | float(0)) / 60) | round(1) }}"
+                ended: "{{ as_timestamp(now()) | int }}"
+          else:
+            - variables:
+                more: false
+      until:
+        - condition: template
+          value_template: "{{ not more or repeat.index >= 6 }}"
+  - action: input_datetime.set_datetime
+    target:
+      entity_id: input_datetime.spa_in_use_since
+    data:
+      datetime: "1970-01-01 00:00:00"
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.spa_session_merging
+  - variables:
+      prompt: "{{ minutes | round(0) | int }} min. Was it soaking or maintenance?"
+  # Quiet hours 23:00-06:30 (390 = 06:30, 1380 = 23:00 in minutes of the day).
+  - wait_template: "{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}"
+    timeout:
+      hours: 8
+    continue_on_timeout: true
+  # Ask; re-ask after an invalid typed time (max 5 rounds). No answer within 12 h ends the loop.
+  - repeat:
+      sequence:
+        - action: notify.mobile_app_your_phone
+          data:
+            title: Spa session ended
+            message: "{{ prompt }}"
+            data:
+              tag: "{{ tag }}"
+              actions:
+                - action: "SOAK_{{ tag }}"
+                  title: Soaking
+                - action: "MAINT_{{ tag }}"
+                  title: Maintenance
+                - action: "SOAKEDIT_{{ tag }}"
+                  title: Soaking (edit time)
+                  behavior: textInput
+                  textInputButtonTitle: Save
+                  textInputPlaceholder: Minutes in the water
+              sticky: true
+              persistent: true
+              clickAction: noAction
+              priority: high
+              ttl: 0
+        - wait_for_trigger:
+            - trigger: event
+              event_type: mobile_app_notification_action
+              event_data:
+                action: "SOAK_{{ tag }}"
+            - trigger: event
+              event_type: mobile_app_notification_action
+              event_data:
+                action: "MAINT_{{ tag }}"
+            - trigger: event
+              event_type: mobile_app_notification_action
+              event_data:
+                action: "SOAKEDIT_{{ tag }}"
+          timeout:
+            hours: 12
+          continue_on_timeout: true
+        - variables:
+            answer: "{{ wait.trigger.event.data.action.split('_')[0] if wait.trigger is not none else 'none' }}"
+        - if:
+            - condition: template
+              value_template: "{{ answer == 'SOAKEDIT' }}"
+          then:
+            - variables:
+                typed: "{{ wait.trigger.event.data.get('reply_text', '') | string | trim }}"
+            # Digits only, 1-300 whole minutes; anything else re-asks with the same tag.
+            - if:
+                - condition: template
+                  value_template: "{{ typed | regex_match('^[0-9]{1,3}$') and 1 <= typed | int <= 300 }}"
+              then:
+                - variables:
+                    minutes: "{{ typed | int }}"
+                    ended: "{{ (first_start | float(0) + (typed | int) * 60) | int }}"
+                    answer: SOAK
+                    done: true
+              else:
+                - variables:
+                    prompt: Please type the minutes as a whole number (e.g. 35).
+                    done: false
+          else:
+            - variables:
+                done: true
+      until:
+        - condition: template
+          value_template: "{{ done or repeat.index >= 5 }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ answer == 'SOAK' }}"
+        sequence:
+          - action: counter.increment
+            target:
+              entity_id: counter.spa_soaking_sessions_total
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.spa_soaking_minutes_total
+            data:
+              value: "{{ (states('input_number.spa_soaking_minutes_total') | float(0) + minutes | float(0)) | round(1) }}"
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_soak
+            data:
+              timestamp: "{{ ended }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ answer == 'MAINT' }}"
+        sequence:
+          - action: counter.increment
+            target:
+              entity_id: counter.spa_maintenance_sessions_total
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.spa_maintenance_minutes_total
+            data:
+              value: "{{ (states('input_number.spa_maintenance_minutes_total') | float(0) + minutes | float(0)) | round(1) }}"
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_maintenance
+            data:
+              timestamp: "{{ ended }}"
+  # Persistent notification: remove it from the phone once answered or timed out.
+  - action: notify.mobile_app_your_phone
+    data:
+      message: clear_notification
+      data:
+        tag: "{{ tag }}"
+mode: parallel
+max: 5

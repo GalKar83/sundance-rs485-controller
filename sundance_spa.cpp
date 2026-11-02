@@ -859,6 +859,10 @@ void SundanceSpa::publish_states_() {
   // Any pump running, for any reason (Jet 1 low or high, Jet 2).
   const bool pumps_running = this->circ_on_ || this->pump_status_[0] != 0 || this->pump_status_[1] != 0;
   this->debounce_(this->pumps_running_db_, pumps_running);
+  // Each pump on its own: Pump 1 = Jet 1 at either speed (low = circulation, f1 bit6; high = f2 bit4),
+  // Pump 2 = Jet 2 (f1 bit2). Pumps Running = at least one of them.
+  this->debounce_(this->pump1_running_db_, this->circ_on_ || this->pump_status_[0] != 0);
+  this->debounce_(this->pump2_running_db_, this->pump_status_[1] != 0);
   // Circulation the controller runs on its own: scheduled filtration (f10 bit7 stays set while a jet
   // interrupts it), heat demand and the purge — everything except the manual Circulation switch.
   // Only while a pump actually runs: f10 bit7 also stays set while a Service Lock stops the cycle.
