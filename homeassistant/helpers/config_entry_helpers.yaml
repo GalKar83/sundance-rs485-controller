@@ -318,19 +318,6 @@
     state_class: measurement
     template_type: sensor
     unit_of_measurement: W
-- domain: integration
-  title: Energy
-  options:
-    max_sub_interval:
-      hours: 0
-      minutes: 1
-      seconds: 0
-    method: left
-    name: Spa Energy
-    round: 3
-    source: sensor.sundance_spa_power
-    unit_prefix: k
-    unit_time: h
 - domain: utility_meter
   title: Energy Today
   options:

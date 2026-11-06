@@ -28,8 +28,8 @@ to work; take what you want.
   `Spa Power` (template) is still used by the dashboard's power tile and the circulation
   measurement automation; the `House Load …` helpers belong to the optional power measurement, which needs a
   whole-house power sensor (they are in `optional/`);
-  `Energy` (the Spa Energy integration) is no longer read by anything since the ESP counts energy
-  itself (§3), so you can skip it. The entry titled `Spa Energy Test` is **not** a test: it is the
+  The earlier `Energy` integration (Spa Energy) was removed once the ESP counted energy itself
+  (§3), so it is not in the export. The entry titled `Spa Energy Test` is **not** a test: it is the
   Energy Total meter (`sensor.sundance_spa_energy_total`) that the energy chart and the outage
   correction use; only its entry title is old.
 
@@ -422,8 +422,10 @@ A plan is deleted only with the trash icon, never by tapping its row.
 **Settings:** Heating (Heater Mode with an Eco/Day explanation card, Primary Filter start / cycles /
 duration — the cycles and duration are not greyed out in Eco or Day because they apply in every
 mode), the three service counters as dropdowns, temperature format, language (display only, with
-no write), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, and
-a Diagnostics block (Status, Wi-Fi signal, Decoder Notice).
+no write), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 h* line under them (the measured
+power against the setting from the optional power measurement, same text as its weekly summary;
+without a house power sensor it only says "no valid measurement"), and a Diagnostics block
+(Status, Wi-Fi signal, Decoder Notice).
 
 Details worth knowing:
 
