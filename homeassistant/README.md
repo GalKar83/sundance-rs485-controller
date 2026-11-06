@@ -29,7 +29,9 @@ to work; take what you want.
   measurement automation; the `House Load …` helpers belong to the optional power measurement, which needs a
   whole-house power sensor (they are in `optional/`);
   `Energy` (the Spa Energy integration) is no longer read by anything since the ESP counts energy
-  itself (§3), and `Spa Energy Test` is a leftover test meter — both can be skipped.
+  itself (§3), so you can skip it. The entry titled `Spa Energy Test` is **not** a test: it is the
+  Energy Total meter (`sensor.sundance_spa_energy_total`) that the energy chart and the outage
+  correction use; only its entry title is old.
 
 Replace before use:
 
