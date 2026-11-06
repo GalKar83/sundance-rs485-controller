@@ -281,7 +281,7 @@ sections:
         grid_options:
           columns: 6
       - type: custom:mushroom-template-card
-        primary: Power measurement · last 24 h
+        primary: Power measurement · last 24 hours
         secondary: >-
           {% macro summ(raw, label, unit_word, setting) -%}{%- set cutoff = (as_timestamp(now()) -
           86400) / 60 -%}{%- set ns = namespace(n=0, skip=0, m=0, p=0) -%}{%- for it in

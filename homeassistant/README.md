@@ -423,7 +423,7 @@ A plan is deleted only with the trash icon, never by tapping its row.
 **Settings:** Heating (Heater Mode with an Eco/Day explanation card, Primary Filter start / cycles /
 duration — the cycles and duration are not greyed out in Eco or Day because they apply in every
 mode), the three service counters as dropdowns, temperature format, language (display only, with
-no write), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 h* line under them (the measured
+no write), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 hours* line under them (the measured
 power against the setting from the optional power measurement, same text as its weekly summary;
 without a house power sensor it only says "no valid measurement"), and a Diagnostics block
 (Status, Wi-Fi signal, Decoder Notice).

@@ -221,6 +221,7 @@ sections:
             '#f44336' if g > w else ('#ff9800' if g == w else '#2196f3') -%}#header__states >
             *:nth-child(2) > *:first-child > *:first-child { color: {{ c }} !important; }
         update_delay: 7s
+        title: Spa Temperature · Last 24 hours
       - type: custom:apexcharts-card
         grid_options:
           columns: full
@@ -332,6 +333,7 @@ sections:
             '#f44336' if g > w else ('#ff9800' if g == w else '#2196f3') -%}#header__states >
             *:nth-child(2) > *:first-child > *:first-child { color: {{ c }} !important; }
         update_delay: 7s
+        title: Spa Temperature · Last 24 hours
       - type: custom:mushroom-template-card
         entity: sensor.spa_next_plan
         primary: Next Plan
