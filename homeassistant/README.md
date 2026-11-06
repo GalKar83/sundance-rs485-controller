@@ -180,7 +180,8 @@ in case that turns out not to be so.
 > **Since p29 the ESP does this itself** (Electrical Power, Energy Counter, the Total Time sensors).
 > The Energy Today / Week / Month / Year / Total meters are utility meters on the ESP's Energy
 > Counter, which keeps counting while Home Assistant is away. The template and integration below
-> are the earlier Home Assistant-side version, kept for comparison and being retired; the
+> are the earlier Home Assistant-side version: the Spa Energy integration has been removed, and the
+> Spa Power template is kept only for the dashboard's power tile and the optional measurement; the
 > Wi-Fi-drop correction in §4 still uses the same schedule model.
 
 The spa does not report power. `sensor.sundance_spa_power` multiplies what is running by the power
@@ -488,9 +489,9 @@ automation work, the second group tests that are still open.
   *Counters At Midnight* are published but the outage automation does not use them yet. With them
   the past hours get the real values, manual use included, and the schedule estimate is only
   needed for a drop longer than 24 hours.
-- **Retire the Home Assistant-side power model.** The Spa Power template and the Spa Energy
-  integration are unused since p29; the *Power Now* tile can point at the ESP's Electrical Power.
-  Delete them once nothing else reads them.
+- **Retire the Home Assistant-side power model.** The Spa Energy integration is already
+  removed; the Spa Power template is still read by the *Power Now* tile and the circulation
+  measurement. Point both at the ESP's Electrical Power, then delete the template.
 - **Lock the Heat Rate.** The learned rate (`new = 0.7 × old + 0.3 × measured`) can wander after an
   odd run; an option to freeze it, or to ignore runs with a soak in the middle.
 - **Maintenance count on the page** next to the soaking counts (the sensor exists).
