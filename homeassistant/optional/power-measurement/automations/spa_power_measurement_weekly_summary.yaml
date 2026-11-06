@@ -1,6 +1,6 @@
 alias: 'Spa - Power measurement: weekly summary'
 description: >-
-  Every Sunday at 08:00 sends the phone a summary of the last 7 days of the two power measurements
+  Every Saturday at 08:00 sends the phone a summary of the last 7 days of the two power measurements
   ('Spa - Power measurement: circulation (nightly)' and '... jet pump (after a soak)'): how many
   valid measurements, the average measured power against the setting on the ESP, the average
   difference in %, and how many were skipped. The measurements are read from
@@ -14,7 +14,7 @@ triggers:
 conditions:
   - condition: time
     weekday:
-      - sun
+      - sat
 actions:
   - action: script.spa_notify
     data:
