@@ -1,0 +1,70 @@
+alias: 'Spa - Settings dropdowns: follow the spa'
+description: >-
+  Keeps the dropdowns on the Hot Tub Settings page (input_select.spa_set_pf_start / _filter_change /
+  _clearray / _water_refresh) showing the value read from the spa, with only the values the spa
+  allows: Primary Filter start 00:00-23:00; Filter Change Off, 10-180 (steps of 10); ClearRay Off,
+  10-360 and 365; Water Refresh Off, 30-180 (steps of 30). A current value off that grid (e.g. 141
+  days, or Change Now) is put at the top of its list. 'Spa - Settings dropdowns: send a change'
+  writes a pick to the spa. Created 2026-11-03.
+triggers:
+  - trigger: state
+    entity_id:
+      - sensor.sundance_spa_remaining_days_filter_change
+      - sensor.sundance_spa_remaining_days_clearray_bulb
+      - sensor.sundance_spa_remaining_days_water_refresh
+      - sensor.sundance_spa_primary_filter_start
+    not_to:
+      - unknown
+      - unavailable
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    hours: /1
+actions:
+  - repeat:
+      for_each:
+        - sel: input_select.spa_set_filter_change
+          src: sensor.sundance_spa_remaining_days_filter_change
+          grid: Off,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180
+        - sel: input_select.spa_set_clearray
+          src: sensor.sundance_spa_remaining_days_clearray_bulb
+          grid: Off,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,260,270,280,290,300,310,320,330,340,350,360,365
+        - sel: input_select.spa_set_water_refresh
+          src: sensor.sundance_spa_remaining_days_water_refresh
+          grid: Off,30,60,90,120,150,180
+        - sel: input_select.spa_set_pf_start
+          src: sensor.sundance_spa_primary_filter_start
+          grid: 00:00,01:00,02:00,03:00,04:00,05:00,06:00,07:00,08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00,22:00,23:00
+      sequence:
+        - variables:
+            cur: '{{ states(repeat.item.src) ~ '''' }}'
+            opts: >-
+              {%- set c = states(repeat.item.src) | string -%}{%- set g =
+              repeat.item.grid.split(',') -%}{{ g if c in g else [c] + g }}
+          note: >-
+            Compared as text: a variable holding 170 renders as a number (bug of 2026-11-03: 170 was
+            added twice and set_options failed).
+        - if:
+            - condition: template
+              value_template: '{{ states(repeat.item.src) not in [''unknown'', ''unavailable'', ''''] }}'
+          then:
+            - if:
+                - condition: template
+                  value_template: '{{ state_attr(repeat.item.sel, ''options'') != opts }}'
+              then:
+                - action: input_select.set_options
+                  target:
+                    entity_id: '{{ repeat.item.sel }}'
+                  data:
+                    options: '{{ opts }}'
+            - if:
+                - condition: template
+                  value_template: '{{ states(repeat.item.sel) != (states(repeat.item.src) | string) }}'
+              then:
+                - action: input_select.select_option
+                  target:
+                    entity_id: '{{ repeat.item.sel }}'
+                  data:
+                    option: '{{ states(repeat.item.src) | string }}'
+mode: queued
+max: 5

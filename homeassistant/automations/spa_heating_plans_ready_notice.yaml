@@ -1,0 +1,42 @@
+alias: 'Spa - Heating plans: ready notice'
+description: >-
+  Phone notice the moment the water reaches the target of a running heating plan
+  (input_text.spa_ready_by_state phase heat or warned), once per plan: input_text.spa_ready_notified
+  keeps the plan_ts already notified ('Spa - Heating plans' also sets it when the water was already
+  warm at the start, so no second notice). Ready-by plans say how long before / after the plan time;
+  start plans say when heating started and how long it took. Created 2026-11-03 on the owner's
+  request (notice right away, not at the plan time).
+triggers:
+  - trigger: state
+    entity_id: climate.sundance_spa
+    attribute: current_temperature
+conditions:
+  - condition: template
+    value_template: >-
+      {%- set st = states('input_text.spa_ready_by_state').split(';') -%}{{ st | count == 5 and
+      st[3] in ['heat', 'warned'] and (state_attr('climate.sundance_spa', 'current_temperature') |
+      float(0)) >= (st[2] | float(99)) and states('input_text.spa_ready_notified') != st[0] }}
+    note: A running plan, the water at its target, not yet notified for this plan.
+actions:
+  - variables:
+      st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+      cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+      panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_ready_notified
+    data:
+      value: '{{ st[0] }}'
+  - action: script.spa_notify
+    data:
+      title: Spa ready
+      tag: spa_ready_by
+      message: >-
+        {%- set fcur = ((cur * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' % cur)
+        -%}{%- set plan = st[0] | int -%}{%- set nowts = as_timestamp(now()) | int -%}{%- if st[4]
+        == st[0] -%}{%- set d = ((plan - nowts) / 60) | round(0) | int -%}Water is {{ fcur }} at {{
+        now().strftime('%H:%M') }}, {{ (d ~ ' min before ' if d > 0 else ((-d) ~ ' min after ' if d
+        < 0 else 'right on ')) ~ (plan | timestamp_custom('%H:%M')) }}.{%- else -%}Water is {{ fcur
+        }} at {{ now().strftime('%H:%M') }} (heating started {{ plan | timestamp_custom('%H:%M') }},
+        took {{ ((nowts - plan) / 60) | round(0) | int }} min).{%- endif -%}
+mode: single

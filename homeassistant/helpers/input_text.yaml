@@ -1,0 +1,73 @@
+# input_text helpers used by the spa setup. Create them in the UI (Settings > Devices & services > Helpers) with these options,
+# or paste each block into configuration.yaml under "input_text:".
+spa_decoder_seen:
+  name: Spa Decoder Seen
+  icon: mdi:magnify-scan
+  min: 0
+  max: 255
+  mode: text
+spa_last_heating:
+  name: Spa Last Heating
+  max: 100
+  min: 0
+  mode: text
+spa_heating_run_data:
+  name: Spa Heating Run Data
+  max: 60
+  min: 0
+  mode: text
+spa_temp_last_drop:
+  name: Spa Temp Last Drop
+  max: 60
+  min: 0
+  mode: text
+spa_night_alerts:
+  name: Spa Night Alerts
+  max: 255
+  min: 0
+  mode: text
+spa_ready_by_state:
+  name: Spa Ready By State
+  min: 0
+  max: 100
+  mode: text
+spa_plan_1:
+  name: Spa Plan 1
+  min: 0
+  max: 60
+  mode: text
+spa_plan_2:
+  name: Spa Plan 2
+  min: 0
+  max: 60
+  mode: text
+spa_plan_3:
+  name: Spa Plan 3
+  min: 0
+  max: 60
+  mode: text
+spa_plan_4:
+  name: Spa Plan 4
+  min: 0
+  max: 60
+  mode: text
+spa_plan_5:
+  name: Spa Plan 5
+  min: 0
+  max: 60
+  mode: text
+spa_ready_notified:
+  name: Spa Ready Notified
+  min: 0
+  max: 20
+  mode: text
+spa_plan_when_auto:
+  name: Spa Plan When Auto
+  min: 0
+  max: 20
+  mode: text
+spa_plan_previous_heater_mode:
+  name: Spa Plan Previous Heater Mode
+  min: 0
+  max: 10
+  mode: text

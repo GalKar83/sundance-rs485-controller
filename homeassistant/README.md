@@ -1,21 +1,33 @@
 # Home Assistant side
 
-Everything here runs in Home Assistant on top of the ESP's entities: helpers, automations, a
-script and a dashboard view. It is the owner's working setup, exported and cleaned up. Nothing in
-it is needed for the component to work; take what you want.
+Everything here runs in Home Assistant on top of the ESP's entities: helpers, automations,
+scripts and the dashboard pages. It is the owner's complete working setup, exported from Home
+Assistant's own files with the personal names replaced. Nothing in it is needed for the component
+to work; take what you want.
 
-- [`automations/`](automations) — one YAML file per automation. Paste it into a new automation
-  with *Edit in YAML*.
-- [`scripts/spa_notify.yaml`](scripts/spa_notify.yaml) — the one script.
-- [`dashboard/hot_tub_view.yaml`](dashboard/hot_tub_view.yaml) — the Hot Tub page
-  (see the screenshot in the main README §4).
-- Helpers are created in the UI (*Settings → Devices & services → Helpers*). Their settings are
-  listed below.
+- [`automations/`](automations) — one YAML file per automation (all 21). Paste it into a new
+  automation with *Edit in YAML*.
+- [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), and the plan scripts
+  `spa_plan_add`, `spa_plan_delete` and `spa_target_step`.
+- [`helpers/`](helpers) — the helpers the automations use: `input_boolean`, `input_number`,
+  `input_text`, `input_datetime`, `input_select` and `counter` (create them in the UI with these
+  options, or paste them into `configuration.yaml`), and `config_entry_helpers.yaml` with the template,
+  utility-meter, integration and statistics helpers that the UI creates as config entries
+  (`domain` = helper type, `options` = its settings; the `device_id` was removed — assign them to
+  your own spa device).
+- [`dashboard/`](dashboard) — the three pages: `hot_tub_view.yaml`, `hot_tub_settings_view.yaml`
+  and `hot_tub_plans_view.yaml` (screenshots in the main README §4). They are *sections* views;
+  add each to a dashboard with its raw configuration editor. The owner's outdoor weather block was
+  left out of the Hot Tub page.
+- The exports are taken as they are in the running system. Some helpers keep an older name in
+  their storage id; the files use the entity id that the automations refer to. `Spa Energy Test`
+  is a leftover test meter and the `Power` / `Energy` / `House Load…` helpers belong to the earlier
+  Home Assistant-side power model (§3), so you can skip them.
 
 Replace before use:
 
 - `notify.mobile_app_your_phone` with your phone's notify action.
-- `person.owner` with your person entity.
+- `person.owner` and `device_tracker.owner_presence` with your person and presence entities.
 - `sensor.load_power` with your whole-house power sensor. It is only used by the two optional
   power-measurement automations.
 
@@ -31,6 +43,7 @@ Contents
 4. [Automations](#4-automations)
 5. [Dashboard](#5-dashboard)
 6. [Things learned the hard way](#6-things-learned-the-hard-way)
+7. [Ideas not built yet](#7-ideas-not-built-yet)
 
 ---
 
@@ -49,6 +62,15 @@ Contents
   so a blip in the middle of an event does not lose it or count it twice.
 - **Notifications are in English**, with a unique `tag` per question. The answer's `clear_notification`
   removes the right one.
+- **Event-driven, not polled.** The heating plans compute their start once and set a `time`
+  trigger on an `input_datetime`; they are recomputed only when something they depend on changes
+  (a plan, the water temperature, the Heat Rate, the ESP coming back). The reminders and their
+  answers are separate triggers, so an HA restart does not lose a question.
+- **The panel unit rules.** Everything the owner types or sees (plan temperature, "Set" answer,
+  notices) is in the unit the panel shows (`sensor.sundance_spa_temperature_format`); the stored
+  values and the climate entity stay in °C.
+- **Change only what was asked.** A setting is sent to the spa only from an explicit pick on the
+  dashboard or a notification answer, never to "sync" a value.
 
 ## 2. Helpers
 
@@ -85,10 +107,39 @@ Contents
 The date sensors only exist to show a date in DD/MM/YYYY format on the dashboard. They show
 nothing until the first date is recorded.
 
-### Run-time counters (history_stats + utility_meter)
+### Heating plans, reminders and settings (added 3–6 Nov)
 
-`history_stats` counts today's on-time from the recorder, from `{{ today_at() }}` to `{{ now() }}`.
-Utility meters with *periodically resetting* on add it up per week and month.
+| Entity | Type | Used by |
+|---|---|---|
+| `input_text.spa_plan_1` … `_5` | text, max 60 | one heating plan each: `R|S;temp_c;HH:MM;once|daily|weekday digits (Mon=0…Sun=6);YYYY-MM-DD or -`. R = ready by, S = start heating. Empty = free slot |
+| `input_boolean.spa_plan_1_on` … `_5_on` | toggle | pauses a plan without deleting it |
+| `input_select.spa_plan_mode` / `spa_plan_repeat` | dropdown | the "Add a plan" form: Ready by / Start heating; Once / Daily / Chosen days |
+| `input_select.spa_plan_temperature` | dropdown | the form's temperature in the panel unit (18.0–40.0 °C in halves, 65–104 °F) |
+| `input_boolean.spa_plan_sun` … `_sat` | toggle | days for "Chosen days" |
+| `input_datetime.spa_plan_when` | date + time | the form's time; `input_text.spa_plan_when_auto` remembers the value the automation last wrote |
+| `input_datetime.spa_plan_next_start` / `spa_plan_ready_check` | date + time | the stored heating start and the ready-by check of the next plan (time triggers) |
+| `input_text.spa_ready_by_state` | text, max 100 | the running plan: `plan_ts;previous setpoint;target;phase;ref_ts` (phase heat / warned / asked / done) |
+| `input_text.spa_ready_notified` | text, max 20 | plan_ts already announced as ready |
+| `input_text.spa_plan_previous_heater_mode` | text, max 10 | Eco / Day to restore after a plan switched the mode to Auto |
+| `input_number.spa_heat_rate`, `input_number.spa_ready_by_margin` | box | learned heating rate (°C/h) and safety margin (min) |
+| `input_datetime.spa_last_bromine` | date + time | last bromine addition (reminder every 4 days) |
+| `input_datetime.spa_previous_soak` | date + time | the soak before the last one (shown on the page as *Previous Soak*) |
+| `input_datetime.spa_last_power_cut` | date + time | when the spa last lost power (outage automation) |
+| `input_select.spa_set_pf_start` / `_filter_change` / `_clearray` / `_water_refresh` | dropdown | the settings page dropdowns; their options are rebuilt from the spa's grid |
+| `sensor.spa_next_plan`, `sensor.spa_water_f`, `sensor.spa_target_f` | template | text of the next enabled plan for the page; water and target in °F for the °F variants of the cards |
+
+Scripts: `script.spa_plan_add` (first free slot; refuses with a persistent notification when there
+is no free slot, a one-off is in the past, or no day is chosen), `script.spa_plan_delete(slot)`,
+and `script.spa_target_step` (the −/+ on the Temperature row: one panel step in the panel unit).
+
+### Run-time counters (utility_meter on the ESP totals)
+
+Since p29 the ESP counts the on-times itself (main README §4). The *Today* counters are **daily
+utility meters** on the ESP's Total Time sensors, *Week* and *Month* are utility meters on the same
+totals, all with *always available* on. (Before p29 `history_stats` counted today's on-time from
+the recorder, from `{{ today_at() }}` to `{{ now() }}`; that is the table below, the entity IDs
+are unchanged.) A meter whose source returns from `unavailable` adds the difference, so a Wi-Fi
+drop does not lose time.
 
 | Today (history_stats) | Source, state | Type | Week / Month meters |
 |---|---|---|---|
@@ -116,6 +167,12 @@ ClearRay counter is the same as Pump 1 (the bulb runs whenever the Jet 1 pump do
 in case that turns out not to be so.
 
 ## 3. Electrical power and energy
+
+> **Since p29 the ESP does this itself** (Electrical Power, Energy Counter, the Total Time sensors).
+> The Energy Today / Week / Month / Year / Total meters are utility meters on the ESP's Energy
+> Counter, which keeps counting while Home Assistant is away. The template and integration below
+> are the earlier Home Assistant-side version, kept for comparison and being retired; the
+> Wi-Fi-drop correction in §4 still uses the same schedule model.
 
 The spa does not report power. `sensor.sundance_spa_power` multiplies what is running by the power
 values on the spa device: the six **Power …** numbers of the ESP (*Configuration* on the device
@@ -179,6 +236,78 @@ The chain from power to energy:
 | `spa_deliver_night_alerts` | sends the overnight queue at 06:30 | also on HA start, if HA was down at 06:30 |
 | `spa_panel_used_while_away` | alerts once per absence when someone presses a panel button | the Panel Button entity sees only physical presses |
 | `spa_raw_decoding_values_changed` | optional, diagnostic: reports unknown status values once | only while the raw entities exist |
+| `Spa - Heating plans` | runs the plans of the Scheduled Plans page | details below |
+| `Spa - Heating plans: ready notice` | phone notice "Spa ready" the moment the water reaches a running plan's target | once per plan |
+| `Spa - Ready by: ask what next` | after the plan: back to the old set point, keep, or type a new one | details below |
+| `Spa - Plan form: When stays in the future` | keeps the form's time at the earliest possible moment | one-off plans only |
+| `Spa - Plan temperature follows the panel unit` | swaps the form's temperature list between °C and °F | also at HA start |
+| `Spa - Settings dropdowns: follow the spa` / `send a change` | the settings page dropdowns show the spa's value and send a pick through the ESP's number controls | details below |
+| `Spa - Bromine reminder` | 08:00, from 4 calendar days after the last addition | Yes / No buttons |
+| `Spa - Maintenance reminder` | 08:00, from 8 calendar days after the last maintenance | Done / Not yet |
+| `Spa - Filter rinse reminder` | 08:00, from 30 calendar days after the last rinse | Done / Not yet |
+
+### Heating plans
+
+Plans live in `input_text.spa_plan_1…5` and are added from the **Scheduled Plans** page. A plan has
+a mode, a target temperature, a time and a repeat:
+
+- **Ready by** — the water should be at the target at the plan time. Heating starts at
+  `plan time − ((target − water) / Heat Rate + margin)`. If the water is still more than 0.4° short
+  at the plan time, one *Spa not ready yet* notice gives the temperature now and the expected
+  minutes left.
+- **Start heating** — heating starts at the plan time.
+- **Repeat** — Once, Daily, or chosen weekdays. Repeating plans stay until deleted. A one-off
+  plan leaves the list when its plan time has passed **and** the water has reached the target
+  (whichever is later); one that never started (ESP offline) is removed 10 minutes after its time.
+  A plan can be switched off without deleting it; turning it off does not stop a heating that has
+  already started.
+- **The heating itself** is a set point change (`climate.set_temperature`); the spa's thermostat
+  does the rest. If Heater Mode is **Eco or Day**, which only let the heater run in part of the day
+  (main README §11), the automation switches it to **Auto** for the plan, remembers the old mode
+  in `input_text.spa_plan_previous_heater_mode`, and the question below restores it.
+- **Event-driven.** The next plan within 8 days is recomputed whenever a plan changes, the water
+  temperature moves (every 0.5 °C / 1 °F), the Heat Rate or margin changes, HA starts or the ESP
+  comes back. The start is stored in `input_datetime.spa_plan_next_start`; a `time` trigger on
+  that helper starts the heating exactly then. (An earlier version polled every 5 minutes.)
+- **Heat Rate** is learned by `Spa - Record Last Heating`: after a heating of at least 20 minutes
+  and 1°, `new = 0.7 × old + 0.3 × measured`. Because it covers whole runs, the thermostat
+  overshoot (main README §11) is already in it.
+- **Notices** (through `script.spa_notify`): *Spa heating* ("Heating from 34.5°C to 35.5°C for 15:30,
+  about 25 min of heating"), *Spa not ready yet*, *Spa ready*. All use the panel unit.
+
+**Ask what next.** When a soak is recorded after a plan (from one hour before the water should be
+ready), or two hours after it should have been ready if nobody soaked, the phone asks *Back to
+<previous>, keep <target>, or set a new temperature?*. "Set" opens a text field in the panel unit
+(whole °F 65–104 or °C 18–40 in halves) and re-asks, up to five rounds, after an invalid value.
+Not in the quiet hours (asked at 06:30); no answer within 12 h changes nothing.
+
+**Plan form.** The form's *When* is kept at the earliest possible moment for one-off plans: now for
+*Start heating*, now + (target − water) / Heat Rate for *Ready by*. An untouched form follows that
+time; a later time chosen by the owner is left alone until it is overtaken.
+
+### Settings dropdowns
+
+The Settings page offers the discrete settings as dropdowns (not sliders): Primary Filter start
+hour (00:00–23:00), Filter Change (Off, 10–180 days in tens), ClearRay (Off, 10–360 in tens and
+365), Water Refresh (Off, 30–180 in steps of 30). `follow the spa` keeps each dropdown on the value
+read from the spa (hourly, and on every change); a current value off the grid, such as 141 days or
+`Change Now`, is put at the top of its list. `send a change` calls `number.set_value` on the
+matching ESP control when the dropdown is set to a different grid value; the ESP walks the menu
+(main README §10), and a failed change makes the dropdown return to the old value because it
+follows the read-back. Primary Filter cycles and duration, Heater Mode and the temperature format
+are plain ESP selects shown on the page.
+
+### Reminders
+
+Three morning reminders, each at 08:00, each with phone buttons that are their own triggers:
+
+| Reminder | Asks when | Buttons | Moves the date |
+|---|---|---|---|
+| Bromine | 4 or more calendar days after `input_datetime.spa_last_bromine` (or never) | Yes / No | Yes sets it to now |
+| Maintenance | 8 or more calendar days after `input_datetime.last_maintenance` | Done / Not yet | Done sets it to now and adds one to the maintenance count; a maintenance session recorded by the soak/maintenance question also moves it and clears the question |
+| Filter rinse | 30 or more calendar days after `input_datetime.last_rinse_filter` | Done / Not yet | Done sets it to now; the power-cut rinse question and a manual edit also clear it |
+
+Not yet, No, or no answer: asked again the next morning. The dashboard shows each *Next* date.
 | `spa_power_measurement_circulation`, `spa_power_measurement_jet_pump` | optional: measure circulation / jet power from the house load and log the result | never change the settings, only log |
 
 ### Soaking or maintenance
@@ -223,8 +352,15 @@ corrected.
   reading).
 - No energy is added.
 
-**Wi-Fi drop (date correct).** The spa ran its normal schedule unseen, so that energy is
-estimated and added. The estimate goes minute by minute through the outage:
+**Wi-Fi drop (date correct).** Since p29 the ESP kept counting during the drop, so the *total* is
+already right when it reconnects: the ESP's Energy Counter is the truth. What is wrong is only
+*when* it was spent: the jump lands in the reconnect hour. The automation therefore waits for a
+fresh Energy Counter, takes `x = counter now − the last 5-minute statistics row before the drop`
+and spreads the part it can explain, `scale × estimate` with `scale = min(1, x / estimate)`, back
+over the past hours; the rest stays in the reconnect hour. The meters for today, week, month and
+year get the part before their last reset removed. The estimate is the schedule model below. (The
+ESP also publishes *Energy Last 24 Hours*, which could give the real hours; see §7.) The estimate
+goes minute by minute through the outage:
 
 - controller always;
 - circulation inside the Primary Filter cycles (Start, Cycles and Duration as read from the spa);
@@ -235,27 +371,50 @@ The minutes are grouped by hour, then:
 
 1. **Hourly statistics.** The recorder writes **no hourly row at all** while the source sensor is
    unavailable. Missing hours get a new row with `recorder.import_statistics`: the sum from the
-   hour before plus the estimate so far. Existing rows get the estimate up to their hour, and
-   the last completed hour gets all of it.
-2. **Meters.** `utility_meter.calibrate` adds the same estimate to Energy Total, Today, Week,
-   Month and Year. For Today, Week, Month and Year it adds only the part after that meter's last
-   reset. Step 1 alone does not stick (§6).
-3. A logbook line records the outage and the kWh added.
+   hour before plus the (scaled) estimate so far. Existing rows get the estimate up to their hour,
+   and the last completed hour gets all of it.
+2. **Meters.** `utility_meter.calibrate` moves Today, Week, Month and Year by the part that
+   belongs to the time before their last reset. Step 1 alone does not stick (§6).
+3. A logbook line records the outage and the kWh moved.
+
+Not tested on a real drop since the rewrite.
 
 The schedule is read from the spa at the time of the outage, so a changed filter schedule is
 followed automatically.
 
 ## 5. Dashboard
 
-The Hot Tub view uses the *sections* layout and has six sections:
+There are three pages: **Hot Tub**, **Settings** (`hot-tub-settings`) and **Scheduled Plans**
+(`hot-tub-plans`), all in one dashboard. Most rows are Mushroom template cards, one line each, with
+the numbers and units in smaller type (card-mod); several are shown in °C or °F depending on
+`sensor.sundance_spa_temperature_format`.
+
+The Hot Tub view uses the *sections* layout and has these sections:
 
 - **Control panel:** Jet 1, Jet 2, the two circulation states, and the light mode list on one
-  row.
-- **Temperature chart:** 24 h of water and target temperature, with heating runs in red.
+  row. A Temperature row with −/+ (one panel step), and *Current Status*, which also says
+  `Heating blocked (Eco until 17:00)` when the heater mode keeps the heater off and the water is
+  at least 1° under the target.
+- **Next plan:** one row that appears only when an enabled future plan exists (`sensor.spa_next_plan`).
+- **Temperature chart:** 24 h of water and target temperature, with heating runs in red; the
+  header numbers use the raw value and `update_delay` so they follow live.
 - **Energy:** today / week / month tiles and one bar chart.
-- **Soaking and Maintenance:** last session, totals and counts.
-- **Service:** remaining days and last replacement for water, filter and ClearRay bulb.
+- **Soaking and Maintenance:** last and previous session, totals and counts, with the bromine
+  row and its *Next* date.
+- **Service:** remaining days and last replacement for water, filter and ClearRay bulb; the
+  maintenance and filter-rinse rows with their *Next* dates.
 - **Run Time:** heater, Pump 1 and Pump 2.
+- **Last Heating:** "lowest → highest · minutes · start".
+
+**Scheduled Plans:** the plan rows (info card, on/off icon, trash icon with confirmation) and the
+*Add a plan* form (mode, temperature, When, repeat, days, Add button) with the Heat Rate and margin.
+A plan is deleted only with the trash icon, never by tapping its row.
+
+**Settings:** Heating (Heater Mode with an Eco/Day explanation card, Primary Filter start / cycles /
+duration — the cycles and duration are not greyed out in Eco or Day because they apply in every
+mode), the three service counters as dropdowns, temperature format, language (display only, with
+no write), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, and
+a Diagnostics block (Status, Wi-Fi signal, Decoder Notice).
 
 Details worth knowing:
 
@@ -282,6 +441,20 @@ Details worth knowing:
   existing rows puts a 5-hour outage into a single hour.
 - **Automation reloads cancel waits.** The first "Last Heating" version waited for the end of the
   run, and was cancelled when another automation was saved in the middle of a run.
+- **Jinja turns numeric-looking text into numbers.** A variable holding `"141"` becomes the number
+  141 and no longer equals the state string, so a dropdown comparison never matched and the
+  *send a change* automation once sent the current values to the spa. Compare states as text
+  inline (`| string`), never through a variable. Also: a variable rendered with `tojson` that
+  holds booleans stays a string (use `{{ dict }}`); HA's Jinja has no `extract` filter; a
+  `variables` action inside a `repeat` only changes variables that were defined outside it, so
+  define the answers before the loop.
+- **Saving an automation cancels every wait.** The plan and reminder logic therefore keeps its
+  state in helpers and reacts to triggers. The one place that still waits inside the automation is
+  the "ask what next" question (it waits for the phone answer); a reload at that moment drops it
+  without an answer, which leaves the plan state at `asked`. Moving it to answer triggers, as the
+  reminders do, is on the list in §7.
+- **A utility meter ignores a decrease at its source.** After a source swap the first update was
+  swallowed (about a minute lost); calibrate the meter once afterwards.
 - **`history_stats` cannot be set by hand.** It recomputes from the recorder history of its
   source. Pointing it at a new entity starts that day from the new entity's history. To avoid a
   short day, switch the source after midnight, once the new entity has a full day of history.
@@ -289,3 +462,45 @@ Details worth knowing:
   from night to night (other loads in the house never fully stop). Letting them adjust the setting
   made it wander, so the power values are fixed settings on the ESP, and the two measurement
   automations only log, for occasional review.
+
+## 7. Ideas not built yet
+
+Collected while building the rest; none of these is needed for the component. The first group is
+automation work, the second group tests that are still open.
+
+**Automations and helpers**
+
+- **"Ask what next" on triggers.** It still polls every 5 minutes for the "2 h after it should have
+  been ready" case and waits for the phone answer inside the automation. Exact timing (a `time`
+  trigger on a stored moment) and answer triggers like the reminders would remove both.
+- **Real hours for a Wi-Fi drop.** The ESP's *Energy Last 24 Hours* (24 hourly Wh values) and
+  *Counters At Midnight* are published but the outage automation does not use them yet. With them
+  the past hours get the real values, manual use included, and the schedule estimate is only
+  needed for a drop longer than 24 hours.
+- **Retire the Home Assistant-side power model.** The Spa Power template and the Spa Energy
+  integration are unused since p29; the *Power Now* tile can point at the ESP's Electrical Power.
+  Delete them once nothing else reads them.
+- **Lock the Heat Rate.** The learned rate (`new = 0.7 × old + 0.3 × measured`) can wander after an
+  odd run; an option to freeze it, or to ignore runs with a soak in the middle.
+- **Maintenance count on the page** next to the soaking counts (the sensor exists).
+- **Wrap long plan texts** on the Scheduled Plans page instead of shrinking them.
+- **Statistics repair.** The *Today* time counters changed from `history_stats` (measurement) to
+  utility meters (total increasing) on the same entity IDs; the old statistics rows keep the old
+  type and can be repaired.
+- **A "last settings read" time on the ESP** (a timestamp sensor): a good *Read Settings* leaves no
+  trace in Home Assistant today (main README §14).
+- **Per-person notifications.** Everything goes to one phone; the notify target is one line in
+  `script.spa_notify` and each question automation.
+
+**Rejected, on purpose**
+
+- *Automatic power calibration.* The house-load measurements vary from night to night, so the
+  Power values are fixed settings and the two measurement automations only log.
+- *Writing a setting to "sync" a value.* A setting is sent only from an explicit pick or answer.
+
+**Still to be seen on the real thing**
+
+- Heating with Eco and the jets on, and the Heater Mode → Auto → back switch of a plan, live.
+- A real Wi-Fi drop through the rewritten outage automation.
+- The Back / Keep / Set answer after a soak, and the real Bromine / Maintenance / Filter rinse
+  notification buttons.

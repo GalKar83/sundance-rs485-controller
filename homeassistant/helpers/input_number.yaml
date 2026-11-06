@@ -1,0 +1,32 @@
+# input_number helpers used by the spa setup. Create them in the UI (Settings > Devices & services > Helpers) with these options,
+# or paste each block into configuration.yaml under "input_number:".
+spa_soaking_minutes_total:
+  name: Spa Real Use Minutes Total
+  icon: mdi:hot-tub
+  min: 0
+  max: 100000000
+  step: 0.1
+  unit_of_measurement: min
+  mode: box
+spa_maintenance_minutes_total:
+  name: Spa Maintenance Minutes Total
+  icon: mdi:flask-outline
+  min: 0
+  max: 100000000
+  step: 0.1
+  unit_of_measurement: min
+  mode: box
+spa_heat_rate:
+  name: Spa Heat Rate
+  min: 0.5
+  max: 6
+  step: 0.1
+  unit_of_measurement: °C/h
+  mode: box
+spa_ready_by_margin:
+  name: Spa Ready By Margin
+  min: 0
+  max: 120
+  step: 5
+  unit_of_measurement: min
+  mode: slider

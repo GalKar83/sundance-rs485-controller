@@ -1,0 +1,83 @@
+alias: Spa - Filter rinse reminder
+description: >-
+  From 30 calendar days after the last filter rinse (input_datetime.last_rinse_filter), asks the
+  phone every morning at 08:00 until it is done. Done sets the date and time to now. A rinse
+  recorded by the power-off question ('Spa - Ask: Filter Rinsed After Power Off') or by hand moves
+  the date as well and clears the question. Not yet, or no answer: asked again the next morning.
+  Answers are their own triggers, so they still work after an HA restart. Created 2026-11-05.
+triggers:
+  - trigger: time
+    at: '08:00:00'
+    id: morning
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: SPA_RINSE_DONE
+    id: done
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: SPA_RINSE_LATER
+    id: later
+  - trigger: state
+    entity_id: input_datetime.last_rinse_filter
+    not_to:
+      - unavailable
+      - unknown
+    id: recorded
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: morning
+          - condition: template
+            value_template: >-
+              {%- set t = state_attr('input_datetime.last_rinse_filter', 'timestamp') | float(0)
+              -%}{{ (now().date() - as_local(as_datetime(t)).date()).days >= 30 }}
+            note: 30 or more calendar days since the last rinse.
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              title: Spa filter rinse
+              message: >-
+                {%- set t = state_attr('input_datetime.last_rinse_filter', 'timestamp') | float(0)
+                -%}Filter rinse is due. Last rinsed {{ t | timestamp_custom('%d/%m %H:%M') }} ({{
+                (now().date() - as_local(as_datetime(t)).date()).days }} days ago). Done?
+              data:
+                tag: spa_rinse
+                actions:
+                  - action: SPA_RINSE_DONE
+                    title: Done
+                  - action: SPA_RINSE_LATER
+                    title: Not yet
+                sticky: true
+                persistent: true
+                clickAction: noAction
+                priority: high
+                ttl: 0
+      - conditions:
+          - condition: trigger
+            id: done
+        sequence:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_rinse_filter
+            data:
+              timestamp: '{{ as_timestamp(now()) | int }}'
+          - action: notify.mobile_app_your_phone
+            data:
+              message: clear_notification
+              data:
+                tag: spa_rinse
+      - conditions:
+          - condition: trigger
+            id:
+              - later
+              - recorded
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              message: clear_notification
+              data:
+                tag: spa_rinse
+mode: queued

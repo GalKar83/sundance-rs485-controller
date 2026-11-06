@@ -1,0 +1,60 @@
+# input_datetime helpers used by the spa setup. Create them in the UI (Settings > Devices & services > Helpers) with these options,
+# or paste each block into configuration.yaml under "input_datetime:".
+last_maintenance:
+  name: Last Maintenance (Storage)
+  icon: mdi:flask-outline
+  has_date: true
+  has_time: true
+last_replacement_filter_date:
+  name: Last Replacement Filter Date (Storage)
+  icon: mdi:air-filter
+  has_date: true
+  has_time: false
+last_replacement_clearray_bulb_date:
+  name: Last Replacement ClearRay Bulb Date (Storage)
+  icon: mdi:lightbulb-on-outline
+  has_date: true
+  has_time: false
+last_replacement_water_date:
+  name: Last Replacement Water Date (Storage)
+  icon: mdi:water-sync
+  has_date: true
+  has_time: false
+last_soak:
+  name: Last Soak (Storage)
+  icon: mdi:hot-tub
+  has_date: true
+  has_time: true
+last_rinse_filter:
+  name: Last Rinse Filter (Storage)
+  icon: mdi:air-filter
+  has_date: true
+  has_time: true
+spa_in_use_since:
+  name: Spa In Use Since
+  has_date: true
+  has_time: true
+spa_plan_when:
+  name: Spa Plan When
+  has_date: true
+  has_time: true
+spa_last_power_cut:
+  name: Spa Last Power Cut
+  has_date: true
+  has_time: true
+spa_plan_next_start:
+  name: Spa Plan Next Start
+  has_date: true
+  has_time: true
+spa_plan_ready_check:
+  name: Spa Plan Ready Check
+  has_date: true
+  has_time: true
+spa_last_bromine:
+  name: Spa Last Bromine
+  has_date: true
+  has_time: true
+spa_previous_soak:
+  name: Spa Previous Soak
+  has_date: true
+  has_time: true

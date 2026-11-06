@@ -1,14 +1,21 @@
-alias: "Spa - Ask: Filter/ClearRay Bulb/Water Replaced?"
+alias: 'Spa - Ask: Filter/ClearRay Bulb/Water Replaced?'
 description: >-
-  When a service counter is reset at the panel (Remaining Days Filter Change / ClearRay Bulb /
-  Water Refresh: the days go up, or Off / Change Now -> days), ask the phone whether the item was
-  actually replaced. Yes -> the matching Last Replacement date is set to the reset date. No, or no
-  answer within 12 h -> nothing changes (covers test resets). unknown/unavailable (ESP reboot) are
-  ignored. No question in the quiet hours 23:00-06:30: it waits and asks at 06:30.
+  When a spa service counter is reset on the panel (Remaining Days Filter Change / ClearRay Bulb /
+  Water Refresh: days jump up, or Off / Change Now -> days), ask the owner's phone whether the item
+  was actually replaced. Yes -> the matching Last Replacement ... Date is set to the reset date. No
+  or no answer within 12 h -> nothing changes (covers test resets). unknown/unavailable (ESP reboot)
+  are ignored. Counters are text since ESP patch 17 (2026-10-25): days, 'Change Now' or 'Off'.
+  Revised 2026-10-28: entities renamed (sensor.sundance_spa_remaining_days_*,
+  input_datetime.last_replacement_*_date). Revised 2026-11-01: no question in the spa quiet hours
+  23:00-06:30 - it waits and asks at 06:30. Revised 2026-11-03: asked only within 12 h after a real
+  power cut (input_datetime.spa_last_power_cut, set by the outage automation when the spa date was
+  reset) - counters are also edited from HA now, and a real replacement always follows switching the
+  spa off.
 triggers:
   - trigger: state
     entity_id: sensor.sundance_spa_remaining_days_filter_change
     id: filter
+    note: Counter reset on the panel
   - trigger: state
     entity_id: sensor.sundance_spa_remaining_days_clearray_bulb
     id: clearray_bulb
@@ -16,35 +23,46 @@ triggers:
     entity_id: sensor.sundance_spa_remaining_days_water_refresh
     id: water
 conditions:
-  # A reset = the days go up (the normal daily change is -1), or a number appears after
-  # Off / Change Now. The counters are text sensors, so no native condition can compare them.
   - condition: template
     value_template: >-
-      {% set f = trigger.from_state.state %}{% set t = trigger.to_state.state %}
-      {{ is_number(t) and ((is_number(f) and t | float > f | float) or f in ['Off', 'Change Now']) }}
+      {% set f = trigger.from_state.state %}{% set t = trigger.to_state.state %}{{ is_number(t) and
+      ((is_number(f) and t | float > f | float) or f in ['Off', 'Change Now']) }}
+    note: >-
+      A reset = the days go up (normal daily change is -1), or a number appears after Off / Change
+      Now. unknown/unavailable (ESP reboot) never count. No native condition compares old vs new
+      state.
+  - condition: template
+    value_template: >-
+      {{ as_timestamp(now()) - (state_attr('input_datetime.spa_last_power_cut', 'timestamp') |
+      float(0)) < 12 * 3600 }}
+    note: >-
+      Owner's rule: a filter, bulb or water change always starts with the spa switched off, so a
+      reset is only asked about within 12 h after a real power cut (spa date reset to 01/01/2014).
+      Otherwise the value was just edited, e.g. from HA.
 actions:
   - variables:
-      item: "{{ {'filter': 'Filter', 'clearray_bulb': 'ClearRay bulb', 'water': 'Water'}[trigger.id] }}"
-      target_entity: "{{ 'input_datetime.last_replacement_' ~ trigger.id ~ '_date' }}"
-      reset_date: "{{ now().date() | string }}"
-      tag: "spa_replace_{{ trigger.id }}_{{ as_timestamp(now()) | int }}"
-  - wait_template: "{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}"
+      item: '{{ {''filter'': ''Filter'', ''clearray_bulb'': ''ClearRay bulb'', ''water'': ''Water''}[trigger.id] }}'
+      target_entity: '{{ ''input_datetime.last_replacement_'' ~ trigger.id ~ ''_date'' }}'
+      reset_date: '{{ now().date() | string }}'
+      tag: spa_replace_{{ trigger.id }}_{{ as_timestamp(now()) | int }}
+  - wait_template: '{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}'
     timeout:
       hours: 8
     continue_on_timeout: true
+    note: 'Spa quiet hours 23:00-06:30: ask at 06:30. The recorded date stays the reset date.'
   - action: notify.mobile_app_your_phone
     data:
       title: Spa counter reset
       message: >-
-        {{ item }} counter was reset to {{ trigger.to_state.state | int }} days.
-        Was the {{ item | lower }} replaced?
+        {{ item }} counter was reset to {{ trigger.to_state.state | int }} days. Was the {{ item |
+        lower }} replaced?
       data:
-        tag: "{{ tag }}"
+        tag: '{{ tag }}'
         actions:
-          - action: "YES_{{ tag }}"
-            title: "Yes"
-          - action: "NO_{{ tag }}"
-            title: "No"
+          - action: YES_{{ tag }}
+            title: 'Yes'
+          - action: NO_{{ tag }}
+            title: 'No'
         sticky: true
         persistent: true
         clickAction: noAction
@@ -54,28 +72,29 @@ actions:
       - trigger: event
         event_type: mobile_app_notification_action
         event_data:
-          action: "YES_{{ tag }}"
+          action: YES_{{ tag }}
       - trigger: event
         event_type: mobile_app_notification_action
         event_data:
-          action: "NO_{{ tag }}"
+          action: NO_{{ tag }}
     timeout:
       hours: 12
     continue_on_timeout: true
   - if:
       - condition: template
-        value_template: "{{ wait.trigger is not none and wait.trigger.event.data.action == 'YES_' ~ tag }}"
+        value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''YES_'' ~ tag }}'
     then:
-      # The date of the reset, not of the answer.
       - action: input_datetime.set_datetime
         target:
-          entity_id: "{{ target_entity }}"
+          entity_id: '{{ target_entity }}'
         data:
-          date: "{{ reset_date }}"
+          date: '{{ reset_date }}'
+        note: Date of the reset, not of the answer
+    note: 'No or no answer: date unchanged.'
   - action: notify.mobile_app_your_phone
     data:
       message: clear_notification
       data:
-        tag: "{{ tag }}"
+        tag: '{{ tag }}'
 mode: parallel
 max: 5

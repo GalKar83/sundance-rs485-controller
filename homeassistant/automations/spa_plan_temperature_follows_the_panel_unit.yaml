@@ -1,0 +1,46 @@
+alias: Spa - Plan temperature follows the panel unit
+description: >-
+  The heating-plan form's temperature dropdown (input_select.spa_plan_temperature) offers the
+  panel's unit: 18.0-40.0 °C in half degrees, or 65-104 °F in whole degrees. When the panel unit
+  changes (sensor.sundance_spa_temperature_format) the options are swapped and the chosen value is
+  converted (°F = °C x 9/5 + 32 rounded; °C back to the nearest half degree). Also checked at HA
+  start. Created 2026-11-03.
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_temperature_format
+    to:
+      - °C
+      - °F
+  - trigger: homeassistant
+    event: start
+actions:
+  - variables:
+      panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+      cur: '{{ states(''input_select.spa_plan_temperature'') | float(38) }}'
+      list_is_f: >-
+        {{ '.' not in (state_attr('input_select.spa_plan_temperature', 'options') | first | string)
+        }}
+  - condition: template
+    value_template: '{{ panel_f != list_is_f }}'
+    note: Options already in the panel's unit.
+  - variables:
+      c: '{{ ((((cur - 32) * 10 / 9) | round(0)) / 2) if list_is_f else cur }}'
+      opts: >-
+        {%- if panel_f -%}{{ range(65, 105) | map('string') | list }}{%- else -%}{%- set ns =
+        namespace(o=[]) -%}{%- for i in range(36, 81) -%}{%- set ns.o = ns.o + ['%.1f' % (i / 2)]
+        -%}{%- endfor -%}{{ ns.o }}{%- endif -%}
+      pick: >-
+        {{ (([[c * 9 / 5 + 32, 65] | max, 104] | min) | round(0) | int | string) if panel_f else
+        ('%.1f' % ([[c, 18] | max, 40] | min)) }}
+  - action: input_select.set_options
+    target:
+      entity_id: input_select.spa_plan_temperature
+    data:
+      options: '{{ opts }}'
+  - action: input_select.select_option
+    target:
+      entity_id: input_select.spa_plan_temperature
+    data:
+      option: '{{ pick }}'
+mode: queued
+max: 3

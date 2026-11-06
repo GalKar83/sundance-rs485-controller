@@ -1,0 +1,76 @@
+alias: Spa - Bromine reminder
+description: >-
+  Every morning at 08:00, if bromine was last added 4 or more calendar days ago
+  (input_datetime.spa_last_bromine, or never), asks the phone 'Added bromine?' with Yes / No. Yes
+  sets the date and time to now, so the next question comes 4 days later. No, or no answer: asked
+  again the next morning at 08:00. The answer is its own trigger, so it still works after an HA
+  restart. The date can also be set by hand from the Hot Tub page. Created 2026-11-05.
+triggers:
+  - trigger: time
+    at: '08:00:00'
+    id: morning
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: SPA_BROMINE_YES
+    id: 'yes'
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: SPA_BROMINE_NO
+    id: 'no'
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: morning
+          - condition: template
+            value_template: >-
+              {%- set t = state_attr('input_datetime.spa_last_bromine', 'timestamp') | float(0)
+              -%}{{ (now().date() - as_local(as_datetime(t)).date()).days >= 4 }}
+            note: 4 or more calendar days since the last addition.
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              title: Spa bromine
+              message: >-
+                {%- set t = state_attr('input_datetime.spa_last_bromine', 'timestamp') | float(0)
+                -%}{%- if t < 172800 -%}Time to add bromine. Added it?{%- else -%}Time to add
+                bromine. Last added {{ t | timestamp_custom('%d/%m %H:%M') }} ({{ (now().date() -
+                as_local(as_datetime(t)).date()).days }} days ago). Added it?{%- endif -%}
+              data:
+                tag: spa_bromine
+                actions:
+                  - action: SPA_BROMINE_YES
+                    title: 'Yes'
+                  - action: SPA_BROMINE_NO
+                    title: 'No'
+                sticky: true
+                persistent: true
+                clickAction: noAction
+                priority: high
+                ttl: 0
+      - conditions:
+          - condition: trigger
+            id: 'yes'
+        sequence:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.spa_last_bromine
+            data:
+              timestamp: '{{ as_timestamp(now()) | int }}'
+          - action: notify.mobile_app_your_phone
+            data:
+              message: clear_notification
+              data:
+                tag: spa_bromine
+      - conditions:
+          - condition: trigger
+            id: 'no'
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              message: clear_notification
+              data:
+                tag: spa_bromine
+mode: queued

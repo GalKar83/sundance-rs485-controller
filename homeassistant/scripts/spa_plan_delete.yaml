@@ -1,0 +1,22 @@
+alias: Spa - Delete heating plan
+description: >-
+  Clears one heating plan slot (input_text.spa_plan_1..5) and its on/off switch. Called from the
+  trash button of a plan row on the Hot Tub Settings page. Created 2026-11-03.
+mode: queued
+fields:
+  slot:
+    description: Slot number 1-5
+    required: true
+    selector:
+      number:
+        min: 1
+        max: 5
+sequence:
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_plan_{{ slot | int }}
+    data:
+      value: ''
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.spa_plan_{{ slot | int }}_on

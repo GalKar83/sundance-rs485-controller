@@ -1,0 +1,100 @@
+# input_select helpers used by the spa setup. Create them in the UI (Settings > Devices & services > Helpers) with these options,
+# or paste each block into configuration.yaml under "input_select:".
+spa_plan_mode:
+  name: Spa Plan Mode
+  options:
+    - Ready by
+    - Start heating
+spa_plan_repeat:
+  name: Spa Plan Repeat
+  options:
+    - Once
+    - Daily
+    - Chosen days
+spa_plan_temperature:
+  name: Spa Plan Temperature
+  options:
+    - '18.0'
+    - '18.5'
+    - '19.0'
+    - '19.5'
+    - '20.0'
+    - '20.5'
+    - '21.0'
+    - '21.5'
+    - '22.0'
+    - '22.5'
+    - '23.0'
+    - '23.5'
+    - '24.0'
+    - '24.5'
+    - '25.0'
+    - '25.5'
+    - '26.0'
+    - '26.5'
+    - '27.0'
+    - '27.5'
+    - '28.0'
+    - '28.5'
+    - '29.0'
+    - '29.5'
+    - '30.0'
+    - '30.5'
+    - '31.0'
+    - '31.5'
+    - '32.0'
+    - '32.5'
+    - '33.0'
+    - '33.5'
+    - '34.0'
+    - '34.5'
+    - '35.0'
+    - '35.5'
+    - '36.0'
+    - '36.5'
+    - '37.0'
+    - '37.5'
+    - '38.0'
+    - '38.5'
+    - '39.0'
+    - '39.5'
+    - '40.0'
+spa_set_pf_start:
+  name: Spa Set PF Start
+  options:
+    - '00:00'
+    - '01:00'
+    - '02:00'
+    - '03:00'
+    - '04:00'
+    - '05:00'
+    - '06:00'
+    - '07:00'
+    - '08:00'
+    - '09:00'
+    - '10:00'
+    - '11:00'
+    - '12:00'
+    - '13:00'
+    - '14:00'
+    - '15:00'
+    - '16:00'
+    - '17:00'
+    - '18:00'
+    - '19:00'
+    - '20:00'
+    - '21:00'
+    - '22:00'
+    - '23:00'
+spa_set_filter_change:
+  name: Spa Set Filter Change
+  options:
+    - '-'
+spa_set_clearray:
+  name: Spa Set ClearRay
+  options:
+    - '-'
+spa_set_water_refresh:
+  name: Spa Set Water Refresh
+  options:
+    - '-'

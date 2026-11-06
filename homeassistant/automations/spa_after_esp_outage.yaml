@@ -1,83 +1,97 @@
-alias: "Spa - After an ESP outage: power cut or Wi-Fi drop"
+alias: 'Spa - After an ESP outage: power cut or Wi-Fi drop'
 description: >-
   Runs when the spa ESP (binary_sensor.sundance_spa_status) comes back after 1+ min offline and
-  tells a real spa power cut from a Wi-Fi drop by the spa clock: every power cut resets the spa
-  date to 01/01/2014 (and the time to 00:00), and the ESP can only correct it after it is back in
-  HA (it needs HA's time). The date arrives ~80 s after the reconnect; the automatic clock sync
-  fixes it ~2 min later, so the date is read in between.
-  POWER CUT (date 01/01/2014): if the spa was off 5+ min and came back on outside the quiet hours
-  23:00-06:30, ask the phone "Did you rinse your filter?"; Yes -> input_datetime.last_rinse_filter
-  = the time the spa came back on (now minus the spa clock reading). No energy is added (the spa
-  used none).
-  WI-FI DROP (date correct): the spa kept running its normal schedule while HA could not see it,
-  so the energy is estimated - controller + circulation during the scheduled filter cycles
-  (Primary Filter Start / Cycles / Duration read from the spa) + one jet pump for the daily 1-min
-  cleanup at the first cycle start + 1 min. Heating or manual use while offline cannot be known
-  and is not added. The estimate goes into the hourly statistics of
-  sensor.sundance_spa_energy_total (in the hours it belongs to) and into the Today / Week /
-  Month / Year meters (only the part after each meter's last reset), and to the logbook.
-  No date within 3 min: nothing changes, a notice is sent.
+  tells a real spa power cut from a Wi-Fi drop by the spa clock: every spa power cut resets the spa
+  date to 01/01/2014 (and the clock to 00:00), and the ESP cannot sync the clock before it is back
+  in HA (it needs HA's time) - the date arrives ~80 s after the reconnect, the sync fixes it ~2 min
+  later (measured 31 Oct 08:02). POWER CUT (date 01/01/2014): input_datetime.spa_last_power_cut =
+  the time the spa came back on (used by the counter-reset question); if off 5+ min and the spa came
+  back ON outside the quiet hours 23:00-06:30, ask the owner's phone 'Did you rinse your filter?';
+  Yes -> input_datetime.last_rinse_filter = the time the spa came back ON = now minus the spa clock
+  reading. Nothing is added to the energy (the spa used none). WI-FI DROP (date correct): since ESP
+  patch 29 the ESP counts energy and run times itself (Energy Counter, *Total Time), so the utility
+  meters get the real figures as soon as it is back, including heating or manual use. Only the
+  hourly bars need help: the jump would land in the hour it came back, so the part the normal
+  schedule explains (controller + circulation in the Primary Filter cycles + the 1-min cleanup, from
+  number.sundance_spa_power_*) is moved back into the hourly statistics of
+  sensor.sundance_spa_energy_total in the hours it belongs to (recorder.import_statistics; scaled
+  down if the ESP counted less), the rest stays in the hour it came back; across a reset the part
+  before it is taken out of the new period's meter; logged to the logbook. No date within 3 min:
+  nothing changes, a notice is sent. Created 2026-10-28 (as 'Spa - Ask: Filter rinsed after power
+  off?'). Revised 2026-11-01/02: detection by the spa date, quiet hours, schedule estimate added to
+  statistics + meters. Revised 2026-11-03 (ESP patch 29): the ESP's own counters are the truth; the
+  estimate only distributes them over the hours.
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_status
-    from: "off"
-    to: "on"
+    from: 'off'
+    to: 'on'
 conditions:
-  # Offline at least a minute. No native condition measures how long the previous state lasted.
   - condition: template
-    value_template: "{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 60 }}"
+    value_template: '{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 60 }}'
+    note: Offline at least a minute. No native condition measures how long the previous state lasted.
 actions:
   - variables:
-      t0: "{{ as_timestamp(trigger.from_state.last_changed) }}"
-      t1: "{{ as_timestamp(trigger.to_state.last_changed) }}"
-      off_min: "{{ ((t1 - t0) / 60) | round(0) | int }}"
-  # The spa date arrives ~80 s after a power-up, well before the automatic clock sync corrects it.
-  - wait_template: "{{ states('sensor.sundance_spa_clock_date') | regex_match('^\\d{2}/\\d{2}/\\d{4}$') }}"
+      t0: '{{ as_timestamp(trigger.from_state.last_changed) }}'
+      t1: '{{ as_timestamp(trigger.to_state.last_changed) }}'
+      off_min: '{{ ((t1 - t0) / 60) | round(0) | int }}'
+  - wait_template: '{{ states(''sensor.sundance_spa_clock_date'') | regex_match(''^\d{2}/\d{2}/\d{4}$'') }}'
     timeout:
       minutes: 3
     continue_on_timeout: true
+    note: The spa date arrives ~80 s after a power-up; well before the automatic clock sync corrects it.
   - if:
       - condition: template
-        value_template: "{{ not wait.completed }}"
+        value_template: '{{ not wait.completed }}'
     then:
       - action: script.spa_notify
         data:
           title: Spa outage
           message: >-
-            The spa ESP was offline {{ off_min }} min but its date never arrived - could not tell
-            a power cut from a Wi-Fi drop; nothing recorded.
+            The spa ESP was offline {{ off_min }} min but its date never arrived - could not tell a
+            power cut from a Wi-Fi drop; nothing recorded.
           tag: spa_outage
       - stop: No spa date
   - choose:
-      # ---------------- Real power cut ----------------
       - conditions:
           - condition: state
             entity_id: sensor.sundance_spa_clock_date
-            state: "01/01/2014"
+            state: 01/01/2014
         sequence:
           - variables:
-              clock: "{{ states('sensor.sundance_spa_clock_time') }}"
-              # The spa clock started at 00:00 when power returned, so it reads the time since then.
+              clock: '{{ states(''sensor.sundance_spa_clock_time'') }}'
               on_ts: >-
-                {% set p = clock.split(':') %}{% if p | count == 2 and p[0] | is_number and p[1] | is_number %}{{ (as_timestamp(now()) - (p[0] | int * 60 + p[1] | int) * 60) | int }}{% else %}{{ t1 | int }}{% endif %}
-              on_min: "{{ (on_ts | timestamp_custom('%H', true)) | int * 60 + (on_ts | timestamp_custom('%M', true)) | int }}"
-              tag: "spa_rinse_{{ as_timestamp(now()) | int }}"
-          # Rinsing takes minutes; nobody rinses the filter in the quiet hours 23:00-06:30.
+                {% set p = clock.split(':') %}{% if p | count == 2 and p[0] | is_number and p[1] |
+                is_number %}{{ (as_timestamp(now()) - (p[0] | int * 60 + p[1] | int) * 60) | int
+                }}{% else %}{{ t1 | int }}{% endif %}
+              on_min: >-
+                {{ (on_ts | timestamp_custom('%H', true)) | int * 60 + (on_ts |
+                timestamp_custom('%M', true)) | int }}
+              tag: spa_rinse_{{ as_timestamp(now()) | int }}
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.spa_last_power_cut
+            data:
+              timestamp: '{{ on_ts }}'
+            note: >-
+              Every real power cut: when the spa came back on. The counter-reset question only asks
+              after one of these.
           - condition: template
-            value_template: "{{ off_min >= 5 and 390 <= on_min < 1380 }}"
+            value_template: '{{ off_min >= 5 and 390 <= on_min < 1380 }}'
+            note: Rinsing takes minutes; nobody rinses the filter in the quiet hours 23:00-06:30.
           - action: notify.mobile_app_your_phone
             data:
               title: Spa was switched off
               message: >-
-                The spa was off for about {{ off_min }} min and came back on at
-                {{ on_ts | timestamp_custom('%H:%M') }}. Did you rinse your filter?
+                The spa was off for about {{ off_min }} min and came back on at {{ on_ts |
+                timestamp_custom('%H:%M') }}. Did you rinse your filter?
               data:
-                tag: "{{ tag }}"
+                tag: '{{ tag }}'
                 actions:
-                  - action: "YES_{{ tag }}"
-                    title: "Yes"
-                  - action: "NO_{{ tag }}"
-                    title: "No"
+                  - action: YES_{{ tag }}
+                    title: 'Yes'
+                  - action: NO_{{ tag }}
+                    title: 'No'
                 sticky: true
                 persistent: true
                 clickAction: noAction
@@ -87,109 +101,126 @@ actions:
               - trigger: event
                 event_type: mobile_app_notification_action
                 event_data:
-                  action: "YES_{{ tag }}"
+                  action: YES_{{ tag }}
               - trigger: event
                 event_type: mobile_app_notification_action
                 event_data:
-                  action: "NO_{{ tag }}"
+                  action: NO_{{ tag }}
             timeout:
               hours: 12
             continue_on_timeout: true
           - if:
               - condition: template
-                value_template: "{{ wait.trigger is not none and wait.trigger.event.data.action == 'YES_' ~ tag }}"
+                value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''YES_'' ~ tag }}'
             then:
-              # The time the spa came back on, not the time of the answer.
               - action: input_datetime.set_datetime
                 target:
                   entity_id: input_datetime.last_rinse_filter
                 data:
-                  timestamp: "{{ on_ts }}"
+                  timestamp: '{{ on_ts }}'
+                note: Time the spa came back on, not the time of the answer
           - action: notify.mobile_app_your_phone
             data:
               message: clear_notification
               data:
-                tag: "{{ tag }}"
-    # ---------------- Wi-Fi drop: estimate the energy of the normal schedule ----------------
+                tag: '{{ tag }}'
     default:
-      # Minute by minute from t0 to t1 (at most a day): controller always, circulation inside a
-      # scheduled filter cycle, a jet pump during the 1-min cleanup. Result: total kWh and a list
-      # of [hour start (UTC epoch), kWh in that hour].
       - variables:
           corr: >-
-            {%- set S = (states('sensor.sundance_spa_primary_filter_start') ~ ':0').split(':')[0] | int(12) -%}
-            {%- set N = [states('sensor.sundance_spa_primary_filter_cycles') | int(4), 1] | max -%}
-            {%- set D = states('sensor.sundance_spa_primary_filter_duration') | float(2) -%}
-            {%- set circ = states('number.sundance_spa_power_circulation') | float(370) -%}
-            {%- set jet = states('number.sundance_spa_power_jet_pump') | float(1630) -%}
-            {%- set ctrl = states('number.sundance_spa_power_controller') | float(15) -%}
-            {%- set off = now().utcoffset().total_seconds() -%}
-            {%- set ns = namespace(total=0, key=none, cur=0, hours=[]) -%}
-            {%- set n = (((t1 - t0) / 60) | round(0, 'ceil')) | int -%}
-            {%- for i in range([n, 1440] | min) -%}
-            {%- set a = t0 + i * 60 -%}
-            {%- set b = [a + 60, t1] | min -%}
-            {%- set m = (a + b) / 2 -%}
-            {%- set h = ((m + off) % 86400) / 3600 -%}
-            {%- set c = namespace(on=false) -%}
-            {%- for k in range(N) -%}
-            {%- if ((h - S - k * 24 / N) % 24) < D -%}{%- set c.on = true -%}{%- endif -%}
-            {%- endfor -%}
-            {%- set cl = (h - S) % 24 >= 1 / 60 and (h - S) % 24 < 2 / 60 -%}
-            {%- set e = (ctrl + (circ if c.on else 0) + (jet if cl else 0)) * (b - a) / 3600000 -%}
-            {%- set key = (m - m % 3600) | int -%}
-            {%- if key != ns.key and ns.key is not none -%}
-            {%- set ns.hours = ns.hours + [[ns.key, ns.cur]] -%}
-            {%- set ns.cur = 0 -%}
-            {%- endif -%}
-            {%- set ns.key = key -%}
-            {%- set ns.cur = ns.cur + e -%}
-            {%- set ns.total = ns.total + e -%}
-            {%- endfor -%}
-            {%- if ns.key is not none -%}{%- set ns.hours = ns.hours + [[ns.key, ns.cur]] -%}{%- endif -%}
-            {{ {'total': ns.total, 'hours': ns.hours} | tojson }}
+            {%- set S = (states('sensor.sundance_spa_primary_filter_start') ~ ':0').split(':')[0] |
+            int(12) -%}{%- set N = [states('sensor.sundance_spa_primary_filter_cycles') | int(4), 1]
+            | max -%}{%- set D = states('sensor.sundance_spa_primary_filter_duration') | float(2)
+            -%}{%- set circ = states('number.sundance_spa_power_circulation') | float(370) -%}{%-
+            set jet = states('number.sundance_spa_power_jet_pump') | float(1630) -%}{%- set ctrl =
+            states('number.sundance_spa_power_controller') | float(15) -%}{%- set off =
+            now().utcoffset().total_seconds() -%}{%- set ns = namespace(total=0, key=none, cur=0,
+            hours=[]) -%}{%- set n = (((t1 - t0) / 60) | round(0, 'ceil')) | int -%}{%- for i in
+            range([n, 1440] | min) -%}{%- set a = t0 + i * 60 -%}{%- set b = [a + 60, t1] | min
+            -%}{%- set m = (a + b) / 2 -%}{%- set h = ((m + off) % 86400) / 3600 -%}{%- set c =
+            namespace(on=false) -%}{%- for k in range(N) -%}{%- if ((h - S - k * 24 / N) % 24) < D
+            -%}{%- set c.on = true -%}{%- endif -%}{%- endfor -%}{%- set cl = (h - S) % 24 >= 1 / 60
+            and (h - S) % 24 < 2 / 60 -%}{%- set e = (ctrl + (circ if c.on else 0) + (jet if cl else
+            0)) * (b - a) / 3600000 -%}{%- set key = (m - m % 3600) | int -%}{%- if key != ns.key
+            and ns.key is not none -%}{%- set ns.hours = ns.hours + [[ns.key, ns.cur]] -%}{%- set
+            ns.cur = 0 -%}{%- endif -%}{%- set ns.key = key -%}{%- set ns.cur = ns.cur + e -%}{%-
+            set ns.total = ns.total + e -%}{%- endfor -%}{%- if ns.key is not none -%}{%- set
+            ns.hours = ns.hours + [[ns.key, ns.cur]] -%}{%- endif -%}{{ {'total': ns.total, 'hours':
+            ns.hours} | tojson }}
       - condition: template
-        value_template: "{{ corr.total > 0.0005 }}"
-      # From a day before, so the last row before the outage is found even after several outages.
+        value_template: '{{ corr.total > 0.0005 }}'
+      - wait_template: >-
+          {{ states('sensor.sundance_spa_energy_counter') | is_number and
+          as_timestamp(states.sensor.sundance_spa_energy_counter.last_updated) >= t1 - 1 }}
+        timeout:
+          minutes: 2
+        continue_on_timeout: false
+        note: >-
+          The ESP counted the real energy while HA could not see it; its Energy Counter arrives
+          right after the reconnect and the utility meters add the jump by themselves.
+      - delay:
+          seconds: 10
+        note: Let the utility meters process the new counter value first.
       - action: recorder.get_statistics
         data:
-          start_time: "{{ (corr.hours[0][0] - 86400) | timestamp_local }}"
-          end_time: "{{ now().isoformat() }}"
+          start_time: '{{ (t0 - 7200) | timestamp_local }}'
+          end_time: '{{ now().isoformat() }}'
+          statistic_ids:
+            - sensor.sundance_spa_energy_counter
+          period: 5minute
+          types:
+            - state
+        response_variable: cst
+        note: >-
+          The counter value just before the outage = the state of its last 5-minute row starting
+          before t0.
+      - variables:
+          x: >-
+            {%- set rows = cst.statistics['sensor.sundance_spa_energy_counter'] | default([]) |
+            selectattr('start', 'lt', (t0 | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false))) |
+            list -%}{%- if rows and rows[-1].state is number -%}{{
+            [states('sensor.sundance_spa_energy_counter') | float(0) - rows[-1].state, 0] | max
+            }}{%- else -%}{{ corr.total }}{%- endif -%}
+          scale: '{{ ([x / corr.total, 1] | min) if corr.total > 0 else 0 }}'
+        note: >-
+          x = what the ESP really counted during the outage. The schedule estimate is scaled down if
+          it is larger (ESP lost counting), so no hour is ever left negative.
+      - action: recorder.get_statistics
+        data:
+          start_time: '{{ (corr.hours[0][0] - 86400) | timestamp_local }}'
+          end_time: '{{ now().isoformat() }}'
           statistic_ids:
             - sensor.sundance_spa_energy_total
           period: hour
-          types: [sum, state]
+          types:
+            - sum
+            - state
         response_variable: st
-      # One row per completed hour from the outage on. The recorder writes NO hourly row while the
-      # source is unavailable, so missing hours get a new row (sum carried over from the hour before
-      # plus the estimate so far); existing rows get the estimate up to their hour; the last
-      # completed hour gets all of it (later hours are compiled on top of it).
+        note: >-
+          From a day before, so the last row before the outage is found even after several outages
+          in a row.
       - variables:
           fixed: >-
-            {%- set rows = st.statistics['sensor.sundance_spa_energy_total'] | default([]) -%}
-            {%- set first = corr.hours[0][0] | int -%}
-            {%- set nowts = as_timestamp(now()) | int -%}
-            {%- set last_done = (nowts - nowts % 3600 - 3600) | int -%}
-            {%- set ns = namespace(out=[], raw=none, state=none) -%}
-            {%- for r in rows -%}
-            {%- if as_timestamp(r.start) < first -%}{%- set ns.raw = r.sum -%}{%- set ns.state = r.state -%}{%- endif -%}
-            {%- endfor -%}
-            {%- set hs = range(first, last_done + 1, 3600) | list if first <= last_done else [last_done] -%}
-            {%- for h in hs -%}
-            {%- set ex = rows | selectattr('start', 'search', (h | timestamp_custom('%Y-%m-%dT%H:00:00', false))) | list -%}
-            {%- if ex -%}{%- set ns.raw = ex[0].sum -%}{%- set ns.state = ex[0].state -%}{%- endif -%}
-            {%- if ns.raw is not none -%}
-            {%- set add = corr.total if h == last_done else (corr.hours | selectattr(0, 'le', h) | map(attribute=1) | sum) -%}
-            {%- set ns.out = ns.out + [{'start': h | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false), 'state': ns.state, 'sum': ns.raw + add}] -%}
-            {%- endif -%}
-            {%- endfor -%}
-            {{ ns.out | tojson }}
-      # import_statistics rewrites only the HOURLY rows. The calibration of the same meter below
-      # moves its 5-minute rows by the same amount, so the following hours are compiled on top of
-      # the corrected value instead of undoing it.
+            {%- set rows = st.statistics['sensor.sundance_spa_energy_total'] | default([]) -%}{%-
+            set first = corr.hours[0][0] | int -%}{%- set nowts = as_timestamp(now()) | int -%}{%-
+            set last_done = (nowts - nowts % 3600 - 3600) | int -%}{%- set ns = namespace(out=[],
+            raw=none, state=none) -%}{%- for r in rows -%}{%- if as_timestamp(r.start) < first
+            -%}{%- set ns.raw = r.sum -%}{%- set ns.state = r.state -%}{%- endif -%}{%- endfor
+            -%}{%- if first <= last_done -%}{%- for h in range(first, last_done + 1, 3600) -%}{%-
+            set ex = rows | selectattr('start', 'search', (h | timestamp_custom('%Y-%m-%dT%H:00:00',
+            false))) | list -%}{%- if ex -%}{%- set ns.raw = ex[0].sum -%}{%- set ns.state =
+            ex[0].state -%}{%- endif -%}{%- if ns.raw is not none -%}{%- set add = scale *
+            (corr.hours | selectattr(0, 'le', h) | map(attribute=1) | sum) -%}{%- set ns.out =
+            ns.out + [{'start': h | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false), 'state':
+            ns.state, 'sum': ns.raw + add}] -%}{%- endif -%}{%- endfor -%}{%- endif -%}{{ ns.out |
+            tojson }}
+        note: >-
+          Each completed hour from the outage on gets the (scaled) estimate up to that hour; a
+          missing row is created from the hour before. The hour the ESP came back in is still open:
+          it is compiled from the meter, which already holds the real total, so it ends up with the
+          rest (manual use, heating) automatically.
       - if:
           - condition: template
-            value_template: "{{ fixed | count > 0 }}"
+            value_template: '{{ fixed | count > 0 }}'
         then:
           - action: recorder.import_statistics
             data:
@@ -198,33 +229,40 @@ actions:
               unit_of_measurement: kWh
               has_mean: false
               has_sum: true
-              stats: "{{ fixed }}"
+              stats: '{{ fixed }}'
       - repeat:
           for_each:
-            - sensor.sundance_spa_energy_total
             - sensor.sundance_spa_energy_today
             - sensor.sundance_spa_energy_week
             - sensor.sundance_spa_energy_month
             - sensor.sundance_spa_energy_year
           sequence:
             - variables:
-                reset_ts: "{{ as_timestamp(state_attr(repeat.item, 'last_reset'), 0) }}"
-                delta: "{{ corr.hours | selectattr(0, 'ge', reset_ts) | map(attribute=1) | sum }}"
+                reset_ts: '{{ as_timestamp(state_attr(repeat.item, ''last_reset''), 0) }}'
+                before: >-
+                  {{ scale * (corr.hours | selectattr(0, 'lt', reset_ts) | map(attribute=1) | sum)
+                  }}
             - if:
                 - condition: template
-                  value_template: "{{ delta > 0.0005 and states(repeat.item) | is_number }}"
+                  value_template: '{{ before > 0.0005 and states(repeat.item) | is_number }}'
               then:
                 - action: utility_meter.calibrate
                   target:
-                    entity_id: "{{ repeat.item }}"
+                    entity_id: '{{ repeat.item }}'
                   data:
-                    value: "{{ (states(repeat.item) | float + delta) | round(3) }}"
+                    value: '{{ [states(repeat.item) | float - before, 0] | max | round(3) }}'
+        note: >-
+          An outage across a reset (midnight, week, month, year): the meter got the whole jump in
+          the new period; take out the part that belongs before the reset. The hourly statistics
+          above already put it in the right day.
       - action: logbook.log
         data:
           name: Spa energy
-          message: >-
-            Wi-Fi drop {{ t0 | timestamp_custom('%d/%m %H:%M') }}-{{ t1 | timestamp_custom('%H:%M') }}
-            ({{ off_min }} min): added an estimated {{ '%.3f' % corr.total }} kWh (normal schedule only).
           entity_id: sensor.sundance_spa_energy_total
+          message: >-
+            Wi-Fi drop {{ t0 | timestamp_custom('%d/%m %H:%M') }}-{{ t1 | timestamp_custom('%H:%M')
+            }} ({{ off_min }} min): the ESP counted {{ '%.3f' % x }} kWh; {{ '%.3f' % (scale *
+            corr.total) }} kWh (normal schedule) moved to the hours it belongs to, the rest stays in
+            the hour it came back.
 mode: queued
 max: 3

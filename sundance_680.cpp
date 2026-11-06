@@ -488,9 +488,24 @@ void SundanceSpa::service_lock_event_() {
   }
 }
 
-// LANG menu f15: 0 English, 1 French, 2 Spanish, 3 German (panel order, verified 2026-10-23).
-void SundanceSpa::publish_language_(int value) {
+// LANG edit screen f15 for languages 0 English, 1 French, 2 Spanish, 3 German (Warmer order).
+// Observed: key 0 (2026-10-23) and key 115 (2026-11-06) plain; key 14 (2026-11-03) shifted by 2
+// (1 German, 2 English). PROVISIONAL model: shifted by 2 when key bit 2 is set (14 yes; 0, 112, 115 no) -
+// only three keys seen. The LANG display screen (first Warmer) always shows f15 0 and carries no value.
+static int lang_code_(int lang, int key) { return (key & 4) ? (lang ^ 2) & 3 : lang & 3; }
+
+// from_screen: value is an f15 code (decoded here) and is kept for the next boot; otherwise it is the
+// language restored at boot.
+void SundanceSpa::publish_language_(int value, bool from_screen) {
   static const char *const NAMES[] = {"English", "French", "Spanish", "German"};
+  if (from_screen && value >= 0 && value < 4) {
+    value = lang_code_(value, this->screen_key_);  // XOR is its own inverse
+    uint8_t saved = 255;
+    if (!this->lang_pref_.load(&saved) || saved != value) {
+      saved = static_cast<uint8_t>(value);
+      this->lang_pref_.save(&saved);
+    }
+  }
   if (this->language_text_sensor_ == nullptr)
     return;
   char buf[16];
@@ -539,12 +554,14 @@ void SundanceSpa::observe_menu_values_() {
       if (!this->pf_start_text_sensor_->has_state() || this->pf_start_text_sensor_->state != buf)
         this->pf_start_text_sensor_->publish_state(buf);
     }
-    if (prev == SCREEN_PF_CYCLES && screen == SCREEN_PF_DURATION && this->pf_cycles_sensor_ != nullptr)
+    if ((prev == SCREEN_PF_CYCLES || prev == SCREEN_PF_CYCLES_EDIT) && screen == SCREEN_PF_DURATION &&
+        this->pf_cycles_sensor_ != nullptr)
       this->pf_cycles_sensor_->publish_state(prev_value);
     if (prev == SCREEN_PF_DURATION && screen == SCREEN_PF && this->pf_duration_sensor_ != nullptr)
       this->pf_duration_sensor_->publish_state(prev_value);
-    // Language: Jets 1 on the LANG edit screens saves the language shown.
-    if ((prev == SCREEN_LANG_SHOW || prev == SCREEN_LANG_EDIT) && screen == SCREEN_LANG)
+    // Language: Jets 1 on the LANG edit screen saves the language shown (from the display
+    // screen it keeps the current one, which f15 does not show).
+    if (prev == SCREEN_LANG_EDIT && screen == SCREEN_LANG)
       this->publish_language_(prev_value);
     // Filter Change: Jets 1 on an FC value screen saves it; 128 = Off (2026-10-22/25).
     if ((prev == SCREEN_FC_SHOW || prev == SCREEN_FC_EDIT) && screen == SCREEN_FC && prev_value == 128) {
@@ -581,6 +598,23 @@ static const uint32_t SYNC_BLIND_PRESS_MS = 600;
 // syncs) and keeps its seconds; only a changed value is applied (an unchanged save, 26 Oct 07:55, left
 // the offset as it was). So a save moves the offset by 60 s per minute changed minus the edit time.
 static const int SYNC_EDIT_PAUSE_S = 4;
+// Auto sync from this offset (owner, 2026-11-03: was 60 s). The clock moves only in whole minutes
+// minus the edit time, so in practice it is corrected from about +35 / -31 s (see best_minute_move_()).
+static const int SYNC_AUTO_LIMIT_S = 30;
+// A move is made only when it brings the offset at least this much nearer to 0 (the 27 Oct manual sync
+// turned -4 s into +52 s).
+static const int SYNC_MIN_GAIN_S = 5;
+
+// Whole minutes to move the spa clock so that the offset after the save is nearest to 0, or 0 when no
+// move improves it by SYNC_MIN_GAIN_S; *expect gets the offset expected after the save.
+static int best_minute_move_(int off, int *expect) {
+  const int delta = static_cast<int>(std::lround((SYNC_EDIT_PAUSE_S - off) / 60.0));
+  const int e = off + 60 * delta - SYNC_EDIT_PAUSE_S;
+  if (delta == 0 || std::abs(e) > std::abs(off) - SYNC_MIN_GAIN_S)
+    return 0;
+  *expect = e;
+  return delta;
+}
 
 enum SyncStep : int {
   SYNC_IDLE = 0,
@@ -614,6 +648,15 @@ enum SyncStep : int {
   TASK_WAIT_MAIN,
   READ_FC_NAV,
   READ_FC_SHOW,
+  // settings write (request_setting_write)
+  WRITE_WAIT_MAIN,
+  WRITE_NAV,
+  WRITE_SHOW,
+  WRITE_ADJUST,
+  WRITE_CONFIRM,
+  WRITE_SAVE,
+  WRITE_TEMP_SHOW,
+  WRITE_TEMP_SWITCH,
 };
 
 static const int NAV_TO_UV[] = {73, 64, 95, 90};
@@ -622,13 +665,446 @@ static const int NAV_TO_LANG[] = {73, 64, 95, 90, 89, 84, 81, 106, 105};
 static const int NAV_TO_FC[] = {73, 64, 95};
 static const int TASK_SYNC = 1, TASK_UV = 2, TASK_PF = 4, TASK_LANG = 8, TASK_FC = 16;
 
+// ---------------------------------------------------------------- settings write
+// Menu screens (normalized) of the settings written from HA; see the README §9 table.
+static const int NAV_ALL[] = {73, 64, 95, 90, 89, 84, 81, 106, 105};  // PF HEAT FC UV H2O TIME DATE TEMP LANG
+static const int NAV_ALL_COUNT = sizeof(NAV_ALL) / sizeof(NAV_ALL[0]);
+static const int SCREEN_HEAT = 64, SCREEN_HEAT_SHOW = 65, SCREEN_HEAT_EDIT = 94;
+static const int SCREEN_H2O = 89, SCREEN_H2O_SHOW = 86, SCREEN_H2O_EDIT = 87;
+static const int SCREEN_TEMP = 106, SCREEN_TEMP_SHOW = 107, SCREEN_TEMP_EDIT = 104;
+enum WriteKind : int {
+  WRITE_NONE = 0,
+  WRITE_HEAT = 1,
+  WRITE_PF_START = 2,
+  WRITE_PF_CYCLES = 3,
+  WRITE_PF_DURATION = 4,
+  WRITE_FC = 5,
+  WRITE_UV = 6,
+  WRITE_H2O = 7,
+  WRITE_TEMP_UNIT = 8,
+  WRITE_LANG = 9,
+  WRITE_PF = 10,  // internal: one walk for start, cycles and duration
+};
+static const uint32_t WRITE_CHANGE_TIMEOUT_MS = 2500;  // f15 must follow a Warmer/Cooler press by then
+
+// f15 code of a ClearRay day count (Off = 128), as on the UV value screens.
+static int uv_code_(int days) { return days == 0 ? 128 : ((days & 0xFF) ^ (days >> 8)); }
+
+// Ordered f15 codes one press steps through, all treated as cyclic. Which button moves forward is
+// learned on the first press (write_dir_); a list end that does not wrap is found by "no change".
+static std::vector<int> write_codes_(int kind, int field) {
+  std::vector<int> v;
+  switch (kind) {
+    case WRITE_HEAT:
+      return {0, 1, 2};  // Auto, Eco, Day
+    case WRITE_LANG:
+      return {0, 1, 2, 3};
+    case WRITE_PF:
+      if (field == 0) {
+        for (int h = 0; h < 24; h++)
+          v.push_back(h);
+        return v;
+      }
+      if (field == 1)
+        return {1, 2, 3, 4, 8};
+      return {1, 2, 3};
+    case WRITE_FC:
+      v.push_back(128);
+      for (int d = 10; d <= 180; d += 10)
+        v.push_back(d);
+      return v;
+    case WRITE_UV:
+      for (int d = 10; d <= 360; d += 10)
+        v.push_back(uv_code_(d));
+      v.push_back(uv_code_(365));
+      v.push_back(128);
+      return v;
+    case WRITE_H2O:
+      return {128, 30, 60, 90, 120, 150, 180};
+    default:
+      return v;
+  }
+}
+
+static int index_of_(const std::vector<int> &v, int code) {
+  for (size_t i = 0; i < v.size(); i++)
+    if (v[i] == code)
+      return static_cast<int>(i);
+  return -1;
+}
+
+// +1 if the shorter way from a to b in a cyclic list of n is forward, -1 if backward.
+static int cyclic_dir_(int a, int b, int n) {
+  const int fwd = ((b - a) % n + n) % n;
+  return fwd <= n - fwd ? 1 : -1;
+}
+
+static int write_menu_screen_(int kind) {
+  switch (kind) {
+    case WRITE_HEAT:
+      return SCREEN_HEAT;
+    case WRITE_PF:
+      return SCREEN_PF;
+    case WRITE_FC:
+      return SCREEN_FC;
+    case WRITE_UV:
+      return SCREEN_UV;
+    case WRITE_H2O:
+      return SCREEN_H2O;
+    case WRITE_TEMP_UNIT:
+      return SCREEN_TEMP;
+    case WRITE_LANG:
+      return SCREEN_LANG;
+    default:
+      return -1;
+  }
+}
+
+// Value screens of a field: the first Warmer shows the value, further presses change it.
+static bool write_on_field_screen_(int kind, int field, int screen) {
+  switch (kind) {
+    case WRITE_HEAT:
+      return screen == SCREEN_HEAT_SHOW || screen == SCREEN_HEAT_EDIT;
+    case WRITE_LANG:
+      return screen == SCREEN_LANG_SHOW || screen == SCREEN_LANG_EDIT;
+    case WRITE_FC:
+      return screen == SCREEN_FC_SHOW || screen == SCREEN_FC_EDIT;
+    case WRITE_UV:
+      return screen == SCREEN_UV_DAYS || screen == SCREEN_UV_EDIT;
+    case WRITE_H2O:
+      return screen == SCREEN_H2O_SHOW || screen == SCREEN_H2O_EDIT;
+    case WRITE_PF:
+      if (field == 0)
+        return screen == SCREEN_PF_START || screen == SCREEN_PF_START_EDIT;
+      if (field == 1)
+        return screen == SCREEN_PF_CYCLES || screen == SCREEN_PF_CYCLES_EDIT;
+      return screen == SCREEN_PF_DURATION;
+    default:
+      return false;
+  }
+}
+
+static const char *write_name_(int kind) {
+  switch (kind) {
+    case WRITE_HEAT:
+      return "Heater Mode";
+    case WRITE_PF:
+    case WRITE_PF_START:
+    case WRITE_PF_CYCLES:
+    case WRITE_PF_DURATION:
+      return "Primary Filter";
+    case WRITE_FC:
+      return "Filter Change";
+    case WRITE_UV:
+      return "ClearRay Bulb";
+    case WRITE_H2O:
+      return "Water Refresh";
+    case WRITE_TEMP_UNIT:
+      return "Temperature Format";
+    case WRITE_LANG:
+      return "Language";
+    default:
+      return "Setting";
+  }
+}
+
+void SundanceSpa::request_setting_write(int kind, int value) {
+  bool ok = false;
+  switch (kind) {
+    case WRITE_HEAT:
+      ok = value >= 0 && value <= 2;
+      break;
+    case WRITE_PF_START:
+      ok = value >= 0 && value <= 23;
+      break;
+    case WRITE_PF_CYCLES:
+      ok = value == 1 || value == 2 || value == 3 || value == 4 || value == 8;
+      break;
+    case WRITE_PF_DURATION:
+      ok = value >= 1 && value <= 3;
+      break;
+    case WRITE_FC:
+      ok = value == 0 || (value >= 10 && value <= 180 && value % 10 == 0);
+      break;
+    case WRITE_UV:
+      ok = value == 0 || value == 365 || (value >= 10 && value <= 360 && value % 10 == 0);
+      break;
+    case WRITE_H2O:
+      ok = value == 0 || (value >= 30 && value <= 180 && value % 30 == 0);
+      break;
+    case WRITE_TEMP_UNIT:
+      ok = value == 0 || value == 1;
+      break;
+    case WRITE_LANG:
+      // Disabled (p31b): the ESP's presses do not change the panel language, and the code mapping per key
+      // is not settled. Re-enable (ok = value >= 0 && value <= 3) once both are understood.
+      ESP_LOGW(TAG, "Language write is disabled");
+      break;
+    default:
+      break;
+  }
+  if (!ok) {
+    ESP_LOGW(TAG, "Setting write %d: value %d not allowed", kind, value);
+    return;
+  }
+  if (this->sl_on_ || this->svl_on_) {
+    this->decoder_notice_(std::string(write_name_(kind)) + " not changed: the panel is locked");
+    return;
+  }
+  ESP_LOGI(TAG, "Setting write queued: %s = %d", write_name_(kind), value);
+  this->write_pending_[kind] = value;
+  if (this->sync_step_ == SYNC_IDLE)
+    this->start_next_task_();
+}
+
+// Starts the next pending write (writes run before reads); false when there is none.
+bool SundanceSpa::start_next_write_() {
+  for (int guard = 0; guard < 10; guard++) {
+    int kind = WRITE_NONE;
+    for (int k : {WRITE_HEAT, WRITE_TEMP_UNIT, WRITE_PF_START, WRITE_PF_CYCLES, WRITE_PF_DURATION, WRITE_FC,
+                  WRITE_UV, WRITE_H2O, WRITE_LANG}) {
+      if (this->write_pending_[k] != -1) {
+        kind = k;
+        break;
+      }
+    }
+    if (kind == WRITE_NONE)
+      return false;
+    this->write_target_[0] = this->write_target_[1] = this->write_target_[2] = -1;
+    if (kind == WRITE_PF_START || kind == WRITE_PF_CYCLES || kind == WRITE_PF_DURATION) {
+      this->write_kind_ = WRITE_PF;
+      this->write_target_[0] = this->write_pending_[WRITE_PF_START];
+      this->write_target_[1] = this->write_pending_[WRITE_PF_CYCLES];
+      this->write_target_[2] = this->write_pending_[WRITE_PF_DURATION];
+      this->write_pending_[WRITE_PF_START] = this->write_pending_[WRITE_PF_CYCLES] =
+          this->write_pending_[WRITE_PF_DURATION] = -1;
+      // 8 cycles a day allow only 1 h (the duration screen offers nothing else then).
+      if (this->write_target_[1] == 8)
+        this->write_target_[2] = 1;
+    } else {
+      const int v = this->write_pending_[kind];
+      this->write_pending_[kind] = -1;
+      this->write_kind_ = kind;
+      if (kind == WRITE_UV)
+        this->write_target_[0] = uv_code_(v);
+      else if (kind == WRITE_FC || kind == WRITE_H2O)
+        this->write_target_[0] = v == 0 ? 128 : v;
+      else if (kind == WRITE_LANG)
+        this->write_target_[0] = lang_code_(v, this->screen_key_);
+      else
+        this->write_target_[0] = v;
+      if (kind == WRITE_TEMP_UNIT && (v == 1) == this->spa_fahrenheit_) {
+        ESP_LOGI(TAG, "Temperature Format already as requested");
+        continue;
+      }
+      if (kind == WRITE_HEAT && this->prior_status_.size() >= 16) {
+        const char *cur = heater_mode_name_(this->prior_status_[6]);
+        const char *want = v == 0 ? "Auto" : v == 1 ? "Eco" : "Day";
+        if (cur != nullptr && std::string(cur) == want) {
+          ESP_LOGI(TAG, "Heater Mode already %s", want);
+          continue;
+        }
+      }
+    }
+    this->write_field_ = 0;
+    this->write_presses_ = 0;
+    this->write_no_change_ = 0;
+    this->write_dir_ = 1;
+    // LANG: the display screen's f15 0 is not a language, so it is treated like an off-list value.
+    this->write_offgrid_ = (this->write_kind_ == WRITE_UV && this->uv_days_ > 0 && this->uv_days_ % 10 != 0 &&
+                            this->uv_days_ != 365) ||
+                           this->write_kind_ == WRITE_LANG;
+    this->write_verify_kind_ = this->write_kind_;
+    this->write_verify_value_ = this->write_kind_ == WRITE_PF ? -1 : this->write_target_[0];
+    ESP_LOGI(TAG, "Changing %s from the topside menu", write_name_(this->write_kind_));
+    this->sync_goto_(WRITE_WAIT_MAIN);
+    return true;
+  }
+  return false;
+}
+
+// One Warmer or Cooler press from the shown f15 code toward the field's target, the shorter way round.
+void SundanceSpa::write_step_toward_(int value) {
+  const std::vector<int> codes = write_codes_(this->write_kind_, this->write_field_);
+  const int n = static_cast<int>(codes.size());
+  // A ClearRay count off the 10-day grid (e.g. 317) can share its code with a grid value (60):
+  // treat the first value as off the list.
+  const int cur = (this->write_offgrid_ && this->write_presses_ == 0) ? -1 : index_of_(codes, value);
+  const int tgt = index_of_(codes, this->write_target_[this->write_field_]);
+  // Off the list (e.g. ClearRay 317 between steps of 10): one press lands on the grid first.
+  const int step = (cur >= 0 && tgt >= 0) ? cyclic_dir_(cur, tgt, n) : 1;
+  const bool warmer = (step > 0) == (this->write_dir_ > 0);
+  this->write_last_value_ = value;
+  this->write_presses_++;
+  this->sync_press_(warmer ? BTN_TEMP_UP : BTN_TEMP_DOWN);
+  this->sync_goto_(WRITE_ADJUST);
+}
+
+void SundanceSpa::service_write_(int screen, int value, uint32_t now) {
+  const int menu = write_menu_screen_(this->write_kind_);
+  switch (this->sync_step_) {
+    case WRITE_WAIT_MAIN: {
+      const bool busy = now - this->last_panel_press_ms_ < 6000 || this->wanted_jet1_ != NO_CHANGE_REQUESTED ||
+                        this->wanted_temp_ != NO_CHANGE_REQUESTED || this->wanted_light680_ != NO_CHANGE_REQUESTED;
+      if (screen != SCREEN_MAIN || busy) {
+        if (now - this->sync_step_ms_ > 60000)
+          this->abort_clock_sync_("spa not idle on the main screen");
+        return;
+      }
+      this->sync_started_ms_ = now;
+      this->sync_nav_index_ = 0;
+      this->sync_press_(BTN_MENU);
+      this->sync_goto_(WRITE_NAV);
+      return;
+    }
+    case WRITE_NAV: {
+      const int expect = NAV_ALL[this->sync_nav_index_];
+      if (screen == expect) {
+        if (expect == menu) {
+          this->sync_press_(BTN_TEMP_UP);  // the first press only shows the current value
+          this->sync_goto_(this->write_kind_ == WRITE_TEMP_UNIT ? WRITE_TEMP_SHOW : WRITE_SHOW);
+        } else if (this->sync_nav_index_ + 1 < NAV_ALL_COUNT) {
+          this->sync_nav_index_++;
+          this->sync_press_(BTN_MENU);
+          this->sync_step_ms_ = now;
+        }
+      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS) {
+        this->abort_clock_sync_("menu navigation");
+      }
+      return;
+    }
+    case WRITE_SHOW: {
+      // The field's value is on screen: keep it, or start stepping toward the target.
+      if (!write_on_field_screen_(this->write_kind_, this->write_field_, screen)) {
+        if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS + READ_DWELL_MS)
+          this->abort_clock_sync_("value screen not shown");
+        return;
+      }
+      if (now - this->sync_press_ms_ < READ_DWELL_MS)
+        return;  // let f15 settle
+      const int target = this->write_target_[this->write_field_];
+      if (target == -1 || (value == target && this->write_kind_ != WRITE_LANG)) {
+        if (this->write_kind_ != WRITE_PF) {
+          ESP_LOGI(TAG, "%s already as requested", write_name_(this->write_kind_));
+          this->write_verify_kind_ = WRITE_NONE;
+          this->sync_goto_(TASK_WAIT_MAIN);  // no further presses: the menu times out unsaved
+          return;
+        }
+        this->sync_goto_(WRITE_CONFIRM);
+        return;
+      }
+      this->write_step_toward_(value);
+      return;
+    }
+    case WRITE_ADJUST: {
+      const int target = this->write_target_[this->write_field_];
+      const bool on_screen = write_on_field_screen_(this->write_kind_, this->write_field_, screen);
+      // LANG: the first press leaves the display screen for the edit screen, even if f15 stays the same.
+      const bool lang_entered = this->write_kind_ == WRITE_LANG && this->write_presses_ == 1 && screen == SCREEN_LANG_EDIT;
+      if (on_screen && (value != this->write_last_value_ || lang_entered) && now - this->sync_press_ms_ >= 300) {
+        const std::vector<int> codes = write_codes_(this->write_kind_, this->write_field_);
+        const int n = static_cast<int>(codes.size());
+        const int a = (this->write_offgrid_ && this->write_presses_ == 1) ? -1 : index_of_(codes, this->write_last_value_);
+        const int b = index_of_(codes, value);
+        const int t = index_of_(codes, target);
+        // Moved the other way from the one intended: the Warmer/Cooler mapping is reversed here.
+        if (a >= 0 && b >= 0 && t >= 0 && cyclic_dir_(a, b, n) != cyclic_dir_(a, t, n)) {
+          this->write_dir_ = -this->write_dir_;
+          ESP_LOGI(TAG, "%s: Warmer/Cooler direction reversed", write_name_(this->write_kind_));
+        }
+        this->write_no_change_ = 0;
+        if (value == target) {
+          this->sync_goto_(WRITE_CONFIRM);
+          return;
+        }
+        if (this->write_presses_ >= n * 2 + 2) {
+          this->abort_clock_sync_("value did not reach the target");
+          return;
+        }
+        this->write_step_toward_(value);
+        return;
+      }
+      if (now - this->sync_press_ms_ > WRITE_CHANGE_TIMEOUT_MS) {
+        // No change: perhaps the end of a list that does not wrap - try the other button once.
+        if (++this->write_no_change_ >= 2) {
+          this->abort_clock_sync_("value does not change");
+          return;
+        }
+        this->write_dir_ = -this->write_dir_;
+        this->write_step_toward_(on_screen ? value : this->write_last_value_);
+      }
+      return;
+    }
+    case WRITE_CONFIRM: {
+      // Jets 1 saves the value shown - only once it is exactly the target and has settled.
+      if (!write_on_field_screen_(this->write_kind_, this->write_field_, screen)) {
+        if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS)
+          this->abort_clock_sync_("left the value screen");
+        return;
+      }
+      const int target = this->write_target_[this->write_field_];
+      if (target != -1 && value != target) {
+        this->write_step_toward_(value);
+        return;
+      }
+      if (now - this->sync_press_ms_ < READ_DWELL_MS)
+        return;
+      this->sync_press_(BTN_P1);
+      if (this->write_kind_ == WRITE_PF && this->write_field_ < 2) {
+        this->write_field_++;
+        this->write_presses_ = 0;
+        this->write_no_change_ = 0;
+        this->sync_goto_(WRITE_SHOW);  // the next PF screen shows its value right away
+      } else {
+        this->sync_goto_(WRITE_SAVE);
+      }
+      return;
+    }
+    case WRITE_SAVE: {
+      if (screen == menu) {
+        ESP_LOGI(TAG, "%s saved", write_name_(this->write_kind_));
+        this->sync_goto_(TASK_WAIT_MAIN);
+      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS) {
+        this->abort_clock_sync_("save not confirmed");
+      }
+      return;
+    }
+    case WRITE_TEMP_SHOW: {
+      // TEMP: Warmer shows the unit (107), a second Warmer switches it (104), Jets 1 saves (106).
+      if (screen == SCREEN_TEMP_SHOW) {
+        if (now - this->sync_press_ms_ >= READ_DWELL_MS) {
+          this->sync_press_(BTN_TEMP_UP);
+          this->sync_goto_(WRITE_TEMP_SWITCH);
+        }
+      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS + READ_DWELL_MS) {
+        this->abort_clock_sync_("TEMP screen");
+      }
+      return;
+    }
+    case WRITE_TEMP_SWITCH: {
+      if (screen == SCREEN_TEMP_EDIT) {
+        if (now - this->sync_press_ms_ >= READ_DWELL_MS) {
+          this->sync_press_(BTN_P1);
+          this->sync_goto_(WRITE_SAVE);
+        }
+      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS + READ_DWELL_MS) {
+        this->abort_clock_sync_("TEMP switch");
+      }
+      return;
+    }
+    default:
+      return;
+  }
+}
+
 bool SundanceSpa::clock_sync_active_() const { return this->sync_step_ != SYNC_IDLE; }
 
 // True once a menu task has started pressing buttons. While a task is still waiting for the main
 // screen, HA commands (lights, jets, temperature) must run first — the task waits for them to finish;
 // blocking them here deadlocked both for a minute per queued task (2026-10-24).
 bool SundanceSpa::menu_in_use_() const {
-  return this->sync_step_ != SYNC_IDLE && this->sync_step_ != SYNC_WAIT_MAIN && this->sync_step_ != READ_WAIT_MAIN;
+  return this->sync_step_ != SYNC_IDLE && this->sync_step_ != SYNC_WAIT_MAIN && this->sync_step_ != READ_WAIT_MAIN &&
+         this->sync_step_ != WRITE_WAIT_MAIN;
 }
 
 void SundanceSpa::set_clock_sync_status_(const std::string &s) {
@@ -660,18 +1136,13 @@ void SundanceSpa::request_clock_sync(bool manual) {
   }
   this->sync_manual_ = manual;
   // With the offset known to the second, move the clock by whole minutes so that offset + 60*delta -
-  // edit time is nearest to 0 — but only when that is at least 5 s better than leaving it (the
-  // 27 Oct manual sync turned -4 s into +52 s). Without it (just after boot or a sync) aim at HA's time.
+  // edit time is nearest to 0, when that is worth it (best_minute_move_()). Without it (just after boot
+  // or a sync) aim at HA's time.
   this->sync_by_offset_ = this->spa_offset_valid_;
   this->sync_delta_min_ = 0;
   if (this->sync_by_offset_) {
     const int off = this->spa_offset_s_;
-    const int delta = static_cast<int>(std::lround((SYNC_EDIT_PAUSE_S - off) / 60.0));
-    const int expect = off + 60 * delta - SYNC_EDIT_PAUSE_S;
-    if (delta != 0 && std::abs(expect) <= std::abs(off) - 5) {
-      this->sync_delta_min_ = delta;
-      this->sync_expect_s_ = expect;
-    }
+    this->sync_delta_min_ = best_minute_move_(off, &this->sync_expect_s_);
     auto t = this->time_->now();
     const bool date_ok = this->prior_status_.size() >= 16 &&
                          this->prior_status_[7] == encode_spa_date_(t.day_of_month, t.month) &&
@@ -696,10 +1167,21 @@ void SundanceSpa::request_clock_sync(bool manual) {
 
 void SundanceSpa::abort_clock_sync_(const char *why) {
   const bool was_sync = this->sync_step_ < READ_WAIT_MAIN;
+  const bool was_write = this->sync_step_ >= WRITE_WAIT_MAIN;
   this->sync_step_ = SYNC_IDLE;
   this->last_sync_attempt_ms_ = millis();
   if (was_sync) {
     this->set_clock_sync_status_(std::string("Failed: ") + why);
+  } else if (was_write) {
+    // The menu times out without saving what was not confirmed; re-read so HA shows the spa's value.
+    this->write_verify_kind_ = WRITE_NONE;
+    this->decoder_notice_(std::string(write_name_(this->write_kind_)) + " not changed: " + why);
+    if (this->write_kind_ == WRITE_PF)
+      this->routine_mask_ |= TASK_PF;
+    else if (this->write_kind_ == WRITE_UV)
+      this->routine_mask_ |= TASK_UV;
+    else if (this->write_kind_ == WRITE_LANG)
+      this->routine_mask_ |= TASK_LANG;
   } else {
     this->decoder_notice_(std::string("Settings read aborted: ") + why);
   }
@@ -719,12 +1201,15 @@ bool SundanceSpa::clock_needs_sync_() const {
   const bool date_ok = this->prior_status_[7] == encode_spa_date_(t.day_of_month, t.month) &&
                        this->prior_status_[9] == ((t.year - 2000) ^ 1);
   // The spa only reports whole minutes, but the moment its minute rolls over gives its offset to the
-  // second (see track_spa_offset_()). Up to a minute off is fine (owner's choice, 2026-10-26): sync
-  // only from 60 s, or from 120 s after two syncs in a row did not get it under a minute.
+  // second (see track_spa_offset_()). Sync from SYNC_AUTO_LIMIT_S when a whole-minute move actually
+  // improves it (otherwise every check would end in "already within"), or from 120 s after two syncs in a
+  // row did not get it under a minute.
   // Until a rollover has been seen (just after boot or a sync) fall back to whole minutes, 1 min slack.
   if (this->spa_offset_valid_) {
-    const int limit = this->sync_fail_streak_ >= 2 ? 120 : 60;
-    return std::abs(this->spa_offset_s_) >= limit || !date_ok;
+    const int off = this->spa_offset_s_;
+    const int limit = this->sync_fail_streak_ >= 2 ? 120 : SYNC_AUTO_LIMIT_S;
+    int expect = 0;
+    return (std::abs(off) >= limit && best_minute_move_(off, &expect) != 0) || !date_ok;
   }
   return drift > 1 || !date_ok;
 }
@@ -738,6 +1223,8 @@ void SundanceSpa::start_next_task_() {
     this->request_clock_sync(false);
     return;
   }
+  if (this->start_next_write_())
+    return;
   if (this->routine_mask_ & (TASK_UV | TASK_PF | TASK_LANG | TASK_FC)) {
     this->read_task_ = (this->routine_mask_ & TASK_UV)     ? TASK_UV
                        : (this->routine_mask_ & TASK_PF)   ? TASK_PF
@@ -787,9 +1274,14 @@ void SundanceSpa::service_clock_sync_() {
   const int value = this->prior_status_[15];
   const bool panel_busy = now - this->last_panel_press_ms_ < 1500;
 
-  if (this->sync_step_ != SYNC_WAIT_MAIN && this->sync_step_ != READ_WAIT_MAIN &&
+  if (this->sync_step_ != SYNC_WAIT_MAIN && this->sync_step_ != READ_WAIT_MAIN && this->sync_step_ != WRITE_WAIT_MAIN &&
       this->last_panel_press_ms_ > this->sync_started_ms_) {
     this->abort_clock_sync_("topside button pressed");
+    return;
+  }
+
+  if (this->sync_step_ >= WRITE_WAIT_MAIN) {
+    this->service_write_(screen, value, now);
     return;
   }
 
@@ -1126,7 +1618,8 @@ void SundanceSpa::service_clock_sync_() {
       // passive observer publishes each confirmed value.
       int ok1 = SCREEN_PF_START, ok2 = SCREEN_PF_START_EDIT, next = READ_PF_CYCLES;
       if (this->sync_step_ == READ_PF_CYCLES) {
-        ok1 = ok2 = SCREEN_PF_CYCLES;
+        ok1 = SCREEN_PF_CYCLES;
+        ok2 = SCREEN_PF_CYCLES_EDIT;
         next = READ_PF_DURATION;
       } else if (this->sync_step_ == READ_PF_DURATION) {
         ok1 = ok2 = SCREEN_PF_DURATION;
@@ -1171,8 +1664,8 @@ void SundanceSpa::service_clock_sync_() {
       // English is 0, so wait for f15 to settle instead of waiting for a non-zero value.
       if (screen == SCREEN_LANG_SHOW) {
         if (now - this->sync_step_ms_ > READ_DWELL_MS) {
-          this->publish_language_(value);
-          ESP_LOGI(TAG, "Language: %d", value);
+          // f15 here is always 0: the language is known only from a confirmed change.
+          ESP_LOGI(TAG, "Language display screen (f15 %d, no value)", value);
           this->sync_goto_(TASK_WAIT_MAIN);  // no further presses: the menu times out unsaved
         }
       } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS) {
@@ -1182,6 +1675,30 @@ void SundanceSpa::service_clock_sync_() {
     }
     case TASK_WAIT_MAIN: {
       if ((screen == SCREEN_MAIN)) {
+        // Back on the main screen after a write: settings with a status field are checked there.
+        bool write_ok = this->write_verify_kind_ != WRITE_NONE;
+        if (this->write_verify_kind_ == WRITE_HEAT || this->write_verify_kind_ == WRITE_TEMP_UNIT) {
+          bool ok;
+          if (this->write_verify_kind_ == WRITE_HEAT) {
+            const char *cur = heater_mode_name_(this->prior_status_[6]);
+            const int v = this->write_verify_value_;
+            ok = cur != nullptr && std::string(cur) == (v == 0 ? "Auto" : v == 1 ? "Eco" : "Day");
+          } else {
+            ok = this->spa_fahrenheit_ == (this->write_verify_value_ == 1);
+          }
+          if (!ok) {
+            write_ok = false;
+            this->decoder_notice_(std::string(write_name_(this->write_verify_kind_)) +
+                                  " was saved but the spa does not show it");
+          }
+        }
+        // A write that worked clears the notice of an earlier failed write (other notices keep their hour).
+        if (write_ok && this->decoder_notice_text_sensor_ != nullptr &&
+            this->decoder_notice_text_sensor_->state.find(" not changed: ") != std::string::npos) {
+          this->cancel_timeout("decoder_notice_clear");
+          this->decoder_notice_text_sensor_->publish_state("OK");
+        }
+        this->write_verify_kind_ = WRITE_NONE;
         this->sync_step_ = SYNC_IDLE;
         this->start_next_task_();
       } else if (now - this->sync_step_ms_ > 60000) {

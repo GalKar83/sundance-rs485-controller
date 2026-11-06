@@ -1,0 +1,91 @@
+alias: Spa - Maintenance reminder
+description: >-
+  From the 8th day without maintenance (8 or more calendar days since
+  input_datetime.last_maintenance, i.e. 7 full days without), asks the phone every morning at 08:00
+  until it is done. Done sets the date and time to now; a maintenance session recorded by 'Spa -
+  Ask: Soaking or Maintenance' moves the date as well and clears the question. Not yet, or no
+  answer: asked again the next morning. Done also adds one to the maintenance count
+  (counter.spa_maintenance_sessions_total); maintenance time counts only real pump sessions. Answers
+  are their own triggers, so they still work after an HA restart. Created 2026-11-05.
+triggers:
+  - trigger: time
+    at: '08:00:00'
+    id: morning
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: SPA_MAINTENANCE_DONE
+    id: done
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: SPA_MAINTENANCE_LATER
+    id: later
+  - trigger: state
+    entity_id: input_datetime.last_maintenance
+    not_to:
+      - unavailable
+      - unknown
+    id: recorded
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: morning
+          - condition: template
+            value_template: >-
+              {%- set t = state_attr('input_datetime.last_maintenance', 'timestamp') | float(0)
+              -%}{{ (now().date() - as_local(as_datetime(t)).date()).days >= 8 }}
+            note: 8 or more calendar days since the last maintenance.
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              title: Spa maintenance
+              message: >-
+                {%- set t = state_attr('input_datetime.last_maintenance', 'timestamp') | float(0)
+                -%}Maintenance is due. Last done {{ t | timestamp_custom('%d/%m %H:%M') }} ({{
+                (now().date() - as_local(as_datetime(t)).date()).days }} days ago). Done?
+              data:
+                tag: spa_maintenance
+                actions:
+                  - action: SPA_MAINTENANCE_DONE
+                    title: Done
+                  - action: SPA_MAINTENANCE_LATER
+                    title: Not yet
+                sticky: true
+                persistent: true
+                clickAction: noAction
+                priority: high
+                ttl: 0
+      - conditions:
+          - condition: trigger
+            id: done
+        sequence:
+          - action: counter.increment
+            target:
+              entity_id: counter.spa_maintenance_sessions_total
+            note: >-
+              Counts in the Today / Week / Month / Total maintenance counters; maintenance time
+              stays with real pump sessions.
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_maintenance
+            data:
+              timestamp: '{{ as_timestamp(now()) | int }}'
+          - action: notify.mobile_app_your_phone
+            data:
+              message: clear_notification
+              data:
+                tag: spa_maintenance
+      - conditions:
+          - condition: trigger
+            id:
+              - later
+              - recorded
+        sequence:
+          - action: notify.mobile_app_your_phone
+            data:
+              message: clear_notification
+              data:
+                tag: spa_maintenance
+mode: queued

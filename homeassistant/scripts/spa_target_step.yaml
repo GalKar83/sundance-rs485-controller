@@ -1,0 +1,30 @@
+alias: Spa - Target temperature step
+description: >-
+  One step of the spa's target temperature in the unit the panel shows: 0.5 °C, or 1 °F (converted
+  to the nearest 0.5 °C the spa accepts). Limits 18-40 °C / 65-104 °F. Called by the - and + buttons
+  on the Hot Tub page. Created 2026-11-05.
+fields:
+  direction:
+    description: 1 = warmer, -1 = cooler
+    required: true
+    selector:
+      number:
+        min: -1
+        max: 1
+        step: 2
+        mode: box
+mode: queued
+max: 10
+sequence:
+  - action: climate.set_temperature
+    target:
+      entity_id: climate.sundance_spa
+    data:
+      temperature: >-
+        {%- set t = state_attr('climate.sundance_spa', 'temperature') | float(35) -%}{%- set d =
+        direction | int(0) -%}{%- if is_state('sensor.sundance_spa_temperature_format', '°F') -%}{%-
+        set f = (t * 9 / 5 + 32) | round(0) + d -%}{%- set f = [[f, 65] | max, 104] | min -%}{{ ((f
+        - 32) * 10 / 9) | round(0) / 2 }}{%- else -%}{{ [[t + d * 0.5, 18] | max, 40] | min }}{%-
+        endif -%}
+  - delay:
+      milliseconds: 700

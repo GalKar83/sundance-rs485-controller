@@ -32,6 +32,10 @@ logger:
   level: DEBUG
 
 api:
+  # Keep running when HA is unreachable: the spa link and the counters below do not need HA, and the
+  # default (reboot after 15 min without HA) lost the run-time counts of every long Wi-Fi drop.
+  # The Wi-Fi reboot_timeout (15 min without Wi-Fi) stays as the recovery path.
+  reboot_timeout: 0s
   encryption:
     key: !secret api_encryption_key
 
@@ -40,6 +44,11 @@ ota:
     password: !secret ota_password
 
 safe_mode:
+
+# Counters and settings kept in flash are written at most every 10 min (default 1 min) - a reboot
+# writes them first, so only a sudden power cut can lose up to 10 min of counting.
+preferences:
+  flash_write_interval: 10min
 
 wifi:
   ssid: !secret wifi_ssid
@@ -82,34 +91,43 @@ sundance_spa:
   # Only if your RS485 module has DE/RE pins (no auto flow control):
   # flow_control_pin: GPIO4
   communication_sensor:
+    id: spa_comm
     name: "Communication"
     icon: "mdi:check-network"
   pumps_running_binary_sensor:
+    id: pumps_running
     name: "Pumps Running"
   circulation_auto_binary_sensor:
     name: "Circulation (Auto)"
   # Each pump on its own (Pump 1 = Jet 1 at either speed, Pump 2 = Jet 2); Pumps Running = at least one
   pump1_running_binary_sensor:
+    id: pump1_running
     name: "Pump 1 Running"
   pump2_running_binary_sensor:
+    id: pump2_running
     name: "Pump 2 Running"
   heater_binary_sensor:
+    id: heater_on
     name: "Heater"
     icon: "mdi:thermometer"
   circ_status_text_sensor:
     name: "Primary Filter"
     icon: "mdi:sync"
   light_status_text_sensor:
+    id: light_status
     name: "Light Status"
     icon: "mdi:lightbulb"
   # 680 heater mode: Auto / Eco / Day
   heater_mode_text_sensor:
+    id: heater_mode_txt
     name: "Heater Mode"
   temp_format_text_sensor:
+    id: temp_format_txt
     name: "Temperature Format"
   lock_text_sensor:
     name: "Lock"
   language_text_sensor:
+    id: language_txt
     name: "Language"
   # Run time since each item was turned on (counts up, resets when off)
   jet1_run_time_sensor:
@@ -144,17 +162,45 @@ sundance_spa:
       active:
         name: "Primary Filter Active"
   clearray_text_sensor:
+    id: clearray_bulb
     name: "ClearRay Bulb"
-  # Optional decoding aids: raw_status_sensors (field/name list), screen_key_sensor,
-  # raw_lights_text_sensor, msg_types_text_sensor, raw_other_text_sensor — see README.md §12.
+  # Decoding aid (diagnostic): raw status bytes + learned screen key; remove once decoding is done
+  raw_status_sensors:
+    - field: 1
+      name: "Raw F1"
+    - field: 2
+      name: "Raw F2"
+    - field: 4
+      name: "Raw F4"
+    - field: 10
+      name: "Raw F10"
+    - field: 11
+      name: "Raw F11"
+    - field: 13
+      name: "Raw F13"
+    - field: 14
+      name: "Raw F14"
+    - field: 15
+      name: "Raw F15"
+  screen_key_sensor:
+    name: "Screen Key"
   panel_button_sensor:
     name: "Panel Button"
+  raw_lights_text_sensor:
+    name: "Raw Lights"
+  msg_types_text_sensor:
+    name: "Bus Message Types"
+  raw_other_text_sensor:
+    name: "Raw Other Messages"
   # 680 service counters and spa clock
   h2o_change_sensor:
+    id: h2o_days_txt
     name: "Remaining Days Water Refresh"
   filter_change_sensor:
+    id: fc_days_txt
     name: "Remaining Days Filter Change"
   uv_change_sensor:
+    id: uv_days_txt
     name: "Remaining Days ClearRay Bulb"
   time_text_sensor:
     name: "Clock Time"
@@ -172,11 +218,14 @@ sundance_spa:
     name: "Decoder Notice"
   # Primary Filter settings (manual names); read nightly at 00:05 and whenever changed at the topside
   pf_start_text_sensor:
+    id: pf_start_txt
     name: "Primary Filter Start"
   pf_cycles_sensor:
+    id: pf_cycles_val
     name: "Primary Filter Cycles"
     state_class: measurement  # makes HA treat it as numeric so display precision 0 applies
   pf_duration_sensor:
+    id: pf_duration_val
     name: "Primary Filter Duration"
 
 time:
@@ -199,6 +248,43 @@ button:
     sundance_spa_id: sundance_spa_id
     button_datapoint: 5
     icon: "mdi:book-open-variant"
+  # Diagnostic: one short topside press each, for decoding tests only (approved test by test).
+  - platform: template
+    name: "Panel Press Warmer"
+    icon: "mdi:chevron-up"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(sundance_spa_id).diag_press(225);
+  - platform: template
+    name: "Panel Press Cooler"
+    icon: "mdi:chevron-down"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(sundance_spa_id).diag_press(226);
+  - platform: template
+    name: "Panel Press Menu"
+    icon: "mdi:menu"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(sundance_spa_id).diag_press(254);
+  - platform: template
+    name: "Panel Press Jets 1"
+    icon: "mdi:numeric-1-box-outline"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(sundance_spa_id).diag_press(228);
+  - platform: template
+    name: "Panel Press Jets 2"
+    icon: "mdi:numeric-2-box-outline"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(sundance_spa_id).diag_press(229);
+  - platform: template
+    name: "Panel Press Light"
+    icon: "mdi:lightbulb-outline"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(sundance_spa_id).diag_press(242);
   - platform: restart
     name: Restart
     icon: "mdi:restart"
@@ -210,6 +296,7 @@ button:
 
 switch:
   - platform: sundance_spa
+    id: jet1_switch
     name: "Jet 1"
     sundance_spa_id: sundance_spa_id
     switch_datapoint: 1
@@ -330,6 +417,247 @@ number:
     optimistic: true
     restore_value: true
 
+# Spa menu settings changed from Home Assistant. Each control shows the value read from the spa; a
+# change is made by walking the topside menu like the clock sync (every value is checked on screen
+# before Jets 1 saves it) and the control follows the spa again afterwards - if it failed, the old
+# value comes back and the Decoder Notice says why. Not possible while a Settings/Service Lock is on.
+# 0 = Off on the three service counters. (Continues the number list above.)
+  - platform: template
+    name: "Primary Filter Start Hour"
+    icon: "mdi:clock-start"
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 23
+    step: 1
+    update_interval: 5s
+    lambda: |-
+      const std::string &v = id(pf_start_txt).state;
+      if (v.size() < 2 || !isdigit(v[0])) return NAN;
+      return atoi(v.c_str());
+    set_action:
+      - lambda: id(sundance_spa_id).request_setting_write(2, (int) x);
+  - platform: template
+    name: "Filter Change Days"
+    icon: "mdi:air-filter"
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 180
+    step: 10
+    update_interval: 5s
+    lambda: |-
+      const std::string &v = id(fc_days_txt).state;
+      if (v == "Off" || v == "Change Now") return 0;
+      if (v.empty() || !isdigit(v[0])) return NAN;
+      return atoi(v.c_str());
+    set_action:
+      - lambda: id(sundance_spa_id).request_setting_write(5, (int) (roundf(x / 10) * 10));
+  - platform: template
+    name: "ClearRay Days"
+    icon: "mdi:lightbulb-fluorescent-tube"
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 365
+    step: 5
+    update_interval: 5s
+    lambda: |-
+      const std::string &v = id(uv_days_txt).state;
+      if (v == "Off" || v == "Change Now") return 0;
+      if (v.empty() || !isdigit(v[0])) return NAN;
+      return atoi(v.c_str());
+    set_action:
+      # steps of 10 up to 360, then 365 (the factory value after a bulb change)
+      - lambda: |-
+          id(sundance_spa_id).request_setting_write(6, x >= 363 ? 365 : (int) (roundf(x / 10) * 10));
+  - platform: template
+    name: "Water Refresh Days"
+    icon: "mdi:water-sync"
+    entity_category: config
+    mode: slider
+    min_value: 0
+    max_value: 180
+    step: 30
+    update_interval: 5s
+    lambda: |-
+      const std::string &v = id(h2o_days_txt).state;
+      if (v == "Off" || v == "Change Now") return 0;
+      if (v.empty() || !isdigit(v[0])) return NAN;
+      return atoi(v.c_str());
+    set_action:
+      - lambda: id(sundance_spa_id).request_setting_write(7, (int) (roundf(x / 30) * 30));
+
+# Run-time and energy counters kept on the ESP. They keep counting what the spa really does while
+# Home Assistant cannot see it (Wi-Fi drops), are kept in flash (see preferences above), and only go up;
+# Home Assistant builds its daily/weekly/monthly figures from them with utility meters, which add what
+# was counted while the ESP was unreachable as soon as it is back. Nothing is counted without status
+# from the spa (Communication off).
+globals:
+  - {id: g_pump1_s, type: double, restore_value: true, initial_value: '0'}
+  - {id: g_pump2_s, type: double, restore_value: true, initial_value: '0'}
+  - {id: g_pumps_s, type: double, restore_value: true, initial_value: '0'}
+  - {id: g_clearray_s, type: double, restore_value: true, initial_value: '0'}
+  - {id: g_heater_s, type: double, restore_value: true, initial_value: '0'}
+  - {id: g_heater_starts, type: uint32_t, restore_value: true, initial_value: '0'}
+  - {id: g_energy_wh, type: double, restore_value: true, initial_value: '0'}
+  - {id: g_power_w, type: float, restore_value: false, initial_value: '0'}
+  # Energy of each of the last 24 hours (Wh), keyed by the UTC hour number (epoch / 3600), so Home
+  # Assistant can put what was counted during a Wi-Fi drop into the right hour.
+  - {id: g_hour_wh, type: 'std::array<float, 24>', restore_value: true}
+  - {id: g_hour_key, type: 'std::array<uint32_t, 24>', restore_value: true}
+  # Totals at the last local midnight (Pump 1, Pump 2, Pumps, ClearRay, Heater time in s; heater starts;
+  # energy Wh) and that day (year * 1000 + day of year), for splitting a drop across midnight.
+  - {id: g_mid_vals, type: 'std::array<double, 7>', restore_value: true}
+  - {id: g_mid_day, type: uint32_t, restore_value: true, initial_value: '0'}
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          static uint32_t last_ms = 0;
+          static bool heater_was_on = false;
+          static bool heater_seen = false;  // the first sample after boot/link loss is not a start
+          const uint32_t now = millis();
+          const float dt = last_ms == 0 ? 0.0f : std::min((now - last_ms) / 1000.0f, 5.0f);
+          last_ms = now;
+          if (!id(spa_comm).state) {
+            id(g_power_w) = NAN;
+            heater_seen = false;
+            return;
+          }
+          const bool p1 = id(pump1_running).state;
+          const bool p1_high = id(jet1_switch).state;
+          const bool p2 = id(pump2_running).state;
+          const bool heat = id(heater_on).state;
+          const std::string &lt = id(light_status).state;
+          const bool light = !lt.empty() && lt != "Off";
+          // Same model as the power settings describe: Pump 1 at high = Jet Pump + ClearRay, at low =
+          // Circulation (incl. the bulb); Pump 2 = Jet Pump; heater; light; controller always.
+          float w = id(power_controller).state;
+          if (p1_high)
+            w += id(power_jet_pump).state + id(power_clearray).state;
+          else if (p1)
+            w += id(power_circulation).state;
+          if (p2)
+            w += id(power_jet_pump).state;
+          if (heat)
+            w += id(power_heater).state;
+          if (light)
+            w += id(power_light).state;
+          id(g_power_w) = w;
+          id(g_energy_wh) += w * dt / 3600.0;
+          auto t = id(ha_time).now();
+          if (t.is_valid()) {
+            // the first second of a new local day: keep the totals reached at midnight
+            const uint32_t day = t.year * 1000 + t.day_of_year;
+            if (day != id(g_mid_day)) {
+              // the very first day after this firmware has no real midnight yet (-1 = not valid)
+              const bool real = id(g_mid_day) != 0;
+              id(g_mid_day) = day;
+              id(g_mid_vals) = {real ? id(g_pump1_s) : -1.0, id(g_pump2_s), id(g_pumps_s), id(g_clearray_s),
+                                id(g_heater_s), (double) id(g_heater_starts), id(g_energy_wh)};
+            }
+            const uint32_t hk = t.timestamp / 3600;
+            const int slot = hk % 24;
+            if (id(g_hour_key)[slot] != hk) {
+              id(g_hour_key)[slot] = hk;
+              id(g_hour_wh)[slot] = 0;
+            }
+            id(g_hour_wh)[slot] += w * dt / 3600.0;
+          }
+          if (p1) id(g_pump1_s) += dt;
+          if (p2) id(g_pump2_s) += dt;
+          if (id(pumps_running).state) id(g_pumps_s) += dt;
+          if (id(clearray_bulb).state == "On") id(g_clearray_s) += dt;
+          if (heat) id(g_heater_s) += dt;
+          if (heat && !heater_was_on && heater_seen) id(g_heater_starts) += 1;
+          heater_was_on = heat;
+          heater_seen = true;
+
+sensor:
+  - platform: template
+    name: "Electrical Power"
+    icon: "mdi:flash"
+    unit_of_measurement: W
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: return id(g_power_w);
+    filters:
+      - delta: 1
+  - platform: template
+    name: "Energy Counter"
+    icon: "mdi:lightning-bolt"
+    unit_of_measurement: kWh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 3
+    update_interval: 60s
+    lambda: return id(g_energy_wh) / 1000.0;
+  - platform: template
+    name: "Pump 1 Total Time"
+    icon: "mdi:pump"
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 4
+    update_interval: 60s
+    lambda: return id(g_pump1_s) / 3600.0;
+  - platform: template
+    name: "Pump 2 Total Time"
+    icon: "mdi:pump"
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 4
+    update_interval: 60s
+    lambda: return id(g_pump2_s) / 3600.0;
+  - platform: template
+    name: "Pumps Total Time"
+    icon: "mdi:pump"
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 4
+    update_interval: 60s
+    lambda: return id(g_pumps_s) / 3600.0;
+  - platform: template
+    name: "ClearRay Total Time"
+    icon: "mdi:lightbulb-fluorescent-tube"
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 4
+    update_interval: 60s
+    lambda: return id(g_clearray_s) / 3600.0;
+  - platform: template
+    name: "Heater Total Time"
+    icon: "mdi:fire"
+    unit_of_measurement: h
+    device_class: duration
+    state_class: total_increasing
+    accuracy_decimals: 4
+    update_interval: 60s
+    lambda: return id(g_heater_s) / 3600.0;
+  - platform: template
+    name: "Heater Total Count"
+    icon: "mdi:counter"
+    state_class: total_increasing
+    accuracy_decimals: 0
+    update_interval: 60s
+    lambda: return id(g_heater_starts);
+  - platform: uptime
+    name: Uptime
+    state_class: measurement
+    device_class: duration
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+    state_class: measurement
+    device_class: signal_strength
+
 # 680: one Light button -> one select (Off + the 10 modes in the manual's order)
 select:
   # Change the log level from HA without reflashing (logger level above is the compiled maximum)
@@ -341,25 +669,96 @@ select:
     name: "Light"
     sundance_spa_id: sundance_spa_id
     icon: "mdi:lightbulb"
+  # Spa menu settings (see the numbers above)
+  - platform: template
+    name: "Heater Mode Setting"
+    icon: "mdi:radiator"
+    entity_category: config
+    options: ["Auto", "Eco", "Day"]
+    update_interval: 5s
+    lambda: |-
+      const std::string &v = id(heater_mode_txt).state;
+      if (v == "Auto" || v == "Eco" || v == "Day") return v;
+      return {};
+    set_action:
+      - lambda: |-
+          id(sundance_spa_id).request_setting_write(1, x == "Eco" ? 1 : x == "Day" ? 2 : 0);
+  - platform: template
+    name: "Primary Filter Cycles Setting"
+    icon: "mdi:sync"
+    entity_category: config
+    options: ["1", "2", "3", "4", "8"]
+    update_interval: 5s
+    lambda: |-
+      if (!id(pf_cycles_val).has_state() || std::isnan(id(pf_cycles_val).state)) return {};
+      return to_string((int) id(pf_cycles_val).state);
+    set_action:
+      - lambda: id(sundance_spa_id).request_setting_write(3, atoi(x.c_str()));
+  - platform: template
+    name: "Primary Filter Duration Setting"
+    icon: "mdi:timer-outline"
+    entity_category: config
+    options: ["1", "2", "3"]
+    update_interval: 5s
+    lambda: |-
+      if (!id(pf_duration_val).has_state() || std::isnan(id(pf_duration_val).state)) return {};
+      return to_string((int) id(pf_duration_val).state);
+    set_action:
+      - lambda: id(sundance_spa_id).request_setting_write(4, atoi(x.c_str()));
+  - platform: template
+    name: "Temperature Format Setting"
+    icon: "mdi:temperature-celsius"
+    entity_category: config
+    options: ["°C", "°F"]
+    update_interval: 5s
+    lambda: |-
+      const std::string &v = id(temp_format_txt).state;
+      if (v == "°C" || v == "°F") return v;
+      return {};
+    set_action:
+      - lambda: |-
+          id(sundance_spa_id).request_setting_write(8, x == "°F" ? 1 : 0);
 
 binary_sensor:
   - platform: status
     name: "Status"
 
 text_sensor:
+  # "hour;wh,wh,...": hour = UTC epoch hour of the newest value, then 24 hourly Wh oldest first
+  # (0 for an hour not counted, e.g. no time after a reboot without HA).
+  - platform: template
+    name: "Energy Last 24 Hours"
+    icon: "mdi:chart-bar"
+    entity_category: diagnostic
+    update_interval: 300s
+    lambda: |-
+      auto t = id(ha_time).now();
+      if (!t.is_valid()) return {};
+      const uint32_t now_hk = t.timestamp / 3600;
+      std::string s = to_string(now_hk) + ";";
+      for (int i = 23; i >= 0; i--) {
+        const uint32_t hk = now_hk - i;
+        const int slot = hk % 24;
+        const int wh = id(g_hour_key)[slot] == hk ? (int) roundf(id(g_hour_wh)[slot]) : 0;
+        s += to_string(wh);
+        if (i > 0) s += ",";
+      }
+      return s;
+  # "day;pump1_h;pump2_h;pumps_h;clearray_h;heater_h;heater_starts;kwh" at the last local midnight.
+  - platform: template
+    name: "Counters At Midnight"
+    icon: "mdi:calendar-today"
+    entity_category: diagnostic
+    update_interval: 300s
+    lambda: |-
+      const auto &m = id(g_mid_vals);
+      if (id(g_mid_day) == 0 || m[0] < 0) return {};
+      char buf[120];
+      snprintf(buf, sizeof(buf), "%u;%.4f;%.4f;%.4f;%.4f;%.4f;%d;%.3f", (unsigned) id(g_mid_day), m[0] / 3600.0,
+               m[1] / 3600.0, m[2] / 3600.0, m[3] / 3600.0, m[4] / 3600.0, (int) m[5], m[6] / 1000.0);
+      return std::string(buf);
   - platform: wifi_info
     ip_address:
       name: "IP Address"
     ssid:
       name: "WiFi SSID"
-
-sensor:
-  - platform: uptime
-    name: Uptime
-    state_class: measurement
-    device_class: duration
-  - platform: wifi_signal
-    name: "WiFi Signal"
-    update_interval: 60s
-    state_class: measurement
-    device_class: signal_strength

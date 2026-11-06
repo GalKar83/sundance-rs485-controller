@@ -66,6 +66,7 @@ static const int SCREEN_PF = 73;
 static const int SCREEN_PF_START = 70;
 static const int SCREEN_PF_START_EDIT = 71;
 static const int SCREEN_PF_CYCLES = 113;
+static const int SCREEN_PF_CYCLES_EDIT = 14;  // cycles being changed (raw 0 with key 14, raw 126 with key 112)
 static const int SCREEN_PF_DURATION = 68;
 static const int SCREEN_UV = 90;
 static const int SCREEN_UV_DAYS = 91;  // ClearRay days shown (first Warmer/Cooler); f15 see uv_days_from_()
@@ -178,6 +179,12 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   static const char *light680_name(int index);
   void request_clock_sync(bool manual);
   void request_settings_read(bool with_sync);
+  // Change a menu setting from HA (sundance_680.cpp, "settings write"). kind = WRITE_*; value:
+  // heater mode 0 Auto 1 Eco 2 Day; PF start 0-23, cycles 1/2/3/4/8, duration 1-3; FC 0 (Off)/10-180;
+  // ClearRay 0 (Off)/10-360/365; Water Refresh 0 (Off)/30-180; unit 0 °C 1 °F; language 0-3.
+  void request_setting_write(int kind, int value);
+  // Diagnostic: one short topside press (decoding tests only).
+  void diag_press(uint8_t button) { this->queue_press_(button); }
   // Runtime switch for the [DIAG] bus/byte logging (HA "Diagnostics" switch); no reflash needed.
   void set_diagnostics(bool enabled) { this->diag_enabled_ = enabled; }
   void set_pf_start_text_sensor(text_sensor::TextSensor *s) { this->pf_start_text_sensor_ = s; }
@@ -364,9 +371,24 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   int menu_prev_screen_{-1};
   int menu_prev_value_{0};
   bool uv_display_pending_{false};
-  void publish_language_(int value);
+  void publish_language_(int value, bool from_screen = true);
   int routine_mask_{0};
   int read_task_{0};
+  // settings write
+  int write_pending_[10]{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};  // requested value per WRITE_* kind
+  int write_kind_{0};                // kind being written (WRITE_PF covers start/cycles/duration)
+  int write_field_{0};               // PF: 0 start, 1 cycles, 2 duration
+  int write_target_[3]{-1, -1, -1};  // f15 code wanted per field (-1 = keep)
+  int write_dir_{1};                 // +1: Warmer moves one step forward in the value list
+  int write_presses_{0};
+  int write_last_value_{-1};
+  int write_no_change_{0};
+  bool write_offgrid_{false};  // ClearRay starts off the 10-day grid: its code may equal a grid value
+  int write_verify_kind_{0};  // checked against the status once back on the main screen
+  int write_verify_value_{-1};
+  bool start_next_write_();
+  void service_write_(int screen, int value, uint32_t now);
+  void write_step_toward_(int value);
   int last_routine_yday_{-1};
   bool boot_read_done_{false};
   void publish_uv_days_(int days);
@@ -395,6 +417,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   uint32_t lock_event_ms_{0};
   uint8_t lock_event_f14_{0};
   ESPPreferenceObject lock_pref_;
+  ESPPreferenceObject lang_pref_;
   void on_panel_press_(uint8_t btn);
   void service_lock_event_();
   // Jet 2 started by the controller (daily cleanup / unlock purge), not by a press -> "Cleanup".

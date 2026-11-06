@@ -1,0 +1,184 @@
+alias: 'Spa - Ready by: ask what next'
+description: >-
+  After a calendar heating ('Spa - Heating schedule (calendar)', input_text.spa_ready_by_state) asks
+  the phone what to do with the temperature: back to the setpoint from before the heating, keep it,
+  or type a new one (in the unit the panel shows, °C 18-40 in 0.5 steps or °F 65-104). Asked when a
+  soak is recorded (input_datetime.last_soak from 1 h before the water should be ready), or 2 h
+  after it should have been ready if nobody soaked (ready = the event start for ready-by, start +
+  estimated heating time for a 'start' event). Never in the spa quiet hours 23:00-06:30: then at
+  06:30. No answer within 12 h: nothing changes. Created 2026-11-03. Revised 2026-11-03:
+  answer/typed/new_c pre-defined before the repeat - set only inside it they stayed local, so Back
+  and Set would not have applied. A one-off plan stays listed until this ends (state 'done'); the
+  5-min cleanup of 'Spa - Heating plans' then removes it. Revised 2026-11-05: after the answer or
+  the 12 h timeout, a Heater Mode that the plan switched to Auto goes back to Eco / Day.
+triggers:
+  - trigger: state
+    entity_id: input_datetime.last_soak
+    id: soak
+  - trigger: time_pattern
+    minutes: /5
+    id: timer
+conditions:
+  - condition: template
+    value_template: >-
+      {%- set st = states('input_text.spa_ready_by_state').split(';') -%}{%- set ref = (st[4] if st
+      | count > 4 else st[0]) | int(0) if st | count >= 4 else 0 -%}{%- if st | count < 4 or st[3]
+      not in ['heat', 'warned'] -%}false{%- elif trigger.id == 'soak' -%}{{
+      (state_attr('input_datetime.last_soak', 'timestamp') | float(0)) >= ref - 3600 }}{%- else
+      -%}{{ as_timestamp(now()) >= ref + 7200 }}{%- endif -%}
+    note: >-
+      Only for an open calendar heating; a soak recorded from 1 h before the water should be ready,
+      or 2 h after it should have been ready.
+actions:
+  - variables:
+      st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+      prev: '{{ st[1] | float(35) }}'
+      target: '{{ st[2] | float(35) }}'
+      panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+      tag: spa_ready_next_{{ st[0] }}
+      ref: '{{ (st[4] if st | count > 4 else st[0]) | int(0) }}'
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_ready_by_state
+    data:
+      value: '{{ st[0] }};{{ st[1] }};{{ st[2] }};asked;{{ ref }}'
+    note: Mark first, so the 5-min trigger cannot ask twice.
+  - variables:
+      fprev: '{{ ((prev * 9 / 5 + 32) | round(0) | int ~ ''°F'') if panel_f else (''%.1f°C'' % prev) }}'
+      ftarget: '{{ ((target * 9 / 5 + 32) | round(0) | int ~ ''°F'') if panel_f else (''%.1f°C'' % target) }}'
+      prompt: >-
+        {{ 'Soak recorded.' if trigger.id == 'soak' else 'Heated for ' ~ (ref | int |
+        timestamp_custom('%H:%M')) ~ ', no soak recorded.' }} Back to {{ fprev }}, keep {{ ftarget
+        }}, or set a new temperature?
+      done: false
+      answer: none
+      typed: ''
+      new_c: none
+    note: >-
+      answer / typed / new_c are defined here so the values set inside the repeat reach the choose
+      after it (a variables action inside a sequence only changes variables that already exist
+      outside it).
+  - wait_template: '{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}'
+    timeout:
+      hours: 8
+    continue_on_timeout: true
+    note: 'Spa quiet hours 23:00-06:30: ask at 06:30.'
+  - repeat:
+      sequence:
+        - action: notify.mobile_app_your_phone
+          data:
+            title: Spa temperature
+            message: '{{ prompt }}'
+            data:
+              tag: '{{ tag }}'
+              actions:
+                - action: BACK_{{ tag }}
+                  title: Back to {{ fprev }}
+                - action: KEEP_{{ tag }}
+                  title: Keep {{ ftarget }}
+                - action: SET_{{ tag }}
+                  title: Set
+                  behavior: textInput
+                  textInputButtonTitle: Set
+                  textInputPlaceholder: '{{ ''e.g. 98'' if panel_f else ''e.g. 36.5'' }}'
+              sticky: true
+              persistent: true
+              clickAction: noAction
+              priority: high
+              ttl: 0
+        - wait_for_trigger:
+            - trigger: event
+              event_type: mobile_app_notification_action
+              event_data:
+                action: BACK_{{ tag }}
+            - trigger: event
+              event_type: mobile_app_notification_action
+              event_data:
+                action: KEEP_{{ tag }}
+            - trigger: event
+              event_type: mobile_app_notification_action
+              event_data:
+                action: SET_{{ tag }}
+          timeout:
+            hours: 12
+          continue_on_timeout: true
+        - variables:
+            answer: >-
+              {{ wait.trigger.event.data.action.split('_')[0] if wait.trigger is not none else
+              'none' }}
+            typed: >-
+              {{ (wait.trigger.event.data.get('reply_text', '') | string | trim | replace(',', '.'))
+              if wait.trigger is not none else '' }}
+        - variables:
+            new_c: >-
+              {%- if answer != 'SET' or not (typed | regex_match('^[0-9]{2,3}(\.[0-9])?$'))
+              -%}none{%- else -%}{%- set v = typed | float -%}{%- if panel_f -%}{{ (((v - 32) * 10 /
+              9) | round(0) / 2) if (65 <= v <= 104 and v == v | round(0)) else 'none' }}{%- else
+              -%}{{ v if (18 <= v <= 40 and (v * 2) == (v * 2) | round(0)) else 'none' }}{%- endif
+              -%}{%- endif -%}
+        - if:
+            - condition: template
+              value_template: '{{ answer == ''SET'' and new_c == ''none'' }}'
+          then:
+            - variables:
+                prompt: >-
+                  {{ 'Please type a whole °F value 65-104 (e.g. 98).' if panel_f else 'Please type
+                  18-40 in steps of 0.5 (e.g. 36.5).' }}
+          else:
+            - variables:
+                done: true
+      until:
+        - condition: template
+          value_template: '{{ done or repeat.index >= 5 }}'
+    note: Re-ask after an invalid typed value (max 5 rounds); no answer within 12 h ends it.
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: '{{ answer == ''BACK'' }}'
+        sequence:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.sundance_spa
+            data:
+              temperature: '{{ prev }}'
+      - conditions:
+          - condition: template
+            value_template: '{{ answer == ''SET'' and new_c != ''none'' }}'
+        sequence:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.sundance_spa
+            data:
+              temperature: '{{ new_c | float }}'
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_ready_by_state
+    data:
+      value: '{{ st[0] }};{{ st[1] }};{{ st[2] }};done;{{ ref }}'
+  - action: notify.mobile_app_your_phone
+    data:
+      message: clear_notification
+      data:
+        tag: '{{ tag }}'
+  - if:
+      - condition: template
+        value_template: '{{ states(''input_text.spa_plan_previous_heater_mode'') in [''Eco'', ''Day''] }}'
+    then:
+      - if:
+          - condition: state
+            entity_id: sensor.sundance_spa_heater_mode
+            state: Auto
+        then:
+          - action: select.select_option
+            target:
+              entity_id: select.sundance_spa_heater_mode_setting
+            data:
+              option: '{{ states(''input_text.spa_plan_previous_heater_mode'') }}'
+        note: Not if someone already chose another mode meanwhile.
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_plan_previous_heater_mode
+        data:
+          value: ''
+    note: Heater Mode back to Eco / Day after the plan ('Spa - Heating plans' switched it to Auto).
+mode: single

@@ -1,109 +1,129 @@
-alias: "Spa - Ask: Soaking or Maintenance"
+alias: 'Spa - Ask: Soaking or Maintenance'
 description: >-
-  When a spa run of 10+ minutes ends (Jet 2 on or Jet 1 high = binary_sensor.sundance_spa_in_use),
-  wait 5 min: any further run (any length) starting within 5 min of the last end is added to the
-  same session (up to 6 runs). Then ask the phone once - Soaking / Maintenance / Soaking (edit time)
-  - with the total minutes: from the start of the first run to the end of the last one, gaps
-  included (time in the water with the pump off counts; the 5-min wait itself is never added).
-  "Soaking (edit time)" lets you type the minutes actually spent in the water.
-  Soaking -> soaking counter + minutes + Last Soak; Maintenance -> maintenance counter + minutes +
-  Last Maintenance. No answer within 12 h -> counted in neither. Runs under 10 min that are not
-  follow-ups are ignored. No question in the quiet hours 23:00-06:30: it waits and asks at 06:30
-  (the recorded times stay those of the session).
+  When a spa session of 10+ minutes ends (Jet 2 on or Jet 1 high,
+  binary_sensor.sundance_spa_in_use_session), wait 5 min: any further run (any length) starting
+  within 5 min of the last end is added to the same session (up to 6 runs). Then ask the owner's
+  phone once (buttons Soaking / Maintenance / Soaking (edit time) - the last one lets the owner type
+  the minutes actually spent in the water, e.g. staying in after the jets stop) whether it was
+  soaking or maintenance (adding chemicals), with the total minutes: just the session if there was
+  no follow-up, otherwise from the start of the first run to the end of the last one, gaps included
+  (time spent in the spa with the pump off counts; the 5-min wait itself is never added). Soaking ->
+  Spa Soaking totals + Last Soak (end of the last run); Maintenance -> Spa Maintenance totals + Last
+  Maintenance. No answer within 12 h -> counted in neither (still in Pumps Time). Runs under 10 min
+  that are not follow-ups are not asked about. input_boolean.spa_session_merging blocks a second
+  question while follow-ups are collected (forced off at HA start). Revised 2026-10-26: follow-up
+  merge. Revised 2026-10-28: dates renamed to input_datetime.last_soak / last_maintenance. Revised
+  2026-10-31: triggered by binary_sensor.sundance_spa_in_use going off from any state (on ->
+  unavailable -> off was missed on 31/10 07:41), with the run start from
+  input_datetime.spa_in_use_since (set by "Spa - Track In Use Start", reset to 1970 once used); runs
+  under 10 min are ignored as before. Revised 2026-11-01: no question in the spa quiet hours
+  23:00-06:30 - it waits and asks at 06:30. Revised 2026-11-06: a recorded soak first copies the old
+  input_datetime.last_soak to input_datetime.spa_previous_soak (shown as 'Previous Soak' on the Hot
+  Tub page).
 triggers:
-  # Any change to off, also via unavailable (a Wi-Fi blip just when the jets stop). The run start
-  # comes from input_datetime.spa_in_use_since, not from the trigger.
   - trigger: state
     entity_id: binary_sensor.sundance_spa_in_use
-    not_from: "off"
-    to: "off"
+    not_from: 'off'
+    to: 'off'
+    note: >-
+      Any change to off, also via unavailable (a WiFi blip at the moment the jets stop) - the run
+      start comes from input_datetime.spa_in_use_since.
 conditions:
-  # A run that ends while an earlier session is still collecting follow-ups is merged into it.
   - condition: state
     entity_id: input_boolean.spa_session_merging
-    state: "off"
+    state: 'off'
+    note: >-
+      A run that ends while an earlier session is still collecting follow-up runs is merged into
+      that one, not asked about separately.
 actions:
   - variables:
-      start_ts: "{{ state_attr('input_datetime.spa_in_use_since', 'timestamp') | float(0) }}"
-  # Close the run, so a later reconnect (unavailable -> off with no run open) does not ask.
+      start_ts: '{{ state_attr(''input_datetime.spa_in_use_since'', ''timestamp'') | float(0) }}'
   - action: input_datetime.set_datetime
     target:
       entity_id: input_datetime.spa_in_use_since
     data:
-      datetime: "1970-01-01 00:00:00"
-  # A run was open and lasted 10+ minutes.
+      datetime: '1970-01-01 00:00:00'
+    note: Close the run, so a later reconnect (unavailable -> off with no run open) does not ask.
   - condition: template
-    value_template: "{{ start_ts > 1000000000 and as_timestamp(now()) - start_ts >= 600 }}"
+    value_template: '{{ start_ts > 1000000000 and as_timestamp(now()) - start_ts >= 600 }}'
+    note: A run was open and lasted 10+ minutes.
   - variables:
-      minutes: "{{ ((as_timestamp(now()) - start_ts) / 60) | round(1) }}"
-      tag: "spa_session_{{ as_timestamp(now()) | int }}"
-      ended: "{{ as_timestamp(now()) | int }}"
+      minutes: '{{ ((as_timestamp(now()) - start_ts) / 60) | round(1) }}'
+      tag: spa_session_{{ as_timestamp(now()) | int }}
+      ended: '{{ as_timestamp(now()) | int }}'
       more: true
-      first_start: "{{ start_ts }}"
+      first_start: '{{ start_ts }}'
       done: false
   - action: input_boolean.turn_on
     target:
       entity_id: input_boolean.spa_session_merging
-  # Collect follow-up runs (at most 6).
   - repeat:
       sequence:
         - wait_for_trigger:
             - trigger: state
               entity_id: binary_sensor.sundance_spa_in_use
-              to: "on"
+              to: 'on'
           timeout:
             minutes: 5
           continue_on_timeout: true
+          note: Another run (any length) within 5 min of the end belongs to the same soak.
         - if:
             - condition: template
-              value_template: "{{ wait.trigger is not none }}"
+              value_template: '{{ wait.trigger is not none }}'
           then:
+            - variables:
+                run_start: '{{ as_timestamp(now()) }}'
             - wait_for_trigger:
                 - trigger: state
                   entity_id: binary_sensor.sundance_spa_in_use
-                  to: "off"
+                  to: 'off'
               timeout:
                 hours: 3
               continue_on_timeout: true
             - variables:
-                minutes: "{{ ((as_timestamp(now()) - first_start | float(0)) / 60) | round(1) }}"
-                ended: "{{ as_timestamp(now()) | int }}"
+                minutes: '{{ ((as_timestamp(now()) - first_start | float(0)) / 60) | round(1) }}'
+                ended: '{{ as_timestamp(now()) | int }}'
+              note: >-
+                From the start of the first run to the end of the last one, gaps included (owner
+                stays in the spa between runs).
           else:
             - variables:
                 more: false
       until:
         - condition: template
-          value_template: "{{ not more or repeat.index >= 6 }}"
+          value_template: '{{ not more or repeat.index >= 6 }}'
+    note: Collect follow-up runs; at most 6.
   - action: input_datetime.set_datetime
     target:
       entity_id: input_datetime.spa_in_use_since
     data:
-      datetime: "1970-01-01 00:00:00"
+      datetime: '1970-01-01 00:00:00'
+    note: Follow-up runs are merged here; close the last one.
   - action: input_boolean.turn_off
     target:
       entity_id: input_boolean.spa_session_merging
   - variables:
-      prompt: "{{ minutes | round(0) | int }} min. Was it soaking or maintenance?"
-  # Quiet hours 23:00-06:30 (390 = 06:30, 1380 = 23:00 in minutes of the day).
-  - wait_template: "{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}"
+      prompt: '{{ minutes | round(0) | int }} min. Was it soaking or maintenance?'
+    note: After the follow-up runs are merged.
+  - wait_template: '{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}'
     timeout:
       hours: 8
     continue_on_timeout: true
-  # Ask; re-ask after an invalid typed time (max 5 rounds). No answer within 12 h ends the loop.
+    note: 'Spa quiet hours 23:00-06:30: ask at 06:30. The recorded times stay those of the session.'
   - repeat:
       sequence:
         - action: notify.mobile_app_your_phone
           data:
             title: Spa session ended
-            message: "{{ prompt }}"
+            message: '{{ prompt }}'
             data:
-              tag: "{{ tag }}"
+              tag: '{{ tag }}'
               actions:
-                - action: "SOAK_{{ tag }}"
+                - action: SOAK_{{ tag }}
                   title: Soaking
-                - action: "MAINT_{{ tag }}"
+                - action: MAINT_{{ tag }}
                   title: Maintenance
-                - action: "SOAKEDIT_{{ tag }}"
+                - action: SOAKEDIT_{{ tag }}
                   title: Soaking (edit time)
                   behavior: textInput
                   textInputButtonTitle: Save
@@ -117,34 +137,35 @@ actions:
             - trigger: event
               event_type: mobile_app_notification_action
               event_data:
-                action: "SOAK_{{ tag }}"
+                action: SOAK_{{ tag }}
             - trigger: event
               event_type: mobile_app_notification_action
               event_data:
-                action: "MAINT_{{ tag }}"
+                action: MAINT_{{ tag }}
             - trigger: event
               event_type: mobile_app_notification_action
               event_data:
-                action: "SOAKEDIT_{{ tag }}"
+                action: SOAKEDIT_{{ tag }}
           timeout:
             hours: 12
           continue_on_timeout: true
         - variables:
-            answer: "{{ wait.trigger.event.data.action.split('_')[0] if wait.trigger is not none else 'none' }}"
+            answer: >-
+              {{ wait.trigger.event.data.action.split('_')[0] if wait.trigger is not none else
+              'none' }}
         - if:
             - condition: template
-              value_template: "{{ answer == 'SOAKEDIT' }}"
+              value_template: '{{ answer == ''SOAKEDIT'' }}'
           then:
             - variables:
-                typed: "{{ wait.trigger.event.data.get('reply_text', '') | string | trim }}"
-            # Digits only, 1-300 whole minutes; anything else re-asks with the same tag.
+                typed: '{{ wait.trigger.event.data.get(''reply_text'', '''') | string | trim }}'
             - if:
                 - condition: template
-                  value_template: "{{ typed | regex_match('^[0-9]{1,3}$') and 1 <= typed | int <= 300 }}"
+                  value_template: '{{ typed | regex_match(''^[0-9]{1,3}$'') and 1 <= typed | int <= 300 }}'
               then:
                 - variables:
-                    minutes: "{{ typed | int }}"
-                    ended: "{{ (first_start | float(0) + (typed | int) * 60) | int }}"
+                    minutes: '{{ typed | int }}'
+                    ended: '{{ (first_start | float(0) + (typed | int) * 60) | int }}'
                     answer: SOAK
                     done: true
               else:
@@ -154,14 +175,30 @@ actions:
           else:
             - variables:
                 done: true
+          note: >-
+            Soaking (edit time): digits only, 1-300 whole minutes; anything else re-asks with the
+            same notification tag. Last Soak = start + typed minutes.
       until:
         - condition: template
-          value_template: "{{ done or repeat.index >= 5 }}"
+          value_template: '{{ done or repeat.index >= 5 }}'
+    note: >-
+      Ask, and re-ask after an invalid typed time (max 5 rounds). No answer within 12 h ends the
+      loop with nothing recorded.
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ answer == 'SOAK' }}"
+            value_template: '{{ answer == ''SOAK'' }}'
         sequence:
+          - if:
+              - condition: template
+                value_template: '{{ (state_attr(''input_datetime.last_soak'', ''timestamp'') | float(0)) > 172800 }}'
+            then:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.spa_previous_soak
+                data:
+                  timestamp: '{{ state_attr(''input_datetime.last_soak'', ''timestamp'') | int(0) }}'
+            note: Keep the soak that was Last Soak until now, for 'Previous Soak' on the Hot Tub page.
           - action: counter.increment
             target:
               entity_id: counter.spa_soaking_sessions_total
@@ -169,15 +206,18 @@ actions:
             target:
               entity_id: input_number.spa_soaking_minutes_total
             data:
-              value: "{{ (states('input_number.spa_soaking_minutes_total') | float(0) + minutes | float(0)) | round(1) }}"
+              value: >-
+                {{ (states('input_number.spa_soaking_minutes_total') | float(0) + minutes |
+                float(0)) | round(1) }}
           - action: input_datetime.set_datetime
             target:
               entity_id: input_datetime.last_soak
             data:
-              timestamp: "{{ ended }}"
+              timestamp: '{{ ended }}'
+            note: Session end time
       - conditions:
           - condition: template
-            value_template: "{{ answer == 'MAINT' }}"
+            value_template: '{{ answer == ''MAINT'' }}'
         sequence:
           - action: counter.increment
             target:
@@ -186,17 +226,21 @@ actions:
             target:
               entity_id: input_number.spa_maintenance_minutes_total
             data:
-              value: "{{ (states('input_number.spa_maintenance_minutes_total') | float(0) + minutes | float(0)) | round(1) }}"
+              value: >-
+                {{ (states('input_number.spa_maintenance_minutes_total') | float(0) + minutes |
+                float(0)) | round(1) }}
           - action: input_datetime.set_datetime
             target:
               entity_id: input_datetime.last_maintenance
             data:
-              timestamp: "{{ ended }}"
-  # Persistent notification: remove it from the phone once answered or timed out.
+              timestamp: '{{ ended }}'
+            note: Session end time
+    note: 'No answer within 12 h: nothing is counted.'
   - action: notify.mobile_app_your_phone
     data:
       message: clear_notification
       data:
-        tag: "{{ tag }}"
+        tag: '{{ tag }}'
+    note: 'Persistent notification: remove it from the phone once answered or timed out.'
 mode: parallel
 max: 5

@@ -1,0 +1,283 @@
+alias: Spa - Heating plans
+description: >-
+  Runs the heating plans from the Hot Tub Settings page (input_text.spa_plan_1..5 =
+  'mode;temp_c;HH:MM;days;date', written by script.spa_plan_add). Mode R = READY BY: the water
+  should be at the target at the plan time - heating starts at plan time - ((target - water) /
+  input_number.spa_heat_rate in °C/h + input_number.spa_ready_by_margin min). Mode S = START HEATING
+  at the plan time. days: 'once' (date in the 5th field; the plan stays listed until the water
+  reached its target and its plan time has come, whichever is later - i.e. with the 'Spa ready'
+  notice, or at the plan time when the water was ready earlier; one that never started is removed 10
+  min after its time), 'daily', or weekday digits Mon=0..Sun=6 (stays until deleted). Event driven
+  (no polling): the next enabled plan is recalculated whenever a plan changes, the water temperature
+  changes (each panel step, 0.5 °C / 1 °F), the Heat Rate or margin changes, HA starts or the ESP
+  reconnects; its heating start is kept in input_datetime.spa_plan_next_start and a time trigger
+  starts it exactly then; input_datetime.spa_plan_ready_check (the plan time, ready-by) triggers the
+  not-ready check. The setpoint before the heating is kept for 'Spa - Ready by: ask what next'.
+  Stateless between runs: input_text.spa_ready_by_state = 'plan_ts;previous
+  setpoint;target;phase;ref_ts' (phase heat / warned / asked / done; ref = when the water should be
+  ready: the plan time for ready-by, plan time + estimated heating for start). Ready-by only: at the
+  plan time, if the water is still more than 0.4° short, one notice. Heater Mode Eco (17:00-07:00
+  only) or Day (07:00-17:00 only) could block heating: it is switched to Auto when a plan's heating
+  starts, the old mode kept in input_text.spa_plan_previous_heater_mode and restored by 'Spa - Ready
+  by: ask what next'. Created 2026-11-03 (first with a calendar, replaced the same day by the plan
+  list on the owner's request). A plan whose switch (input_boolean.spa_plan_N_on) is off is skipped
+  but kept; a switched-off one-off is still removed once its time has passed. Revised 2026-11-03: a
+  one-off plan is no longer removed when its heating starts (owner: only once the whole action has
+  ended); the stale cleanup skips the running plan (state plan_ts). Revised 2026-11-03: the 'Spa
+  heating' notice names the start temperature (water at the start of the heating) - 'Heating from
+  34.5°C to 35.5°C ...'. Revised 2026-11-03: the 'Spa not ready yet' notice gives the water
+  temperature now and the expected minutes / time left to the target (Heat Rate). Revised
+  2026-11-03: 'Spa - Heating plans: ready notice' tells the phone the moment the water reaches the
+  target; when it is already warm at the start, input_text.spa_ready_notified is set here so that
+  notice is skipped. Revised 2026-11-03: also runs when a plan is added, changed or switched on
+  (input_text.spa_plan_N / input_boolean.spa_plan_N_on), so a plan whose heating should already have
+  begun starts at once instead of at the next 5-min run; mode queued so such a run is not dropped
+  while another is running. Revised 2026-11-03 (owner's design): 5-min polling replaced by the event
+  triggers above; the 12 h look-ahead dropped (start times are stored, not polled). Backup: OneDrive
+  HA-MCP/backups/automation-spa_heating_plans-20261103-1525-before-event-driven.json. Also runs when
+  input_text.spa_ready_by_state changes, so a finished one-off plan (phase done) leaves the list at
+  once; its own writes re-run it once with no effect. Revised 2026-11-03 (owner): a one-off plan is
+  removed not before its plan time and not before the water reached the target (triggers:
+  ready_check at the plan time, input_text.spa_ready_notified when the target is reached). The
+  Back/Keep/Set question follows independently (state).
+triggers:
+  - trigger: homeassistant
+    event: start
+  - trigger: state
+    entity_id:
+      - input_text.spa_plan_1
+      - input_text.spa_plan_2
+      - input_text.spa_plan_3
+      - input_text.spa_plan_4
+      - input_text.spa_plan_5
+      - input_boolean.spa_plan_1_on
+      - input_boolean.spa_plan_2_on
+      - input_boolean.spa_plan_3_on
+      - input_boolean.spa_plan_4_on
+      - input_boolean.spa_plan_5_on
+    not_to:
+      - unavailable
+      - unknown
+    id: plan_changed
+  - trigger: time
+    at: input_datetime.spa_plan_next_start
+    id: start_time
+  - trigger: time
+    at: input_datetime.spa_plan_ready_check
+    id: ready_check
+  - trigger: state
+    entity_id: climate.sundance_spa
+    attribute: current_temperature
+    id: water
+  - trigger: state
+    entity_id:
+      - input_number.spa_heat_rate
+      - input_number.spa_ready_by_margin
+    id: params
+  - trigger: state
+    entity_id: binary_sensor.sundance_spa_status
+    to: 'on'
+    id: esp_back
+  - trigger: state
+    entity_id: input_text.spa_ready_by_state
+    id: state_changed
+  - trigger: state
+    entity_id: input_text.spa_ready_notified
+    id: ready_reached
+conditions:
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_status
+    state: 'on'
+    note: >-
+      Settings can only be sent while the ESP is connected; the esp_back trigger catches up after a
+      drop.
+actions:
+  - variables:
+      panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+      st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+      cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+      setp: '{{ state_attr(''climate.sundance_spa'', ''temperature'') | float(0) }}'
+  - variables:
+      ftarget: >-
+        {%- set t = (st[2] | float(0)) if st | count > 2 else 0 -%}{{ ((t * 9 / 5 + 32) | round(0) |
+        int ~ '°F') if panel_f else ('%.1f°C' % t) }}
+  - if:
+      - condition: template
+        value_template: >-
+          {{ st | count == 5 and st[3] == 'heat' and st[4] == st[0] and as_timestamp(now()) >= st[4]
+          | int(0) and cur < (st[2] | float(0)) - 0.4 }}
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_ready_by_state
+        data:
+          value: '{{ st[0] }};{{ st[1] }};{{ st[2] }};warned;{{ st[4] }}'
+      - action: script.spa_notify
+        data:
+          title: Spa not ready yet
+          message: >-
+            {%- set fcur = ((cur * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' %
+            cur) -%}{%- set left = (((st[2] | float(0)) - cur) /
+            ([states('input_number.spa_heat_rate') | float(2), 0.5] | max) * 60) | round(0) | int
+            -%}The spa should be {{ ftarget }} at {{ st[4] | int | timestamp_custom('%H:%M') }} but
+            the water is {{ fcur }} now. About {{ left }} more min to {{ ftarget }} (ready about {{
+            (as_timestamp(now()) + left * 60) | timestamp_custom('%H:%M') }}) at the learned Heat
+            Rate of {%- set r = states('input_number.spa_heat_rate') | float(2) %} {{ ((r * 1.8) |
+            round(1) ~ '°F/h') if panel_f else (r | round(1) ~ '°C/h') }}.
+          tag: spa_ready_by
+    note: >-
+      Ready-by heating (ref = plan time) and the water is still short at that time: one notice per
+      plan.
+  - variables:
+      stale: >-
+        {%- set st = states('input_text.spa_ready_by_state').split(';') -%}{%- set active = (st[0] |
+        int(0)) if (st | count == 5 and st[3] in ['heat', 'warned', 'asked']) else 0 -%}{%- set
+        nowts = as_timestamp(now()) | int -%}{%- set ns = namespace(s=[]) -%}{%- for i in range(1,
+        6) -%}{%- set p = states('input_text.spa_plan_' ~ i).split(';') -%}{%- if p | count == 5 and
+        p[3] == 'once' and p[2] | regex_match('^[0-9]{2}:[0-9]{2}$') and p[4] |
+        regex_match('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') -%}{%- set ts = as_timestamp(today_at(p[2]) +
+        timedelta(days=(as_datetime(p[4]).date() - now().date()).days)) | int -%}{%- set
+        done_running = ts == active and states('input_text.spa_ready_notified') == (ts | string) and
+        ts <= nowts -%}{%- set never_ran = ts != active and ts < nowts - 600 -%}{%- if done_running
+        or never_ran -%}{%- set ns.s = ns.s + ['input_text.spa_plan_' ~ i] -%}{%- endif -%}{%- endif
+        -%}{%- endfor -%}{{ ns.s }}
+  - if:
+      - condition: template
+        value_template: '{{ stale | count > 0 }}'
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: '{{ stale }}'
+        data:
+          value: ''
+    note: >-
+      One-off plans leave the list: a running one once the water reached its target AND its plan
+      time has come (whichever is later - with the 'Spa ready' notice, or at the plan time); one
+      that never started (e.g. ESP offline) 10 min after its time.
+  - variables:
+      pick: >-
+        {%- set ns = namespace(r=none) -%}{%- for i in range(1, 6) -%}{%- set p =
+        states('input_text.spa_plan_' ~ i).split(';') -%}{%- if p | count == 5 and
+        is_state('input_boolean.spa_plan_' ~ i ~ '_on', 'on') and p[2] |
+        regex_match('^[0-9]{2}:[0-9]{2}$') -%}{%- set base = today_at(p[2]) -%}{%- for d in range(0,
+        8) -%}{%- set dt = base + timedelta(days=d) -%}{%- set ok = (p[3] == 'daily') or (p[3] ==
+        'once' and (dt.date() | string) == p[4]) or (p[3] not in ['daily', 'once'] and (dt.weekday()
+        | string) in p[3]) -%}{%- if ok and as_timestamp(dt) > as_timestamp(now()) - 600 -%}{%- set
+        ts = as_timestamp(dt) | int -%}{%- if ns.r is none or ts < ns.r.start -%}{%- set ns.r =
+        {'start': ts, 'target': p[1] | float, 'mode': ('start' if p[0] == 'S' else 'ready'), 'slot':
+        i, 'once': p[3] == 'once'} -%}{%- endif -%}{%- endif -%}{%- endfor -%}{%- endif -%}{%-
+        endfor -%}{{ ns.r }}
+  - condition: template
+    value_template: '{{ pick is mapping }}'
+    note: There is an enabled plan in the next 8 days.
+  - variables:
+      st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+      same: '{{ st | count >= 4 and st[0] | int(0) == pick.start }}'
+      cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+      setp: '{{ state_attr(''climate.sundance_spa'', ''temperature'') | float(0) }}'
+      lead_min: >-
+        {{ (([pick.target - cur, 0] | max) / ([states('input_number.spa_heat_rate') | float(2), 0.5]
+        | max) * 60 + states('input_number.spa_ready_by_margin') | float(20)) | round(0) }}
+      begin_ts: '{{ pick.start if pick.mode == ''start'' else pick.start - lead_min * 60 }}'
+      fmt_t: >-
+        {{ ((pick.target * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' %
+        pick.target) }}
+      heat_min: >-
+        {{ (([pick.target - cur, 0] | max) / ([states('input_number.spa_heat_rate') | float(2), 0.5]
+        | max) * 60) | round(0) }}
+      ref: '{{ pick.start if pick.mode == ''ready'' else pick.start + heat_min * 60 }}'
+  - if:
+      - condition: template
+        value_template: '{{ not same }}'
+    then:
+      - if:
+          - condition: template
+            value_template: '{{ begin_ts | int > as_timestamp(now()) | int }}'
+        then:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.spa_plan_next_start
+            data:
+              timestamp: '{{ begin_ts | int }}'
+      - if:
+          - condition: template
+            value_template: '{{ pick.mode == ''ready'' }}'
+        then:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.spa_plan_ready_check
+            data:
+              timestamp: '{{ pick.start }}'
+    note: >-
+      Plan not started yet: keep its heating start (moves with every water reading, Heat Rate or
+      margin change) and, for ready-by, the plan time for the not-ready check. The time triggers
+      fire exactly then.
+  - if:
+      - condition: template
+        value_template: '{{ not same and as_timestamp(now()) >= begin_ts }}'
+    then:
+      - variables:
+          prev: '{{ st[1] if (st | count >= 4 and st[3] in [''heat'', ''warned'', ''asked'']) else setp }}'
+          old_mode: '{{ states(''sensor.sundance_spa_heater_mode'') }}'
+        note: An event that replaces one still open keeps the setpoint from before the first one.
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_ready_by_state
+        data:
+          value: '{{ pick.start }};{{ prev }};{{ pick.target }};heat;{{ ref }}'
+      - if:
+          - condition: template
+            value_template: '{{ setp != pick.target }}'
+        then:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.sundance_spa
+            data:
+              temperature: '{{ pick.target }}'
+      - if:
+          - condition: template
+            value_template: '{{ cur >= pick.target }}'
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_ready_notified
+            data:
+              value: '{{ pick.start }}'
+        note: >-
+          Already warm: the start notice says so, so 'Spa - Heating plans: ready notice' does not
+          send another.
+      - if:
+          - condition: template
+            value_template: '{{ old_mode in [''Eco'', ''Day''] }}'
+        then:
+          - if:
+              - condition: template
+                value_template: '{{ states(''input_text.spa_plan_previous_heater_mode'') not in [''Eco'', ''Day''] }}'
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.spa_plan_previous_heater_mode
+                data:
+                  value: '{{ old_mode }}'
+          - action: select.select_option
+            target:
+              entity_id: select.sundance_spa_heater_mode_setting
+            data:
+              option: Auto
+        note: >-
+          Eco and Day can block the heater during the plan: Auto while it runs. 'Spa - Ready by: ask
+          what next' restores the mode after the question.
+      - action: script.spa_notify
+        data:
+          title: Spa heating
+          message: >-
+            {%- set fcur = ((cur * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' %
+            cur) -%}{%- if cur >= pick.target -%}Water is {{ fcur }}, already at {{ fmt_t }}{{ '' if
+            pick.mode == 'start' else ' for ' ~ (pick.start | timestamp_custom('%H:%M')) }}.{%- elif
+            pick.mode == 'start' -%}Heating from {{ fcur }} to {{ fmt_t }}, starting now, ready
+            about {{ ref | int | timestamp_custom('%H:%M') }}.{%- else -%}Heating from {{ fcur }} to
+            {{ fmt_t }} for {{ pick.start | timestamp_custom('%H:%M') }} (about {{ heat_min | int }}
+            min of heating).{%- endif -%}{{ ' Heater Mode switched to Auto for this plan (was ' ~
+            old_mode ~ ').' if old_mode in ['Eco', 'Day'] else '' }}
+          tag: spa_ready_by
+mode: queued

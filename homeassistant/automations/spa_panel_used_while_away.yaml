@@ -1,13 +1,20 @@
 alias: Spa - Panel used while the owner is away
 description: >-
-  When a button is pressed on the topside panel (sensor.sundance_spa_panel_button - physical
-  presses only; actions from HA never appear there) while the owner is not home, notify ONCE per
-  absence: input_boolean.spa_panel_alert_sent blocks further alerts until the owner is home again.
-  Replace person.owner with your person entity.
+  When a button is pressed on the spa topside panel (sensor.sundance_spa_panel_button, physical
+  presses only; anything done from HA does not appear there) while the owner (person.owner) is not
+  home, notify the owner's phone ONCE per absence: input_boolean.spa_panel_alert_sent blocks further
+  alerts until the owner is home again (then it is cleared). NOTE: relies on the Panel Button entity
+  - keep it when the diagnostic entities are removed in v1. Revised 2026-10-26: one alert per
+  absence (was one per 10 min). Revised 2026-10-29: presence now read from person.owner (GPS
+  overruled to home by the home Wi-Fi via the template tracker device_tracker.owner_presence)
+  instead of the raw GPS tracker device_tracker.your_phone.
 triggers:
   - trigger: state
     entity_id: sensor.sundance_spa_panel_button
-    not_to: ["Idle", "unknown", "unavailable"]
+    not_to:
+      - Idle
+      - unknown
+      - unavailable
     id: press
   - trigger: state
     entity_id: person.owner
@@ -22,6 +29,7 @@ actions:
           - action: input_boolean.turn_off
             target:
               entity_id: input_boolean.spa_panel_alert_sent
+        note: 'Back home: the next absence gets a new alert.'
       - conditions:
           - condition: trigger
             id: press
@@ -32,14 +40,14 @@ actions:
                 state: home
           - condition: state
             entity_id: input_boolean.spa_panel_alert_sent
-            state: "off"
+            state: 'off'
         sequence:
           - action: notify.mobile_app_your_phone
             data:
               title: Spa panel used
               message: >-
-                Someone pressed '{{ trigger.to_state.state }}' on the spa panel at
-                {{ now().strftime('%H:%M') }} while you are away.
+                Someone pressed '{{ trigger.to_state.state }}' on the spa panel at {{
+                now().strftime('%H:%M') }} while you are away.
               data:
                 tag: spa_panel_used
                 priority: high

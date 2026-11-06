@@ -1,0 +1,389 @@
+title: Hot Tub Settings
+path: hot-tub-settings
+icon: mdi:cog
+subview: true
+back_path: /home-control/hot-tub
+type: sections
+max_columns: 3
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Spa Settings
+        heading_style: title
+        icon: mdi:hot-tub
+      - type: markdown
+        content: >-
+          Changes go through the spa's menu and take from a few seconds to about a minute; they are
+          not possible while the panel is locked.
+        grid_options:
+          columns: full
+      - type: heading
+        heading: Heating
+        heading_style: subtitle
+      - type: custom:mushroom-template-card
+        entity: select.sundance_spa_heater_mode_setting
+        primary: Heater Mode
+        secondary: '{{ states(''select.sundance_spa_heater_mode_setting'') }}'
+        icon: mdi:radiator
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: heading
+        heading: Primary Filter
+        heading_style: subtitle
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_set_pf_start
+        primary: Start
+        secondary: '{{ states(''input_select.spa_set_pf_start'') }}'
+        icon: mdi:clock-start
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: select.sundance_spa_primary_filter_cycles_setting
+        primary: Cycles
+        secondary: >-
+          {%- set x = states('select.sundance_spa_primary_filter_cycles_setting') -%}{{ (x ~ ' per
+          day') if x | is_number else x }}
+        icon: mdi:sync
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: select.sundance_spa_primary_filter_duration_setting
+        primary: Duration
+        secondary: >-
+          {%- set x = states('select.sundance_spa_primary_filter_duration_setting') -%}{{ x ~ ('
+          hour' if x == '1' else ' hours') if x | is_number else x }}
+        icon: mdi:timer-outline
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: markdown
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: select.sundance_spa_heater_mode_setting
+            state_not: Auto
+        content: >-
+          {% set m = states('select.sundance_spa_heater_mode_setting') %}<small>**{{ m }}** heats
+          only {{ '17:00-07:00 (next day)' if m == 'Eco' else '07:00-17:00' }} by the spa clock.
+          Filtering is not affected.</small>
+      - type: heading
+        heading: Service Counters
+        heading_style: subtitle
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_set_filter_change
+        primary: Filter Change
+        secondary: >-
+          {%- set x = states('input_select.spa_set_filter_change') -%}{{ (x ~ ' days') if x |
+          is_number else x }}
+        icon: mdi:air-filter
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_set_clearray
+        primary: ClearRay
+        secondary: >-
+          {%- set x = states('input_select.spa_set_clearray') -%}{{ (x ~ ' days') if x | is_number
+          else x }}
+        icon: mdi:lightbulb-fluorescent-tube
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_set_water_refresh
+        primary: Water Refresh
+        secondary: >-
+          {%- set x = states('input_select.spa_set_water_refresh') -%}{{ (x ~ ' days') if x |
+          is_number else x }}
+        icon: mdi:water-sync
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: heading
+        heading: Panel
+        heading_style: subtitle
+      - type: custom:mushroom-template-card
+        entity: select.sundance_spa_temperature_format_setting
+        primary: Temperature Format
+        secondary: '{{ states(''select.sundance_spa_temperature_format_setting'') }}'
+        icon: mdi:temperature-celsius
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: tile
+        entity: sensor.sundance_spa_lock
+        name: Lock
+        icon: mdi:lock
+        grid_options:
+          columns: 6
+      - type: custom:mushroom-template-card
+        entity: sensor.sundance_spa_language
+        primary: Language
+        secondary: '{{ states(''sensor.sundance_spa_language'') }}'
+        icon: mdi:translate
+        icon_color: blue
+        tap_action:
+          action: none
+        grid_options:
+          columns: 6
+          rows: 1
+        hold_action:
+          action: none
+      - type: heading
+        heading: Clock
+        heading_style: subtitle
+      - type: tile
+        entity: sensor.sundance_spa_clock_time
+        name: Spa Time
+        icon: mdi:clock-outline
+        grid_options:
+          columns: 4
+      - type: tile
+        entity: sensor.sundance_spa_clock_date
+        name: Spa Date
+        icon: mdi:calendar
+        grid_options:
+          columns: 4
+      - type: tile
+        entity: sensor.sundance_spa_clock_sync
+        name: Last Sync
+        icon: mdi:clock-check-outline
+        grid_options:
+          columns: 12
+      - type: custom:mushroom-template-card
+        entity: button.sundance_spa_clock_sync_now
+        primary: Sync Clock
+        secondary: ''
+        icon: mdi:clock-edit-outline
+        icon_color: blue
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_clock_sync_now
+          confirmation:
+            text: Sync the spa clock now? The ESP will go through the spa menu.
+        icon_tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_clock_sync_now
+          confirmation:
+            text: Sync the spa clock now? The ESP will go through the spa menu.
+        hold_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_clock_sync_now
+          confirmation:
+            text: Sync the spa clock now? The ESP will go through the spa menu.
+        grid_options:
+          columns: 12
+  - type: grid
+    cards:
+      - type: heading
+        heading: Power Values
+        heading_style: title
+        icon: mdi:flash
+      - type: markdown
+        content: >-
+          Used for the energy estimate; kept on the ESP. Change them only if you measured your own
+          spa.
+        grid_options:
+          columns: full
+      - type: tile
+        entity: number.sundance_spa_power_heater
+        name: Heater
+        color: red
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: number.sundance_spa_power_jet_pump
+        name: Jet Pump
+        color: blue
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: number.sundance_spa_power_circulation
+        name: Circulation
+        color: cyan
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: number.sundance_spa_power_clearray
+        name: ClearRay
+        color: purple
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: number.sundance_spa_power_light
+        name: Light
+        color: amber
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: number.sundance_spa_power_controller
+        name: Controller
+        color: grey
+        grid_options:
+          columns: 6
+  - type: grid
+    cards:
+      - type: heading
+        heading: Diagnostics
+        heading_style: title
+        icon: mdi:stethoscope
+      - type: tile
+        entity: binary_sensor.sundance_spa_status
+        name: Status
+        icon: mdi:lan-connect
+        grid_options:
+          columns: 4
+      - type: tile
+        entity: sensor.sundance_spa_wifi_signal
+        name: Wi-Fi Signal
+        icon: mdi:wifi
+        grid_options:
+          columns: 4
+      - type: custom:mushroom-template-card
+        entity: button.sundance_spa_read_settings
+        primary: Read Settings
+        secondary: ''
+        icon: mdi:book-open-variant
+        icon_color: blue
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_read_settings
+          confirmation:
+            text: Read the settings from the spa now? The ESP will go through the spa menu.
+        icon_tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_read_settings
+          confirmation:
+            text: Read the settings from the spa now? The ESP will go through the spa menu.
+        hold_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_read_settings
+          confirmation:
+            text: Read the settings from the spa now? The ESP will go through the spa menu.
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: sensor.sundance_spa_decoder_notice
+        name: Decoder Notice
+        icon: mdi:message-alert-outline
+        grid_options:
+          columns: 4
+      - type: custom:mushroom-template-card
+        entity: button.sundance_spa_restart
+        primary: Restart ESP
+        secondary: ''
+        icon: mdi:restart
+        icon_color: red
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_restart
+          confirmation:
+            text: Restart the spa ESP? It is offline for a few seconds; the spa keeps running.
+        icon_tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_restart
+          confirmation:
+            text: Restart the spa ESP? It is offline for a few seconds; the spa keeps running.
+        hold_action:
+          action: none
+        grid_options:
+          columns: 6
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: button.sundance_spa_safe_mode_boot
+        primary: Safe Mode Boot
+        secondary: ''
+        icon: mdi:restart-alert
+        icon_color: orange
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_safe_mode_boot
+          confirmation:
+            text: >-
+              Boot the spa ESP into safe mode? It stops talking to the spa and to Home Assistant
+              until it restarts. The spa itself keeps running.
+        icon_tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.sundance_spa_safe_mode_boot
+          confirmation:
+            text: >-
+              Boot the spa ESP into safe mode? It stops talking to the spa and to Home Assistant
+              until it restarts. The spa itself keeps running.
+        hold_action:
+          action: none
+        grid_options:
+          columns: 6
+          rows: 1

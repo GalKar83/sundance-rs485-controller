@@ -1,24 +1,29 @@
 alias: Spa - Record Last Heating
 description: >-
-  Writes "lowest → highest °C · minutes · start" of each heating run
-  (binary_sensor.sundance_spa_heating_run) to input_text.spa_last_heating and the logbook.
-  Stateless - no long waits, so an automation reload or HA restart in the middle of a run loses
-  nothing: the open run is kept in input_text.spa_heating_run_data as "start_ts;min;max"
-  (empty = no run). Start: min = the current water temperature, or the last drop recorded within
-  30 s before the run (input_text.spa_temp_last_drop "ts;temp") if lower - the reading that starts
-  a heat call often lasts only 1-3 s, before the 2 s-confirmed heating_run turns on. While a run is
-  open every temperature reading widens min/max; max = the temperature reached (the readings
-  flicker by 0.5 at the end). End: any change of heating_run to off (also via unavailable).
+  Writes 'lowest → highest °C · minutes · start' of each heating run
+  (binary_sensor.sundance_spa_heating_run) to input_text.spa_last_heating and the logbook. Stateless
+  (no long waits, so an automation reload or HA restart mid-run loses nothing): the open run is kept
+  in input_text.spa_heating_run_data as 'start_ts;min;max' (empty = no run). Start: min = the
+  current water temperature, or the last drop recorded within 30 s before the run
+  (input_text.spa_temp_last_drop 'ts;temp') if lower - the 34.0 reading that starts a heat call
+  often lasts only 1-3 s, before the 2 s-confirmed heating_run turns on. While a run is open every
+  temperature reading widens min/max; max = the temperature reached (end readings flicker by 0.5).
+  End: any change of heating_run to off (also via unavailable) closes an open run. Created
+  2026-10-30. Revised 2026-10-31: rebuilt stateless (the first version waited for the end and was
+  cancelled by an automation reload at 08:50), min over the run + pre-run drop instead of the single
+  reading at start, max instead of the reading at the end. Revised 2026-11-03: also updates
+  input_number.spa_heat_rate (30% weight per run of 20+ min rising 1°+) for the calendar Ready-by
+  heating.
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_heating_run
-    from: "off"
-    to: "on"
+    from: 'off'
+    to: 'on'
     id: start
   - trigger: state
     entity_id: binary_sensor.sundance_spa_heating_run
-    not_from: "off"
-    to: "off"
+    not_from: 'off'
+    to: 'off'
     id: end
   - trigger: state
     entity_id: climate.sundance_spa
@@ -26,88 +31,105 @@ triggers:
     id: temp
 actions:
   - variables:
-      run: "{{ states('input_text.spa_heating_run_data') }}"
-      is_open: "{{ run.split(';') | count == 3 }}"
+      run: '{{ states(''input_text.spa_heating_run_data'') }}'
+      is_open: '{{ run.split('';'') | count == 3 }}'
   - choose:
       - conditions:
           - condition: trigger
             id: start
         sequence:
           - variables:
-              cur: "{{ state_attr('climate.sundance_spa', 'current_temperature') | float(0) }}"
-              since: "{{ as_timestamp(trigger.to_state.last_changed) | int }}"
-              drop: "{{ states('input_text.spa_temp_last_drop').split(';') }}"
+              cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+              since: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
+              drop: '{{ states(''input_text.spa_temp_last_drop'').split('';'') }}'
               low: >-
-                {% if drop | count == 2 and since - drop[0] | float(0) <= 30 %}{{ [cur, drop[1] | float(99)] | min }}{% else %}{{ cur }}{% endif %}
+                {% if drop | count == 2 and since - drop[0] | float(0) <= 30 %}{{ [cur, drop[1] |
+                float(99)] | min }}{% else %}{{ cur }}{% endif %}
           - action: input_text.set_value
             target:
               entity_id: input_text.spa_heating_run_data
             data:
-              value: "{{ since }};{{ low }};{{ cur }}"
+              value: '{{ since }};{{ low }};{{ cur }}'
       - conditions:
           - condition: trigger
             id: temp
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.current_temperature is number }}"
+            value_template: '{{ trigger.to_state.attributes.current_temperature is number }}'
         sequence:
           - variables:
-              t: "{{ trigger.to_state.attributes.current_temperature | float }}"
+              t: '{{ trigger.to_state.attributes.current_temperature | float }}'
           - if:
               - condition: template
-                value_template: "{{ is_open }}"
+                value_template: '{{ is_open }}'
             then:
               - variables:
-                  p: "{{ run.split(';') }}"
-                  mn: "{{ [p[1] | float, t] | min }}"
-                  mx: "{{ [p[2] | float, t] | max }}"
+                  p: '{{ run.split('';'') }}'
+                  mn: '{{ [p[1] | float, t] | min }}'
+                  mx: '{{ [p[2] | float, t] | max }}'
               - if:
                   - condition: template
-                    value_template: "{{ mn != p[1] | float or mx != p[2] | float }}"
+                    value_template: '{{ mn != p[1] | float or mx != p[2] | float }}'
                 then:
                   - action: input_text.set_value
                     target:
                       entity_id: input_text.spa_heating_run_data
                     data:
-                      value: "{{ p[0] }};{{ mn }};{{ mx }}"
+                      value: '{{ p[0] }};{{ mn }};{{ mx }}'
             else:
-              # No run open: remember the last drop, a heat call may start right after it.
               - if:
                   - condition: template
                     value_template: >-
-                      {{ trigger.from_state.attributes.current_temperature is number
-                         and t < trigger.from_state.attributes.current_temperature }}
+                      {{ trigger.from_state.attributes.current_temperature is number and t <
+                      trigger.from_state.attributes.current_temperature }}
                 then:
                   - action: input_text.set_value
                     target:
                       entity_id: input_text.spa_temp_last_drop
                     data:
-                      value: "{{ as_timestamp(trigger.to_state.last_updated) | int }};{{ t }}"
+                      value: '{{ as_timestamp(trigger.to_state.last_updated) | int }};{{ t }}'
       - conditions:
           - condition: trigger
             id: end
           - condition: template
-            value_template: "{{ is_open }}"
+            value_template: '{{ is_open }}'
         sequence:
           - variables:
-              p: "{{ run.split(';') }}"
+              p: '{{ run.split('';'') }}'
               summary: >-
-                {{ '%.1f' % (p[1] | float) }} → {{ '%.1f' % (p[2] | float) }} °C ·
-                {{ ((as_timestamp(now()) - p[0] | float) / 60) | round(0) | int }} min ·
-                {{ (p[0] | int) | timestamp_custom('%d/%m %H:%M') }}
+                {{ '%.1f' % (p[1] | float) }} → {{ '%.1f' % (p[2] | float) }} °C · {{
+                ((as_timestamp(now()) - p[0] | float) / 60) | round(0) | int }} min · {{ (p[0] |
+                int) | timestamp_custom('%d/%m %H:%M') }}
           - action: input_text.set_value
             target:
               entity_id: input_text.spa_last_heating
             data:
-              value: "{{ summary }}"
+              value: '{{ summary }}'
           - action: input_text.set_value
             target:
               entity_id: input_text.spa_heating_run_data
             data:
-              value: ""
+              value: ''
           - action: logbook.log
             data:
               name: Spa heating
-              message: "{{ summary }}"
+              message: '{{ summary }}'
               entity_id: climate.sundance_spa
+          - variables:
+              mins: '{{ (as_timestamp(now()) - p[0] | float) / 60 }}'
+              rise: '{{ p[2] | float - p[1] | float }}'
+          - if:
+              - condition: template
+                value_template: '{{ mins >= 20 and rise >= 1 }}'
+            then:
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.spa_heat_rate
+                data:
+                  value: >-
+                    {{ ([[(states('input_number.spa_heat_rate') | float(2)) * 0.7 + (rise / mins *
+                    60) * 0.3, 0.5] | max, 6] | min) | round(1) }}
+            note: >-
+              Learns the heating rate (°C/h) for Spa - Ready by: 30% of each run of 20+ min that
+              rose 1° or more (shorter runs are too noisy at 0.5° resolution).
 mode: queued
 max: 20

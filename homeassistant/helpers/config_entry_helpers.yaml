@@ -1,0 +1,576 @@
+# Template, utility meter, integration and statistics helpers (created in the UI as helpers).
+# Each item is one helper: domain = helper type, options = its settings. device_id was removed: assign them to your own spa device.
+- domain: utility_meter
+  title: Pumps Time Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: In Use Time Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_pumps_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Heater Time Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Heater Time Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_heater_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Heater Time Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Heater Time Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_heater_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Heater Count Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Heating Run Count Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_heater_total_count
+    tariffs: []
+- domain: utility_meter
+  title: Heater Count Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Heating Run Count Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_heater_total_count
+    tariffs: []
+- domain: template
+  title: Soaking Time Total
+  options:
+    additional_options:
+      availability: '{{ has_value(''input_number.spa_soaking_minutes_total'') }}'
+    device_class: duration
+    name: Spa Real Use Time Total
+    state: '{{ states(''input_number.spa_soaking_minutes_total'') | float(0) }}'
+    state_class: total_increasing
+    template_type: sensor
+    unit_of_measurement: min
+- domain: template
+  title: Maintenance Time Total
+  options:
+    device_class: duration
+    name: Spa Maintenance Time Total
+    state: '{{ states(''input_number.spa_maintenance_minutes_total'') | float(0) }}'
+    state_class: total_increasing
+    template_type: sensor
+    unit_of_measurement: min
+- domain: template
+  title: Soaking Count Total
+  options:
+    additional_options:
+      availability: '{{ has_value(''counter.spa_soaking_sessions_total'') }}'
+    name: Spa Real Use Count Total
+    state: '{{ states(''counter.spa_soaking_sessions_total'') | int(0) }}'
+    state_class: total_increasing
+    template_type: sensor
+- domain: template
+  title: Maintenance Count Total
+  options:
+    additional_options:
+      availability: '{{ has_value(''counter.spa_maintenance_sessions_total'') }}'
+    name: Spa Maintenance Count Total
+    state: '{{ states(''counter.spa_maintenance_sessions_total'') | int(0) }}'
+    state_class: total_increasing
+    template_type: sensor
+- domain: utility_meter
+  title: Soaking Time Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Spa Real Use Time Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_soaking_time_total
+    tariffs: []
+- domain: utility_meter
+  title: Soaking Time Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Spa Real Use Time Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_soaking_time_total
+    tariffs: []
+- domain: utility_meter
+  title: Soaking Time Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Spa Real Use Time Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_soaking_time_total
+    tariffs: []
+- domain: utility_meter
+  title: Soaking Count Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Spa Real Use Count Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_soaking_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Soaking Count Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Spa Real Use Count Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_soaking_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Soaking Count Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Spa Real Use Count Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_soaking_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Maintenance Count Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Spa Maintenance Count Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_maintenance_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Maintenance Count Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Spa Maintenance Count Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_maintenance_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Maintenance Count Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Spa Maintenance Count Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_maintenance_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Pumps Time Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Sundance Spa Pump Run Time Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_pumps_total_time
+    tariffs: []
+- domain: template
+  title: Last Replacement Filter Date
+  options:
+    name: Filter Last Replacement
+    state: >-
+      {% set d = states('input_datetime.last_replacement_filter_date') %}{{
+      as_datetime(d).strftime('%d/%m/%Y') if d >= '2000' else none }}
+    template_type: sensor
+- domain: template
+  title: Last Replacement ClearRay Bulb Date
+  options:
+    name: Bulb Last Replacement
+    state: >-
+      {% set d = states('input_datetime.last_replacement_clearray_bulb_date') %}{{
+      as_datetime(d).strftime('%d/%m/%Y') if d >= '2000' else none }}
+    template_type: sensor
+- domain: template
+  title: Last Replacement Water Date
+  options:
+    name: Water Last Replacement
+    state: >-
+      {% set d = states('input_datetime.last_replacement_water_date') %}{{
+      as_datetime(d).strftime('%d/%m/%Y') if d >= '2000' else none }}
+    template_type: sensor
+- domain: template
+  title: Last Soak
+  options:
+    name: Last Spa Use
+    state: >-
+      {% set d = states('input_datetime.last_soak') %}{{ as_datetime(d).strftime('%d/%m/%Y %H:%M')
+      if d >= '2000' else none }}
+    template_type: sensor
+- domain: template
+  title: Last Maintenance
+  options:
+    name: Last Spa Maintenance
+    state: >-
+      {% set d = states('input_datetime.last_maintenance') %}{{ as_datetime(d).strftime('%d/%m/%Y
+      %H:%M') if d >= '2000' else none }}
+    template_type: sensor
+- domain: utility_meter
+  title: ClearRay Bulb Time Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: UV Time Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_clearray_total_time
+    tariffs: []
+- domain: utility_meter
+  title: ClearRay Bulb Time Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: UV Time Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_clearray_total_time
+    tariffs: []
+- domain: template
+  title: Last Rinse Filter
+  options:
+    name: Last Rinse Filter
+    state: >-
+      {% set d = states('input_datetime.last_rinse_filter') %}{{ as_datetime(d).strftime('%d/%m/%Y
+      %H:%M') if d >= '2000' else none }}
+    template_type: sensor
+- domain: template
+  title: Power
+  options:
+    additional_options:
+      availability: '{{ is_state(''binary_sensor.sundance_spa_status'', ''on'') }}'
+    device_class: power
+    name: Spa Power
+    state: >-
+      {# Spa electrical power from the ESP states x the power values set on the spa device
+      (number.sundance_spa_power_*, kept on the ESP). Pump 1 = Pump 1 Running: at high (Jet 1
+      switch) = Jet Pump + ClearRay, at low = Circulation (includes the ClearRay bulb); Pump 2 =
+      Pump 2 Running x Jet Pump; heater; light; controller always. #}{% set p1 =
+      is_state('binary_sensor.sundance_spa_pump_1_running', 'on') %}{% set p1_high =
+      is_state('switch.sundance_spa_jet_1', 'on') %}{% set p2 =
+      is_state('binary_sensor.sundance_spa_pump_2_running', 'on') %}{% set heat =
+      is_state('binary_sensor.sundance_spa_heater', 'on') %}{% set light =
+      states('sensor.sundance_spa_light_status') not in ['Off', 'unknown', 'unavailable'] %}{% set
+      ctrl = states('number.sundance_spa_power_controller') | float(15) %}{% set uv =
+      states('number.sundance_spa_power_clearray') | float(20) %}{% set lt =
+      states('number.sundance_spa_power_light') | float(5) %}{% set circ =
+      states('number.sundance_spa_power_circulation') | float(370) %}{% set jet =
+      states('number.sundance_spa_power_jet_pump') | float(1630) %}{% set heater =
+      states('number.sundance_spa_power_heater') | float(2700) %}{{ (ctrl + ((jet + uv) if p1_high
+      else (circ if p1 else 0)) + (jet if p2 else 0) + (heater if heat else 0) + (lt if light else
+      0)) | round(0) }}
+    state_class: measurement
+    template_type: sensor
+    unit_of_measurement: W
+- domain: integration
+  title: Energy
+  options:
+    max_sub_interval:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    method: left
+    name: Spa Energy
+    round: 3
+    source: sensor.sundance_spa_power
+    unit_prefix: k
+    unit_time: h
+- domain: utility_meter
+  title: Energy Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Energy Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_energy_counter
+    tariffs: []
+- domain: utility_meter
+  title: Energy Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Energy Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_energy_counter
+    tariffs: []
+- domain: utility_meter
+  title: Energy Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Energy Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_energy_counter
+    tariffs: []
+- domain: integration
+  title: House Load Energy (Spa Calibration)
+  options:
+    max_sub_interval:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    method: left
+    name: House Load Energy (Spa Calibration)
+    round: 4
+    source: sensor.load_power
+    unit_prefix: k
+    unit_time: h
+- domain: statistics
+  title: House Load Mean 10 Min (Spa Calibration)
+  options:
+    entity_id: sensor.load_power
+    keep_last_sample: true
+    max_age:
+      hours: 0
+      minutes: 10
+      seconds: 0
+    name: House Load Mean 10 Min (Spa Calibration)
+    percentile: 50
+    precision: 0
+    state_characteristic: average_step
+- domain: utility_meter
+  title: Energy Year
+  options:
+    always_available: true
+    cycle: yearly
+    delta_values: false
+    name: Energy Year
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_energy_counter
+    tariffs: []
+- domain: utility_meter
+  title: Pump 1 Time Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Pump 1 Time Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_pump_1_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Pump 1 Time Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Pump 1 Time Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_pump_1_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Pump 2 Time Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Pump 2 Time Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_pump_2_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Pump 2 Time Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Pump 2 Time Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_pump_2_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Spa Energy Test
+  options:
+    always_available: true
+    cycle: none
+    delta_values: false
+    name: Spa Energy Test
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_energy_counter
+    tariffs: []
+- domain: utility_meter
+  title: Pump 1 Time Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Pump 1 Time Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_pump_1_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Pumps Time Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Pumps Time Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_pumps_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Pump 2 Time Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Pump 2 Time Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_pump_2_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Heater Time Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Heater Time Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_heater_total_time
+    tariffs: []
+- domain: utility_meter
+  title: Heater Count Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Heater Count Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_heater_total_count
+    tariffs: []
+- domain: utility_meter
+  title: ClearRay Bulb Time Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: ClearRay Bulb Time Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_clearray_total_time
+    tariffs: []
+- domain: template
+  title: Spa Next Plan
+  options:
+    name: Spa Next Plan
+    state: >-
+      {%- set ns = namespace(ts=0, p=[]) -%}{%- for i in range(1, 6) -%}{%- set p =
+      states('input_text.spa_plan_' ~ i).split(';') -%}{%- if p | count == 5 and
+      is_state('input_boolean.spa_plan_' ~ i ~ '_on', 'on') and p[2] |
+      regex_match('^[0-9]{2}:[0-9]{2}$') -%}{%- set base = today_at(p[2]) -%}{%- for d in range(0,
+      8) -%}{%- set dt = base + timedelta(days=d) -%}{%- set ok = (p[3] == 'daily') or (p[3] ==
+      'once' and (dt.date() | string) == p[4]) or (p[3] not in ['daily', 'once'] and (dt.weekday() |
+      string) in p[3]) -%}{%- if ok and dt > now() -%}{%- set ts = as_timestamp(dt) | int -%}{%- if
+      ns.ts == 0 or ts < ns.ts -%}{%- set ns.ts = ts -%}{%- set ns.p = p -%}{%- endif -%}{%- endif
+      -%}{%- endfor -%}{%- endif -%}{%- endfor -%}{%- if ns.ts == 0 -%}none{%- else -%}{%- set p =
+      ns.p -%}{%- set c = p[1] | float(0) -%}{%- set t = ((c * 9 / 5 + 32) | round(0) | int ~ '°F')
+      if is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+      set dd = (as_local(as_datetime(ns.ts)).date() - now().date()).days -%}{%- set when = 'today'
+      if dd == 0 else ('tomorrow' if dd == 1 else 'on ' ~ ns.ts | timestamp_custom('%a %d/%m'))
+      -%}{%- if p[0] == 'R' -%}Hot Tub will be ready by {{ p[2] }} {{ when }} with {{ t }}{%- else
+      -%}Hot Tub will start heating at {{ p[2] }} {{ when }} to {{ t }}{%- endif -%}{%- endif -%}
+    template_type: sensor
+- domain: template
+  title: Spa Water F
+  options:
+    name: Spa Water F
+    state: >-
+      {{ (state_attr('climate.sundance_spa', 'current_temperature') | float(0) * 9 / 5 + 32) |
+      round(0) | int }}
+    template_type: sensor
+- domain: template
+  title: Spa Target F
+  options:
+    name: Spa Target F
+    state: >-
+      {{ (state_attr('climate.sundance_spa', 'temperature') | float(0) * 9 / 5 + 32) | round(0) |
+      int }}
+    template_type: sensor

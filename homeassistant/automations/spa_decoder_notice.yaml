@@ -1,21 +1,30 @@
 alias: Spa - Decoder notice
 description: >-
-  Sends the ESP's Decoder Notice (sensor.sundance_spa_decoder_notice) to the phone. The ESP
-  publishes "OK" normally, or a short English message when something it could not handle happened
-  (clock sync or settings read failed, unknown topside screen, light or command not confirmed, no
-  status from the spa...). It returns to "OK" after an hour, so the same problem notifies at most
-  about once an hour. not_from unknown/unavailable: an HA-ESP reconnect restores the last notice
-  and must not send it again.
+  Sends the spa ESP's Decoder Notice (sensor.sundance_spa_decoder_notice) to the owner's phone. The
+  ESP publishes 'OK' normally, or a short English message when something it could not handle
+  happened (clock sync or settings read failed, clock still off after a sync, unknown topside
+  screen, ClearRay on an unmapped screen, light or command not confirmed, no status from the spa).
+  It returns to 'OK' after an hour, so the same problem notifies at most about once an hour. Created
+  2026-10-26 for v1 (entity appears after the v1 flash). Revised 2026-10-29: not_from
+  unknown/unavailable, so an HA-ESP reconnect that restores the same notice does not notify again
+  (29 Oct 15:01 re-sent code 71). Revised 2026-11-01: sent through script.spa_notify (quiet hours
+  23:00-06:30, delivered together at 06:30).
 triggers:
   - trigger: state
     entity_id: sensor.sundance_spa_decoder_notice
-    not_to: ["OK", "unknown", "unavailable"]
-    not_from: ["unknown", "unavailable"]
+    not_to:
+      - OK
+      - unknown
+      - unavailable
+    not_from:
+      - unknown
+      - unavailable
 actions:
   - action: script.spa_notify
     data:
       title: Spa decoder notice
-      message: "{{ trigger.to_state.state }} ({{ now().strftime('%d/%m/%Y %H:%M') }})"
+      message: '{{ trigger.to_state.state }} ({{ now().strftime(''%d/%m/%Y %H:%M'') }})'
       tag: spa_decoder_notice
+    note: Held until 06:30 in the spa quiet hours (23:00-06:30).
 mode: queued
 max: 5

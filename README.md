@@ -23,15 +23,19 @@ controller), what was decoded on the RS-485 bus, how sure we are about each part
 unknown. It is meant for anyone who wants to continue the work, reproduce it on another 680, or
 spot mistakes.
 
-> Status (2026-11-02): running daily on one spa. Temperature, set point, heater, both jets,
+> Status (2026-11-06): running daily on one spa. Temperature, set point, heater, both jets,
 > circulation, lights, heater mode, clock/date (read + automatic sync to within a minute, incl. DST
 > changes), service counters (with Off / Change Now), Primary Filter settings and states (incl.
-> Cleanup and Purge), language, all four lock modes, temperature unit, run timers, activity
-> sessions and a Decoder Notice are exposed to Home Assistant. Derived states are confirmed for 2 s
-> before they are published, so the controller's flag hand-overs never show as blips. Electrical
-> power was measured against the house load (§11); the power value of each load is a setting on
-> the device. The Home Assistant side (helpers, automations, dashboard) is documented in
-> [`homeassistant/`](homeassistant/README.md). A few status bits are still unknown — see
+> Cleanup and Purge), language (display only), all four lock modes, temperature unit, run timers,
+> activity sessions and a Decoder Notice are exposed to Home Assistant. **Settings can also be
+> written from Home Assistant** (heater mode, Primary Filter start / cycles / duration, the three
+> service counters, °C/°F) by walking the topside menu (§10). Run time, energy and power are
+> counted **in the ESP** (they survive Wi-Fi drops and reboots). Derived states are confirmed for
+> 2 s before they are published, so the controller's flag hand-overs never show as blips.
+> Electrical power was measured against the house load (§11); the power value of each load is a
+> setting on the device. The Home Assistant side (helpers, heating plans, reminders, dashboard) is
+> documented in [`homeassistant/`](homeassistant/README.md). A few status bits are still unknown
+> and the language code is only partly decoded — see
 > [Open questions](#13-open-questions--help-wanted).
 
 Contents
@@ -141,7 +145,8 @@ topside:
 | Heater mode | rest/ready | **Auto / Eco / Day** (f6 = 32/34/36) |
 | Clock | time only | time **and date** decoded; HA→spa sync by navigating the menu |
 | Service counters | not mapped | Water Refresh, Filter Change (status frame), ClearRay bulb (menu read); each as days / `Change Now` / `Off` |
-| Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu) |
+| Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu); **written from HA** by walking the menu (heater mode, Primary Filter, service counters, °C/°F — never the locks, §10) |
+| Run time / energy | — | counted **in the ESP** from the debounced states × the Power settings; restored across reboots, so Wi-Fi drops and reboots do not lose them |
 | Screen codes | — | **XOR-masked by a key derived from the ClearRay counter** — it changes every midnight (see §9) |
 | Climate modes | heat/off | **Heat only** — the 680 has no heater-off mode (ESPHome's traits start with OFF, so the set is replaced) |
 | Temperature min | 80 °F-ish | 18 °C / 65 °F (680 manual) |
@@ -151,11 +156,14 @@ hooks (§16 lists the order in which things were added).
 
 ## 4. Home Assistant entities
 
-<img src="docs/images/ha-hot-tub-page.jpg" alt="Home Assistant Hot Tub dashboard page: control panel with Jet 1, Jet 2, manual and auto circulation and the light mode selector, 24-hour spa temperature chart, energy tiles with a daily bar chart, soaking and maintenance counters" width="760">
+| Hot Tub page, top | Hot Tub page, bottom | Settings page | Scheduled Plans page |
+|---|---|---|---|
+| <img src="docs/images/ha-hot-tub-top.jpg" alt="Hot Tub page: Jet 1, Jet 2, circulation, light, temperature with minus/plus, current status, 24-hour temperature chart, Settings and Scheduled Plans buttons, outdoor, energy" width="190"> | <img src="docs/images/ha-hot-tub-bottom.webp" alt="Hot Tub page: soaking, maintenance with next dates, service counters, run time, last heating" width="190"> | <img src="docs/images/ha-hot-tub-settings.jpg" alt="Settings page: heater mode, Primary Filter start, cycles and duration, service counters, temperature format, language, clock, power values, diagnostics" width="190"> | <img src="docs/images/ha-scheduled-plans.jpg" alt="Scheduled Plans page: a ready-by plan, the add-a-plan form, heat rate and safety margin" width="190"> |
 
-*The owner's Hot Tub page in Home Assistant (top of the page). The tiles are this component's
-entities; the energy, soaking/maintenance and run-time figures are Home Assistant helpers built on
-them, and the chart and light card use the apexcharts and mushroom custom cards.*
+*The owner's Home Assistant pages. The tiles are this component's entities; the energy,
+soaking/maintenance, plans and reminders are Home Assistant helpers and automations built on them
+(see [`homeassistant/`](homeassistant/README.md)), and the chart and cards use the apexcharts and
+mushroom custom cards.*
 
 **Updated live** (from the status/lights broadcast, several times per second):
 
@@ -218,10 +226,42 @@ Settings* button) **or when someone saves the value at the panel**:
 | Primary Filter Start | HH:00 (24 h) |
 | Primary Filter Cycles | 1–4 |
 | Primary Filter Duration | hours |
-| Language | English / French / Spanish / German |
+| Language | English / French / Spanish / German — **not readable from the spa**: shows the last language saved at the panel (kept in flash), see §10 |
 
 **Event-driven**: *Clock Sync* (`Not synced yet` after boot / `Waiting for main screen` /
 `OK HH:MM` / `OK (already within ±n s)` / `Failed: <reason>`).
+
+**Counted in the ESP** (since p29; `total_increasing`, restored from flash, nothing counted while
+*Communication* is off):
+
+| Entity | Meaning |
+|---|---|
+| Electrical Power (W) | the same model as the Home Assistant Spa Power template: debounced states × the Power settings |
+| Energy Counter (kWh) | that power integrated every second |
+| Pump 1 / Pump 2 / Pumps / ClearRay / Heater Total Time (h), Heater Total Count | on-times and heater starts |
+| Energy Last 24 Hours | `epoch_hour;24 Wh values, oldest first` — lets Home Assistant fill the hours of a Wi-Fi drop with real values |
+| Counters At Midnight | `day;pump1_h;pump2_h;pumps_h;clearray_h;heater_h;heater_starts;kwh` at the last local midnight |
+
+The ESP does not reboot because the Home Assistant API connection is lost (`api: reboot_timeout: 0s`;
+only the Wi-Fi timeout is kept), and preferences are flushed every 10 min, so the counters survive
+long drops.
+
+**Settings you can change from Home Assistant** (since p30; *Configuration* category):
+
+| Entity | Values |
+|---|---|
+| Heater Mode Setting (select) | Auto / Eco / Day |
+| Primary Filter Cycles Setting / Duration Setting (select) | 1, 2, 3, 4, 8 cycles/day (8 allows only 1 h) / 1–3 h |
+| Primary Filter Start Hour (number) | 0–23 |
+| Filter Change Days / ClearRay Days / Water Refresh Days (number) | 0 = Off, otherwise the grid the spa offers (10 steps for Filter Change and ClearRay up to 360 and 365, 30 steps for Water Refresh) |
+| Temperature Format Setting (select) | °C / °F |
+
+Each change walks the menu on the topside (§10) and is refused while Settings or Service Lock is on.
+A failed walk leaves a Decoder Notice (`<setting> not changed: <why>`) and re-reads the menu so Home
+Assistant shows the spa's real value. There is **no language setting** (see §10 and §13). Six
+diagnostic buttons, *Panel Press Warmer / Cooler / Menu / Jets 1 / Jets 2 / Light*, send one short
+press for decoding tests; they are meant to be used by hand with a log or the raw entities open and
+never touch the lock menu.
 
 **Temperature units**: the climate entity and the temperature sensor always use the unit set in
 `temperature_scale` (here `C`). The panel can be switched to °F independently (f14 bit 6); the ESP
@@ -444,15 +484,15 @@ The menu times out (≈5–25 s) without saving. **Each Jets 1 press saves the s
 
 | Menu | Screens (normalized) | f15 |
 |---|---|---|
-| PF (Primary Filter) | Warmer → 70 start (display) / 71 start (editing) → Jets 1 → 113 cycles → Jets 1 → 68 duration → Jets 1 → 73 | start = hour **24 h**; cycles; duration in hours |
+| PF (Primary Filter) | Warmer → 70 start (display) / 71 start (editing) → Jets 1 → 113 cycles (display) / **14 cycles (editing)** → Jets 1 → 68 duration → Jets 1 → 73 | start = hour **24 h**; cycles (1, 2, 3, 4, 8); duration in hours. The edit screen is code 14 under the key (raw 0 at key 14, raw 126 at key 112) — it is **not** raw 0 in general. PF can be edited in every heater mode |
 | HEAT | Warmer/Cooler → 65 (shows current) → 94 while changing → Jets 1 saves → 64 | 0 Auto, 1 Eco, 2 Day; Cooler cycles Auto→Day→Eco |
 | FC (Filter Change) | Warmer/Cooler → 92 / 93 (value screens; the first press only shows the current value) → Jets 1 saves → 95 | 128 = Off, otherwise days; steps of 10 (Off–180) |
 | UV (ClearRay) | Warmer/Cooler → 91 (shows current) → further presses 88 → Jets 1 saves → 90 (under the new key) | `f15 = (days & 0xFF) ^ (days >> 8)`, **128 = Off**; steps of 10 up to 365, then Off (325 → 68, 320 → 65, 250 → 250, 10 → 10). f15 alone is ambiguous (68 = 325 or 68 days); the low byte from the key decides: `days = 256·(f15 ^ low) + low` with `low = k ^ 78`. Off and 0 days both give low = 0; Off shows f15 = 128 |
-| H2O (Water Refresh) | Warmer/Cooler → 86 / 87 (value screens; the first press shows the current value, e.g. 143) → Jets 1 saves → 89 | days; Cooler steps 120, 90, 60, 30, Off (128), 180, 150 — steps of 30 |
+| H2O (Water Refresh) | Warmer/Cooler → 86 / 87 (value screens; the first press shows the current value, e.g. 143) → Jets 1 saves → 89 | days; Cooler steps 120, 90, 60, 30, Off (128), 180, 150 — steps of 30 (150 → 120 in one press, confirmed 3 Nov) |
 | TIME | Warmer → 85 hour (display) / **82 hour (editing)** → Jets 1 → 83 minute → Jets 1 → 80 AM/PM → Jets 1 saves → 84 | hour and minute are XOR-masked like f13 (the mask changes); AM/PM: 1 = PM. **Hour (1–12) and minute (0–59) each wrap on their own** — 59 → 00 does not change the hour, 12 → 1 does not change AM/PM (owner's panel tests, 27 Oct) |
 | DATE | Warmer → 110 (scroll) → Warmer → 111 year → Jets 1 → 108 month → Jets 1 → 109 day → Jets 1 saves → 81 | year as yy; month; day |
-| TEMP | Warmer → 104/107 | 0/1 (°C/°F, not fully mapped) |
-| LANG | Warmer → 102 (shows current) → further presses 103 | 0 English, 1 French, 2 Spanish, 3 German |
+| TEMP | Warmer → 107 (shows current unit) → Warmer → 104 (unit switched) → Jets 1 saves → 106 | f15 1 on 107, 0 on 104 in **both** directions — it does not encode the unit; the unit is f14 bit 6 (owner panel test 3 Nov: °C→°F and back, same screens) |
+| LANG | Warmer → 102 (shows the current language **on the panel only**; f15 is always 0 here) → further presses 103 (the language being chosen) | order of the cycle: English → French → Spanish → German → English. f15 codes seen: key 0 (23 Oct) and key 115 (6 Nov): 0 English, 1 French, 2 Spanish, 3 German; key 14 (3 Nov): 1 German, 2 English, 3 French, 0 Spanish (shifted by 2). **Provisional model:** shifted by 2 when bit 2 of the key is set — three keys only |
 | LOCK | Cooler → 101 AL → 13 SVL → 15 TL → 98 SL (option screens) → Jets 1 saves | — (option is in the screen code) |
 
 Other screens seen: 114 when Menu is pressed while Settings Lock is on; 10 right after an unlock;
@@ -496,10 +536,36 @@ on two consecutive 30-second checks, at most every 30 min):
    reports "editing", f2 bit 5). Any mismatch, timeout or a panel press aborts; the menu then times
    out without saving the unconfirmed step.
 
-**Settings read** (ClearRay days, PF settings, language, and Filter Change only while it reads 0):
-enter the menu, press Warmer once to display the value and read f15; PF values are confirmed
-unchanged with Jets 1 (the observer publishes each confirmed value); UV, language and FC are left to
-time out without saving.
+**Settings read** (ClearRay days, PF settings, and Filter Change only while it reads 0): enter the
+menu, press Warmer once to display the value and read f15; PF values are confirmed unchanged with
+Jets 1 (the observer publishes each confirmed value); UV and FC are left to time out without
+saving. The LANG screen is visited but carries no value (§9), so nothing is published from it.
+
+**Settings write** (since p30; `request_setting_write(kind, value)`): Heater Mode, Primary Filter
+start / cycles / duration (one walk), Filter Change, ClearRay and Water Refresh days, and °C/°F.
+The same rules as the clock sync apply (spa idle on the main screen, every press only when the
+last reported screen is the one expected, any panel press aborts), plus:
+
+1. Menu to the setting's screen (`NAV_ALL`), first Warmer/Cooler shows the current value.
+2. The value lists are **cyclic**; the direction of Warmer/Cooler is learned from the first move
+   and the shorter way round is taken. At the end of a list a press can say "no change" and is
+   retried.
+3. Jets 1 (save) is sent **only when f15 equals the target** (values are verified in f15, never
+   assumed). A value off the grid — e.g. 141 days — is left alone until it is the starting point.
+4. Heater Mode is verified afterwards in f6 and the unit in f14 bit 6 on the main screen; the others
+   by the re-read that follows every write.
+5. Refused while Settings or Service Lock is on. **The locks themselves are never written.**
+6. A failed or aborted walk leaves *Decoder Notice* `<setting> not changed: <why>` and re-reads the
+   menu; a later successful write clears that notice (other notices keep their hour).
+
+A walk takes about 6 s once started. 8 cycles a day allow only a 1 h duration.
+
+**Language is read-only.** The ESP can walk the LANG menu and save, and the bus shows the save
+(screen back to LANG, no notice), but the **panel stays in the old language** — while the same
+presses made by hand do change it. The cause is unknown (the setting may belong to the topside).
+The f15 code also depends on the screen key (§9). So the language write and its select were
+removed; the Language sensor shows what the ESP last saw saved at the panel, kept in flash across
+reboots (the LANG display screen carries no value, so a fresh ESP cannot read it).
 
 The spa clock does **not** follow daylight-saving changes; the automatic sync corrects it within a
 few minutes (seen at the end of DST on 2026-10-25).
@@ -545,6 +611,16 @@ counter at the panel, the value is published without any ESP action.
   manual says). Service Lock stops the pumps and does **not** block the set point. Unlock = hold Menu;
   after a Service Lock unlock the purge runs (≈1 min Jet 1 low, ≈1 min Jet 2).
 - **Service Lock** also stops a running filter cycle; f10 bit 7 stays set meanwhile.
+- **Heater Mode** only limits *when* the heater may run: **Eco 17:00–07:00, Day 07:00–17:00**, Auto
+  always. The filtration schedule does not depend on it, and Primary Filter can be edited in every
+  mode (tested 3 Nov).
+- **Thermostat overshoot** (3 Nov, set point 35.5 °C): the heater came on at 34.5 °C at 15:01, the
+  reading reached 35.5 °C at 15:24 and the heater kept running until 15:40, the first 36.0 °C
+  reading; the reading then zigzagged 35.5 / 36.0 (the real water is about 35.7–35.8 °C, the
+  display resolution is 0.5 °C). So a heating cycle ends about **0.25 °C above the set point**, and
+  the next one starts about **1 °C below** it. This is the spa's own behaviour. A learned heating
+  rate that covers whole runs includes the overshoot and stays consistent; to land on an exact
+  temperature, set the target 0.5 °C lower.
 - **Overnight** (outdoor 20.5–21 °C, set point 35 °C): the filtration cycles alone kept the water at
   35–35.5 °C for the first week; the heater first ran on 30 Oct with the nights down to ~15 °C.
 - **Spa clock drift**: a few seconds to ~12 s per day, not constant.
@@ -602,7 +678,14 @@ issue with timestamps and what the panel showed.
 7. Does the f7 date formula hold for every day (only verified against samples and by reasoning)?
 8. Does Jets 1 low → high restart the 20 min jet timer?
 9. How Auto / Eco / Day change when the heater runs.
-10. The TEMP menu value screens (104/107) are only partly mapped.
+10. **Language.** (a) How does f15 on the LANG edit screen depend on the screen key? Only three
+    keys are known (0 and 115 plain, 14 shifted by 2; provisional model: shifted when key bit 2 is
+    set) — readings at other keys, taken by pressing Warmer at LANG without saving, would settle it.
+    (b) Why does a language save made by the ESP's presses leave the panel unchanged when the same
+    presses by hand change it? (c) Is the current language anywhere on the bus? The display screen
+    always sends f15 = 0.
+11. Does the Water Refresh list really step by 30 in both directions (150 → 120 was one press), and
+    is the Filter Change grid really 10-day steps up to 180?
 
 ## 14. Known issues and limitations
 
@@ -614,6 +697,11 @@ issue with timestamps and what the panel showed.
 - The service counters are text sensors (to show `Off` / `Change Now`), so HA cannot use them in
   numeric conditions or graphs.
 - After an ESP reboot the menu-only values are `unknown` for ~2–4 minutes until the boot read runs.
+- A good *Read Settings* leaves no trace in Home Assistant: the values do not change, so nothing is
+  recorded, and the Decoder Notice appears only when the read fails.
+- The Language sensor is not read from the spa (§10); right after a first install it is `unknown`
+  until a language is saved at the panel.
+- The spa's thermostat overshoots the set point by about 0.25 °C (§11).
 - The `Clock Time` sensor changes every minute; exclude it from the logbook in `configuration.yaml`
   (it still appears in the device's Activity panel).
 - ClearRay Bulb is inferred from the pump state, not read from the spa.
@@ -637,7 +725,8 @@ Each test is short; note the time and what the panel showed.
 | Locks | pump off; Menu → LOCK → SL, Jets 1, 1 min on the main screen, hold Menu; repeat for SVL | Lock entity + f14 bit 1 / bit 2 flips |
 | Service counter Off | Menu → H2O (or FC) → Off, Jets 1, wait, set the value back, Jets 1 | `Off` vs `Change Now`, f2 bit 7 |
 | ClearRay counter / key | Menu → UV → Warmer/Cooler to a value (e.g. 250, then Off), Jets 1, 15 s on the main screen, set it back, Jets 1 (steps of 10: the old value is only restored to ±5 days) | f15 encoding, the new key from the confirming frame on |
-| Language | Menu → LANG → Warmer ×4, wait (no save) | language codes |
+| Language | Menu → LANG → Warmer ×6, wait (no save); write down the language name shown after each press, and read Raw F13 / F15 / Screen Key from the history | the first press only displays the current language (f15 0); the next ones give the code of each language at this key |
+| Settings write | from HA change one value (e.g. Primary Filter Cycles 4 → 3 → 4); watch Raw F13 for the return to the main screen | the walk, the notice on failure, the re-read |
 | Power cut | spa breaker off 1 min, on, do not touch the panel for 5 min | boot messages, purge, clock reset, automatic sync, boot read |
 | Light from HA | select Red, then Off | light seek logic |
 
@@ -657,3 +746,5 @@ What was added and verified on the test spa, in order:
 | 29 Oct | 4-bit screen key; climate offers Heat only; electrical power measured (§11) |
 | 31 Oct | Screen key = ClearRay counter low byte ^ 78 (any value 0–255), learned only when it fits the counter; ClearRay days decoded below 256 days and Off, followed at midnight and on a save at the panel |
 | 2 Nov | Pump 1 Running / Pump 2 Running; the six Power values as settings on the device; the Home Assistant side published in `homeassistant/` |
+| 3 Nov | **p29:** automatic clock sync from 30 s when a whole-minute move improves it; run time, energy, power counted in the ESP; no reboot on a lost API connection. **p30:** settings write from HA (heater mode, Primary Filter, service counters, °C/°F), diagnostic Panel Press buttons, Energy Last 24 Hours, Counters At Midnight. TEMP menu mapped (§9) |
+| 5–6 Nov | **p31 / p31b:** language kept in flash; Primary Filter cycles edit screen is code 14 under the key (the first guess, raw 0, failed); a successful write clears an earlier failure notice; language write and select removed after the ESP's presses were shown not to change the panel; provisional per-key language code model. Cycles 4 → 3 → 4 written from HA on p31b |

@@ -1,0 +1,63 @@
+alias: 'Spa - Plan form: When stays in the future'
+description: >-
+  Earliest possible time for the 'When' of the Add a plan form (input_datetime.spa_plan_when,
+  Scheduled Plans page), one-off plans only (input_select.spa_plan_repeat = Once). Start heating:
+  the current minute. Ready by: now + (form temperature - water) / input_number.spa_heat_rate,
+  rounded up to a minute; the safety margin is not added; no gap means the current minute. An
+  untouched form follows this time up and down with the clock, the water, the temperature, the mode
+  and the Heat Rate: input_text.spa_plan_when_auto keeps the last value written here, so a value
+  that differs from it and is later than the earliest time was chosen by the owner and is left alone
+  until it is overtaken. An earlier value is replaced. Repeating plans use only the time of day, so
+  nothing is changed for them. Plans already added are not touched. Created 2026-11-05 on the
+  owner's request (first the next day at the same time, then the current time, then this).
+triggers:
+  - trigger: time_pattern
+    minutes: '*'
+    id: tick
+  - trigger: state
+    entity_id:
+      - input_datetime.spa_plan_when
+      - input_select.spa_plan_repeat
+      - input_select.spa_plan_mode
+      - input_select.spa_plan_temperature
+      - input_number.spa_heat_rate
+    not_to:
+      - unavailable
+      - unknown
+    id: edited
+  - trigger: homeassistant
+    event: start
+    id: start
+conditions:
+  - condition: state
+    entity_id: input_select.spa_plan_repeat
+    state: Once
+actions:
+  - variables:
+      earliest: >-
+        {%- set nowts = as_timestamp(now()) | int -%}{%- set o =
+        states('input_select.spa_plan_temperature') | float(0) -%}{%- set target = ((o - 32) * 5 /
+        9) if o >= 50 else o -%}{%- set w = state_attr('climate.sundance_spa',
+        'current_temperature') -%}{%- set gap = (target - (w | float)) if (w is number and
+        is_state('input_select.spa_plan_mode', 'Ready by')) else 0 -%}{%- if gap > 0 -%}{{ (((nowts
+        + gap / ([states('input_number.spa_heat_rate') | float(2), 0.5] | max) * 3600) / 60) |
+        round(0, 'ceil') * 60) | int }}{%- else -%}{{ nowts - now().second }}{%- endif -%}
+      current: '{{ state_attr(''input_datetime.spa_plan_when'', ''timestamp'') | float(0) | int }}'
+      auto: '{{ states(''input_text.spa_plan_when_auto'') | int(0) }}'
+  - condition: template
+    value_template: '{{ current != earliest and (current < earliest or current == auto) }}'
+    note: >-
+      Earlier than possible, or still the value written here. A later value chosen by the owner
+      stays.
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_plan_when_auto
+    data:
+      value: '{{ earliest }}'
+  - action: input_datetime.set_datetime
+    target:
+      entity_id: input_datetime.spa_plan_when
+    data:
+      timestamp: '{{ earliest }}'
+mode: single
+max_exceeded: silent

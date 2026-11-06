@@ -1,0 +1,33 @@
+# input_boolean helpers used by the spa setup. Create them in the UI (Settings > Devices & services > Helpers) with these options,
+# or paste each block into configuration.yaml under "input_boolean:".
+spa_session_merging:
+  name: Spa Session Merging
+  icon: mdi:merge
+  initial: false
+spa_panel_alert_sent:
+  name: Spa Panel Alert Sent
+  icon: mdi:bell-check
+spa_plan_sun:
+  name: Spa Plan Sun
+spa_plan_mon:
+  name: Spa Plan Mon
+spa_plan_tue:
+  name: Spa Plan Tue
+spa_plan_wed:
+  name: Spa Plan Wed
+spa_plan_thu:
+  name: Spa Plan Thu
+spa_plan_fri:
+  name: Spa Plan Fri
+spa_plan_sat:
+  name: Spa Plan Sat
+spa_plan_1_on:
+  name: Spa Plan 1 On
+spa_plan_2_on:
+  name: Spa Plan 2 On
+spa_plan_3_on:
+  name: Spa Plan 3 On
+spa_plan_4_on:
+  name: Spa Plan 4 On
+spa_plan_5_on:
+  name: Spa Plan 5 On

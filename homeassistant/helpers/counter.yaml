@@ -1,0 +1,18 @@
+# counter helpers used by the spa setup. Create them in the UI (Settings > Devices & services > Helpers) with these options,
+# or paste each block into configuration.yaml under "counter:".
+spa_soaking_sessions_total:
+  name: Spa Real Use Sessions Total
+  icon: mdi:hot-tub
+  initial: 0
+  minimum: 0
+  step: 1
+  restore: true
+  maximum: null
+spa_maintenance_sessions_total:
+  name: Spa Maintenance Sessions Total
+  icon: mdi:flask-outline
+  initial: 0
+  minimum: 0
+  step: 1
+  restore: true
+  maximum: null

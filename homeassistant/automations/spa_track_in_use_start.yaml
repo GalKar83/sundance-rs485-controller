@@ -1,19 +1,18 @@
 alias: Spa - Track In Use Start
 description: >-
-  Stores the time a spa run starts (binary_sensor.sundance_spa_in_use off -> on: Jet 2 on or
-  Jet 1 high) in input_datetime.spa_in_use_since. "Spa - Ask: Soaking or Maintenance" reads it when
-  the run ends and resets it to 1970-01-01 (= no open run). Kept in a helper instead of the
-  trigger's from_state, because a Wi-Fi blip at the end (on -> unavailable -> off) loses the
-  original on time; a reconnect mid-run (unavailable -> on) keeps the original start.
+  Stores the time a spa run starts (binary_sensor.sundance_spa_in_use off -> on: Jet 2 on or Jet 1
+  high) in input_datetime.spa_in_use_since. 'Spa - Ask: Soaking or Maintenance' reads it when the
+  run ends and resets it to 1970-01-01 (= no open run). A reconnect mid-run (unavailable -> on)
+  keeps the original start. Created 2026-10-31.
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_in_use
-    from: "off"
-    to: "on"
+    from: 'off'
+    to: 'on'
 actions:
   - action: input_datetime.set_datetime
     target:
       entity_id: input_datetime.spa_in_use_since
     data:
-      timestamp: "{{ as_timestamp(trigger.to_state.last_changed) | int }}"
+      timestamp: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
 mode: single

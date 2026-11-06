@@ -1,0 +1,598 @@
+title: Scheduled Plans
+path: hot-tub-plans
+icon: mdi:calendar-clock
+subview: true
+back_path: /home-control/hot-tub
+type: sections
+max_columns: 1
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Heating Plans
+        heading_style: title
+        icon: mdi:calendar-clock
+      - type: markdown
+        content: No heating plans. Add one below.
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_1
+            state:
+              - ''
+              - unknown
+              - unavailable
+          - condition: state
+            entity: input_text.spa_plan_2
+            state:
+              - ''
+              - unknown
+              - unavailable
+          - condition: state
+            entity: input_text.spa_plan_3
+            state:
+              - ''
+              - unknown
+              - unavailable
+          - condition: state
+            entity: input_text.spa_plan_4
+            state:
+              - ''
+              - unknown
+              - unavailable
+          - condition: state
+            entity: input_text.spa_plan_5
+            state:
+              - ''
+              - unknown
+              - unavailable
+      - type: custom:mushroom-template-card
+        entity: input_text.spa_plan_1
+        primary: >-
+          {%- set p = states('input_text.spa_plan_1').split(';') -%}{%- if p | count == 5 -%}{%- set
+          c = p[1] | float(0) -%}{%- set t = ((c * 9 / 5 + 32) | round(0) | int ~ '°F') if
+          is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+          if p[3] == 'once' -%}{%- set when = 'today' if p[4] == (now().date() | string) else
+          ('tomorrow' if p[4] == ((now() + timedelta(days=1)).date() | string) else 'on ' ~
+          as_datetime(p[4]).strftime('%a %d/%m')) -%}{%- elif p[3] == 'daily' -%}{%- set when =
+          'every day' -%}{%- else -%}{%- set names = {'6': 'Sunday', '0': 'Monday', '1': 'Tuesday',
+          '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday'} -%}{%- set ns =
+          namespace(d=[]) -%}{%- for k in ['6', '0', '1', '2', '3', '4', '5'] -%}{%- if k in p[3]
+          -%}{%- set ns.d = ns.d + [names[k] if p[3] | length == 1 else names[k][:3]] -%}{%- endif
+          -%}{%- endfor -%}{%- set when = 'every ' ~ ns.d | join(', ') -%}{%- endif -%}{%- if p[0]
+          == 'R' -%}Ready by {{ p[2] }} {{ when }} · {{ t }}{%- else -%}Heat from {{ p[2] }} {{ when
+          }} · {{ t }}{%- endif -%}{%- endif -%}
+        secondary: '{{ ''Paused'' if is_state(''input_boolean.spa_plan_1_on'', ''off'') else '''' }}'
+        icon: >-
+          {{ 'mdi:toggle-switch' if is_state('input_boolean.spa_plan_1_on', 'on') else
+          'mdi:toggle-switch-off-outline' }}
+        icon_color: '{{ ''green'' if is_state(''input_boolean.spa_plan_1_on'', ''on'') else ''grey'' }}'
+        grid_options:
+          columns: 10
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_1
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+        tap_action:
+          action: none
+        icon_tap_action:
+          action: perform-action
+          perform_action: input_boolean.toggle
+          target:
+            entity_id: input_boolean.spa_plan_1_on
+        card_mod:
+          style: 'ha-card { --card-primary-font-size: 11px; --ha-tile-info-primary-font-size: 11px; }'
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:trash-can-outline
+        icon_color: red
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_plan_delete
+          data:
+            slot: 1
+          confirmation:
+            text: Delete this heating plan?
+        grid_options:
+          columns: 2
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_1
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+      - type: custom:mushroom-template-card
+        entity: input_text.spa_plan_2
+        primary: >-
+          {%- set p = states('input_text.spa_plan_2').split(';') -%}{%- if p | count == 5 -%}{%- set
+          c = p[1] | float(0) -%}{%- set t = ((c * 9 / 5 + 32) | round(0) | int ~ '°F') if
+          is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+          if p[3] == 'once' -%}{%- set when = 'today' if p[4] == (now().date() | string) else
+          ('tomorrow' if p[4] == ((now() + timedelta(days=1)).date() | string) else 'on ' ~
+          as_datetime(p[4]).strftime('%a %d/%m')) -%}{%- elif p[3] == 'daily' -%}{%- set when =
+          'every day' -%}{%- else -%}{%- set names = {'6': 'Sunday', '0': 'Monday', '1': 'Tuesday',
+          '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday'} -%}{%- set ns =
+          namespace(d=[]) -%}{%- for k in ['6', '0', '1', '2', '3', '4', '5'] -%}{%- if k in p[3]
+          -%}{%- set ns.d = ns.d + [names[k] if p[3] | length == 1 else names[k][:3]] -%}{%- endif
+          -%}{%- endfor -%}{%- set when = 'every ' ~ ns.d | join(', ') -%}{%- endif -%}{%- if p[0]
+          == 'R' -%}Ready by {{ p[2] }} {{ when }} · {{ t }}{%- else -%}Heat from {{ p[2] }} {{ when
+          }} · {{ t }}{%- endif -%}{%- endif -%}
+        secondary: '{{ ''Paused'' if is_state(''input_boolean.spa_plan_2_on'', ''off'') else '''' }}'
+        icon: >-
+          {{ 'mdi:toggle-switch' if is_state('input_boolean.spa_plan_2_on', 'on') else
+          'mdi:toggle-switch-off-outline' }}
+        icon_color: '{{ ''green'' if is_state(''input_boolean.spa_plan_2_on'', ''on'') else ''grey'' }}'
+        grid_options:
+          columns: 10
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_2
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+        tap_action:
+          action: none
+        icon_tap_action:
+          action: perform-action
+          perform_action: input_boolean.toggle
+          target:
+            entity_id: input_boolean.spa_plan_2_on
+        card_mod:
+          style: 'ha-card { --card-primary-font-size: 11px; --ha-tile-info-primary-font-size: 11px; }'
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:trash-can-outline
+        icon_color: red
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_plan_delete
+          data:
+            slot: 2
+          confirmation:
+            text: Delete this heating plan?
+        grid_options:
+          columns: 2
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_2
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+      - type: custom:mushroom-template-card
+        entity: input_text.spa_plan_3
+        primary: >-
+          {%- set p = states('input_text.spa_plan_3').split(';') -%}{%- if p | count == 5 -%}{%- set
+          c = p[1] | float(0) -%}{%- set t = ((c * 9 / 5 + 32) | round(0) | int ~ '°F') if
+          is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+          if p[3] == 'once' -%}{%- set when = 'today' if p[4] == (now().date() | string) else
+          ('tomorrow' if p[4] == ((now() + timedelta(days=1)).date() | string) else 'on ' ~
+          as_datetime(p[4]).strftime('%a %d/%m')) -%}{%- elif p[3] == 'daily' -%}{%- set when =
+          'every day' -%}{%- else -%}{%- set names = {'6': 'Sunday', '0': 'Monday', '1': 'Tuesday',
+          '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday'} -%}{%- set ns =
+          namespace(d=[]) -%}{%- for k in ['6', '0', '1', '2', '3', '4', '5'] -%}{%- if k in p[3]
+          -%}{%- set ns.d = ns.d + [names[k] if p[3] | length == 1 else names[k][:3]] -%}{%- endif
+          -%}{%- endfor -%}{%- set when = 'every ' ~ ns.d | join(', ') -%}{%- endif -%}{%- if p[0]
+          == 'R' -%}Ready by {{ p[2] }} {{ when }} · {{ t }}{%- else -%}Heat from {{ p[2] }} {{ when
+          }} · {{ t }}{%- endif -%}{%- endif -%}
+        secondary: '{{ ''Paused'' if is_state(''input_boolean.spa_plan_3_on'', ''off'') else '''' }}'
+        icon: >-
+          {{ 'mdi:toggle-switch' if is_state('input_boolean.spa_plan_3_on', 'on') else
+          'mdi:toggle-switch-off-outline' }}
+        icon_color: '{{ ''green'' if is_state(''input_boolean.spa_plan_3_on'', ''on'') else ''grey'' }}'
+        grid_options:
+          columns: 10
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_3
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+        tap_action:
+          action: none
+        icon_tap_action:
+          action: perform-action
+          perform_action: input_boolean.toggle
+          target:
+            entity_id: input_boolean.spa_plan_3_on
+        card_mod:
+          style: 'ha-card { --card-primary-font-size: 11px; --ha-tile-info-primary-font-size: 11px; }'
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:trash-can-outline
+        icon_color: red
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_plan_delete
+          data:
+            slot: 3
+          confirmation:
+            text: Delete this heating plan?
+        grid_options:
+          columns: 2
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_3
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+      - type: custom:mushroom-template-card
+        entity: input_text.spa_plan_4
+        primary: >-
+          {%- set p = states('input_text.spa_plan_4').split(';') -%}{%- if p | count == 5 -%}{%- set
+          c = p[1] | float(0) -%}{%- set t = ((c * 9 / 5 + 32) | round(0) | int ~ '°F') if
+          is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+          if p[3] == 'once' -%}{%- set when = 'today' if p[4] == (now().date() | string) else
+          ('tomorrow' if p[4] == ((now() + timedelta(days=1)).date() | string) else 'on ' ~
+          as_datetime(p[4]).strftime('%a %d/%m')) -%}{%- elif p[3] == 'daily' -%}{%- set when =
+          'every day' -%}{%- else -%}{%- set names = {'6': 'Sunday', '0': 'Monday', '1': 'Tuesday',
+          '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday'} -%}{%- set ns =
+          namespace(d=[]) -%}{%- for k in ['6', '0', '1', '2', '3', '4', '5'] -%}{%- if k in p[3]
+          -%}{%- set ns.d = ns.d + [names[k] if p[3] | length == 1 else names[k][:3]] -%}{%- endif
+          -%}{%- endfor -%}{%- set when = 'every ' ~ ns.d | join(', ') -%}{%- endif -%}{%- if p[0]
+          == 'R' -%}Ready by {{ p[2] }} {{ when }} · {{ t }}{%- else -%}Heat from {{ p[2] }} {{ when
+          }} · {{ t }}{%- endif -%}{%- endif -%}
+        secondary: '{{ ''Paused'' if is_state(''input_boolean.spa_plan_4_on'', ''off'') else '''' }}'
+        icon: >-
+          {{ 'mdi:toggle-switch' if is_state('input_boolean.spa_plan_4_on', 'on') else
+          'mdi:toggle-switch-off-outline' }}
+        icon_color: '{{ ''green'' if is_state(''input_boolean.spa_plan_4_on'', ''on'') else ''grey'' }}'
+        grid_options:
+          columns: 10
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_4
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+        tap_action:
+          action: none
+        icon_tap_action:
+          action: perform-action
+          perform_action: input_boolean.toggle
+          target:
+            entity_id: input_boolean.spa_plan_4_on
+        card_mod:
+          style: 'ha-card { --card-primary-font-size: 11px; --ha-tile-info-primary-font-size: 11px; }'
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:trash-can-outline
+        icon_color: red
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_plan_delete
+          data:
+            slot: 4
+          confirmation:
+            text: Delete this heating plan?
+        grid_options:
+          columns: 2
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_4
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+      - type: custom:mushroom-template-card
+        entity: input_text.spa_plan_5
+        primary: >-
+          {%- set p = states('input_text.spa_plan_5').split(';') -%}{%- if p | count == 5 -%}{%- set
+          c = p[1] | float(0) -%}{%- set t = ((c * 9 / 5 + 32) | round(0) | int ~ '°F') if
+          is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+          if p[3] == 'once' -%}{%- set when = 'today' if p[4] == (now().date() | string) else
+          ('tomorrow' if p[4] == ((now() + timedelta(days=1)).date() | string) else 'on ' ~
+          as_datetime(p[4]).strftime('%a %d/%m')) -%}{%- elif p[3] == 'daily' -%}{%- set when =
+          'every day' -%}{%- else -%}{%- set names = {'6': 'Sunday', '0': 'Monday', '1': 'Tuesday',
+          '2': 'Wednesday', '3': 'Thursday', '4': 'Friday', '5': 'Saturday'} -%}{%- set ns =
+          namespace(d=[]) -%}{%- for k in ['6', '0', '1', '2', '3', '4', '5'] -%}{%- if k in p[3]
+          -%}{%- set ns.d = ns.d + [names[k] if p[3] | length == 1 else names[k][:3]] -%}{%- endif
+          -%}{%- endfor -%}{%- set when = 'every ' ~ ns.d | join(', ') -%}{%- endif -%}{%- if p[0]
+          == 'R' -%}Ready by {{ p[2] }} {{ when }} · {{ t }}{%- else -%}Heat from {{ p[2] }} {{ when
+          }} · {{ t }}{%- endif -%}{%- endif -%}
+        secondary: '{{ ''Paused'' if is_state(''input_boolean.spa_plan_5_on'', ''off'') else '''' }}'
+        icon: >-
+          {{ 'mdi:toggle-switch' if is_state('input_boolean.spa_plan_5_on', 'on') else
+          'mdi:toggle-switch-off-outline' }}
+        icon_color: '{{ ''green'' if is_state(''input_boolean.spa_plan_5_on'', ''on'') else ''grey'' }}'
+        grid_options:
+          columns: 10
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_5
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+        tap_action:
+          action: none
+        icon_tap_action:
+          action: perform-action
+          perform_action: input_boolean.toggle
+          target:
+            entity_id: input_boolean.spa_plan_5_on
+        card_mod:
+          style: 'ha-card { --card-primary-font-size: 11px; --ha-tile-info-primary-font-size: 11px; }'
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:trash-can-outline
+        icon_color: red
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_plan_delete
+          data:
+            slot: 5
+          confirmation:
+            text: Delete this heating plan?
+        grid_options:
+          columns: 2
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_text.spa_plan_5
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+      - type: heading
+        heading: Add a plan
+        heading_style: subtitle
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_plan_mode
+        primary: Mode
+        secondary: '{{ states(''input_select.spa_plan_mode'') }}'
+        icon: mdi:tune
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_plan_repeat
+        primary: Repeat
+        secondary: '{{ states(''input_select.spa_plan_repeat'') }}'
+        icon: mdi:repeat
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_plan_temperature
+        primary: Temperature
+        secondary: '{{ states(''input_select.spa_plan_temperature'') }}'
+        icon: mdi:thermometer
+        icon_color: blue
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: input_datetime.spa_plan_when
+        primary: When
+        secondary: >-
+          {%- set t = state_attr('input_datetime.spa_plan_when', 'timestamp') | float(0) -%}{{ t |
+          timestamp_custom('%H:%M') if not is_state('input_select.spa_plan_repeat', 'Once') else t |
+          timestamp_custom('%d/%m %H:%M') }}
+        icon: mdi:calendar-clock
+        icon_color: blue
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: markdown
+        content: <small>A repeating plan uses only the time.</small>
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state_not: Once
+      - type: tile
+        entity: input_boolean.spa_plan_sun
+        name: Sun
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: tile
+        entity: input_boolean.spa_plan_mon
+        name: Mon
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: tile
+        entity: input_boolean.spa_plan_tue
+        name: Tue
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: tile
+        entity: input_boolean.spa_plan_wed
+        name: Wed
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: tile
+        entity: input_boolean.spa_plan_thu
+        name: Thu
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: tile
+        entity: input_boolean.spa_plan_fri
+        name: Fri
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: tile
+        entity: input_boolean.spa_plan_sat
+        name: Sat
+        hide_state: true
+        vertical: true
+        grid_options:
+          columns: 3
+          rows: 1
+        visibility:
+          - condition: state
+            entity: input_select.spa_plan_repeat
+            state: Chosen days
+        tap_action:
+          action: toggle
+        icon_tap_action:
+          action: toggle
+        hold_action:
+          action: none
+      - type: button
+        icon: mdi:plus-circle
+        name: Add plan
+        grid_options:
+          columns: full
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_plan_add
+      - type: markdown
+        content: >-
+          **Ready by** - the water is at the temperature at that time (heating starts in time from
+          the Heat Rate). **Start heating** - heating starts at that time. A one-off plan disappears
+          once it has run; repeating plans stay until deleted with the trash button; tap the switch
+          icon of a plan to pause or resume it without deleting it. After the soak, or 2 h after the
+          water should be ready, the phone asks: back to the previous temperature, keep it, or set a
+          new one.
+        grid_options:
+          columns: full
+      - type: custom:mushroom-template-card
+        entity: input_number.spa_heat_rate
+        primary: Heat Rate
+        secondary: >-
+          {%- set r = states('input_number.spa_heat_rate') | float(0) -%}{{ ((r * 1.8) | round(1) ~
+          ' °F/hour') if is_state('sensor.sundance_spa_temperature_format', '°F') else (r | round(1)
+          ~ ' °C/hour') }}
+        icon: mdi:thermometer-chevron-up
+        icon_color: red
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: 12
+          rows: 1
+      - type: custom:mushroom-number-card
+        entity: input_number.spa_ready_by_margin
+        name: Safety Margin
+        display_mode: slider
+        icon_color: orange
+        grid_options:
+          columns: 12
+          rows: 1
+        layout: horizontal
