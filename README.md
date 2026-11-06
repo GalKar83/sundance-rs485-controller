@@ -68,8 +68,10 @@ Contents
   `source: type: local`.
 - Protocol background: HyperActiveJ `sundanceRS485` decoding notes (the 780 bit names in the code
   come from there).
-- Upstream has **no LICENSE file** at the time of writing — keep that in mind before republishing
-  derived code.
+- **Licence and credit.** The upstream repository has no LICENSE file, so this fork is shared as a
+  free hobby project, with all credit for the original work going to its author. If the original
+  author (or anyone else whose work is included) asks for something to be changed or removed, it
+  will be done promptly — please open an issue on this repository.
 - Reference manual: Sundance *2020 680 Series Owner's Manual* (menu order, value ranges, heat modes,
   lock modes, error codes).
 
