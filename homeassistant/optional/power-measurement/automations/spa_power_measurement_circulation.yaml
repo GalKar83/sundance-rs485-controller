@@ -11,7 +11,9 @@ description: >-
   Revised 2026-11-02 (owner): MEASUREMENT ONLY - no longer changes
   number.sundance_spa_power_circulation (set to 370 W); each night logs the measured value and its
   difference from the setting, reviewed periodically. Revised 2026-11-02: setting read from
-  number.sundance_spa_power_circulation (on the ESP).
+  number.sundance_spa_power_circulation (on the ESP). Revised 2026-11-06: each result (measured W
+  and difference, or a skipped night) is also appended to input_text.spa_power_measure_circulation
+  for the weekly summary; the setting is still never changed.
 triggers:
   - trigger: time
     at: '00:05:00'
@@ -114,6 +116,15 @@ actions:
         note: >-
           Measurement only since 2026-11-02 - the setting is changed by hand (owner) when the
           measurements show a consistent gap.
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_power_measure_circulation
+        data:
+          value: >-
+            {% set items = states('input_text.spa_power_measure_circulation').split(';') | select |
+            list %}{% set e = ((as_timestamp(now()) / 60) | int | string) ~ ',' ~ (measured | float
+            | round(0) | int | string) ~ ',' ~ (((measured | float - old) / old * 100) | round(1) |
+            string) %}{{ (items + [e])[-10:] | join(';') }}
     else:
       - action: logbook.log
         data:
@@ -122,4 +133,12 @@ actions:
           message: >-
             night skipped: base {{ q1 }}/{{ q2 }} W, circulation {{ circ_w }} W, measured {{
             measured }} W
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_power_measure_circulation
+        data:
+          value: >-
+            {% set items = states('input_text.spa_power_measure_circulation').split(';') | select |
+            list %}{% set e = ((as_timestamp(now()) / 60) | int | string) ~ ',x' %}{{ (items +
+            [e])[-10:] | join(';') }}
 mode: single

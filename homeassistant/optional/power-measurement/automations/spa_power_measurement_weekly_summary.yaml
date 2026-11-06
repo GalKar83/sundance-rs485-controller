@@ -1,0 +1,38 @@
+alias: 'Spa - Power measurement: weekly summary'
+description: >-
+  Every Sunday at 08:00 sends the phone a summary of the last 7 days of the two power measurements
+  ('Spa - Power measurement: circulation (nightly)' and '... jet pump (after a soak)'): how many
+  valid measurements, the average measured power against the setting on the ESP, the average
+  difference in %, and how many were skipped. The measurements are read from
+  input_text.spa_power_measure_circulation / _jet_pump (up to the last 10 results each,
+  'minutes_since_epoch,measured_W,difference_%' or 'minutes,x' for a skipped one). Information only:
+  the Power settings are never changed by any automation. Optional - needs a whole-house power
+  sensor for the two measurement automations. Created 2026-11-06.
+triggers:
+  - trigger: time
+    at: '08:00:00'
+conditions:
+  - condition: time
+    weekday:
+      - sun
+actions:
+  - action: script.spa_notify
+    data:
+      title: Spa power measurement, last 7 days
+      tag: spa_power_weekly
+      message: >-
+        {% macro summ(raw, label, unit_word, setting) -%}{%- set cutoff = (as_timestamp(now()) -
+        604800) / 60 -%}{%- set ns = namespace(n=0, skip=0, m=0, p=0) -%}{%- for it in
+        raw.split(';') if it -%}{%- set f = it.split(',') -%}{%- if f[0] | float(0) >= cutoff -%}{%-
+        if f | count >= 3 -%}{%- set ns.n = ns.n + 1 -%}{%- set ns.m = ns.m + f[1] | float(0) -%}{%-
+        set ns.p = ns.p + f[2] | float(0) -%}{%- else -%}{%- set ns.skip = ns.skip + 1 -%}{%- endif
+        -%}{%- endif -%}{%- endfor -%}{%- if ns.n > 0 -%}{{ label }}: {{ ns.n }} {{ unit_word }}{{
+        '' if ns.n == 1 else 's' }} measured, average {{ (ns.m / ns.n) | round(0) | int }} W vs
+        setting {{ setting | round(0) | int }} W ({{ '%+.1f' % (ns.p / ns.n) }}%){{ ', ' ~ ns.skip ~
+        ' skipped' if ns.skip > 0 else '' }}.{%- else -%}{{ label }}: no valid measurement{{ ' (' ~
+        ns.skip ~ ' skipped)' if ns.skip > 0 else '' }}.{%- endif -%}{%- endmacro -%}{{
+        summ(states('input_text.spa_power_measure_circulation'), 'Circulation', 'night',
+        states('number.sundance_spa_power_circulation') | float(370)) }} {{
+        summ(states('input_text.spa_power_measure_jet_pump'), 'Jet pump', 'soak',
+        states('number.sundance_spa_power_jet_pump') | float(1630)) }} Settings unchanged.
+mode: single

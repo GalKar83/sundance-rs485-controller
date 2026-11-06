@@ -367,32 +367,6 @@
     periodically_resetting: false
     source: sensor.sundance_spa_energy_counter
     tariffs: []
-- domain: integration
-  title: House Load Energy (Spa Calibration)
-  options:
-    max_sub_interval:
-      hours: 0
-      minutes: 1
-      seconds: 0
-    method: left
-    name: House Load Energy (Spa Calibration)
-    round: 4
-    source: sensor.load_power
-    unit_prefix: k
-    unit_time: h
-- domain: statistics
-  title: House Load Mean 10 Min (Spa Calibration)
-  options:
-    entity_id: sensor.load_power
-    keep_last_sample: true
-    max_age:
-      hours: 0
-      minutes: 10
-      seconds: 0
-    name: House Load Mean 10 Min (Spa Calibration)
-    percentile: 50
-    precision: 0
-    state_characteristic: average_step
 - domain: utility_meter
   title: Energy Year
   options:

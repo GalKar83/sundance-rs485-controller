@@ -5,7 +5,8 @@ scripts and the dashboard pages. It is the owner's complete working setup, expor
 Assistant's own files with the personal names replaced. Nothing in it is needed for the component
 to work; take what you want.
 
-- [`automations/`](automations) — one YAML file per automation (all 21). Paste it into a new
+- [`automations/`](automations) — one YAML file per automation (19; the optional power-measurement ones are in
+  [`optional/`](optional/power-measurement)). Paste it into a new
   automation with *Edit in YAML*.
 - [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), and the plan scripts
   `spa_plan_add`, `spa_plan_delete` and `spa_target_step`.
@@ -19,11 +20,14 @@ to work; take what you want.
   and `hot_tub_plans_view.yaml` (screenshots in the main README §4). They are *sections* views;
   add each to a dashboard with its raw configuration editor. The owner's outdoor weather block was
   left out of the Hot Tub page.
+- [`optional/power-measurement/`](optional/power-measurement) — measuring the spa's power against
+  the whole-house consumption, with a weekly phone summary. **Only relevant if you have a
+  whole-house power sensor**, and then the entity names will differ; its own README explains it.
 - The exports are taken as they are in the running system. Some helpers keep an older name in
   their storage id; the files use the entity id that the automations refer to. Notes on a few:
   `Spa Power` (template) is still used by the dashboard's power tile and the circulation
-  measurement automation; `House Load Energy` and `House Load Mean 10 Min` (Spa Calibration)
-  only serve the two power-measurement automations, which need a whole-house power sensor;
+  measurement automation; the `House Load …` helpers belong to the optional power measurement, which needs a
+  whole-house power sensor (they are in `optional/`);
   `Energy` (the Spa Energy integration) is no longer read by anything since the ESP counts energy
   itself (§3), and `Spa Energy Test` is a leftover test meter — both can be skipped.
 
@@ -311,7 +315,7 @@ Three morning reminders, each at 08:00, each with phone buttons that are their o
 | Filter rinse | 30 or more calendar days after `input_datetime.last_rinse_filter` | Done / Not yet | Done sets it to now; the power-cut rinse question and a manual edit also clear it |
 
 Not yet, No, or no answer: asked again the next morning. The dashboard shows each *Next* date.
-| `spa_power_measurement_circulation`, `spa_power_measurement_jet_pump` | optional: measure circulation / jet power from the house load and log the result | never change the settings, only log |
+| `spa_power_measurement_circulation`, `spa_power_measurement_jet_pump`, `spa_power_measurement_weekly_summary` | optional (`optional/power-measurement/`): measure circulation / jet power from the house load, log each result, and send a weekly summary to the phone | never change the settings, only measure and report |
 
 ### Soaking or maintenance
 

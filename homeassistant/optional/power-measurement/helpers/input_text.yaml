@@ -1,0 +1,11 @@
+# input_text helpers for the optional power measurement (create them in the UI with these options).
+spa_power_measure_circulation:
+  name: Spa Power Measure Circulation
+  min: 0
+  max: 255
+  mode: text
+spa_power_measure_jet_pump:
+  name: Spa Power Measure Jet Pump
+  min: 0
+  max: 255
+  mode: text
