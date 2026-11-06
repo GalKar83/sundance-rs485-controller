@@ -20,9 +20,12 @@ to work; take what you want.
   add each to a dashboard with its raw configuration editor. The owner's outdoor weather block was
   left out of the Hot Tub page.
 - The exports are taken as they are in the running system. Some helpers keep an older name in
-  their storage id; the files use the entity id that the automations refer to. `Spa Energy Test`
-  is a leftover test meter and the `Power` / `Energy` / `House Load…` helpers belong to the earlier
-  Home Assistant-side power model (§3), so you can skip them.
+  their storage id; the files use the entity id that the automations refer to. Notes on a few:
+  `Spa Power` (template) is still used by the dashboard's power tile and the circulation
+  measurement automation; `House Load Energy` and `House Load Mean 10 Min` (Spa Calibration)
+  only serve the two power-measurement automations, which need a whole-house power sensor;
+  `Energy` (the Spa Energy integration) is no longer read by anything since the ESP counts energy
+  itself (§3), and `Spa Energy Test` is a leftover test meter — both can be skipped.
 
 Replace before use:
 
