@@ -535,3 +535,48 @@
       {{ (state_attr('climate.sundance_spa', 'temperature') | float(0) * 9 / 5 + 32) | round(0) |
       int }}
     template_type: sensor
+- domain: template
+  title: Spa Audio Person 1 Connected
+  options:
+    name: Spa Audio Person 1 Connected
+    state: >-
+      {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
+      ((state_attr('sensor.person1_phone_bluetooth_connection', 'connected_paired_devices') or []) |
+      select('search', mac, ignorecase=true) | list | count) > 0 }}
+    template_type: binary_sensor
+- domain: template
+  title: Spa Audio Person 2 Connected
+  options:
+    name: Spa Audio Person 2 Connected
+    state: >-
+      {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
+      ((state_attr('sensor.person2_phone_bluetooth_connection', 'connected_paired_devices') or []) |
+      select('search', mac, ignorecase=true) | list | count) > 0 }}
+    template_type: binary_sensor
+- domain: template
+  title: Spa Audio
+  options:
+    name: Spa Audio
+    state: >-
+      {%- set g = is_state('binary_sensor.spa_audio_person1_connected', 'on') -%}{%- set e =
+      is_state('binary_sensor.spa_audio_person2_connected', 'on') -%}{%- if g and e -%}{{ 'Person 2'
+      if states.binary_sensor.spa_audio_person2_connected.last_changed >
+      states.binary_sensor.spa_audio_person1_connected.last_changed else 'Person 1' }}{%- elif g
+      -%}Person 1{%- elif e -%}Person 2{%- else -%}Not connected{%- endif -%}
+    template_type: sensor
+- domain: template
+  title: Spa Audio Now Playing
+  options:
+    name: Spa Audio Now Playing
+    state: >-
+      {%- set who = states('sensor.spa_audio') -%}{%- set mid = {'Person 1':
+      'sensor.person1_phone_media_session', 'Person 2':
+      'sensor.person2_phone_media_session'}.get(who) -%}{%- set m = states[mid] if mid else none
+      -%}{%- set ns = namespace(pkg='', playing=false) -%}{%- if m is not none -%}{%- for k in
+      m.attributes.keys() | list if k.startswith('playback_state_') -%}{%- set p = k[15:] -%}{%- if
+      ns.pkg == '' or (m.attributes[k] == 'Playing' and not ns.playing) -%}{%- set ns.pkg = p -%}{%-
+      set ns.playing = m.attributes[k] == 'Playing' -%}{%- endif -%}{%- endfor -%}{%- endif -%}{%-
+      if m is none or ns.pkg == '' -%}—{%- else -%}{%- set t = m.attributes['title_' ~ ns.pkg] |
+      default('', true) -%}{%- set a = m.attributes['artist_' ~ ns.pkg] | default('', true) -%}{{
+      ('' if ns.playing else 'Paused: ') ~ t ~ ((' – ' ~ a) if a else '') }}{%- endif -%}
+    template_type: sensor

@@ -71,3 +71,8 @@ spa_plan_previous_heater_mode:
   min: 0
   max: 10
   mode: text
+spa_audio_bluetooth_mac:
+  name: Spa Audio Bluetooth MAC
+  min: 0
+  max: 17
+  mode: text

@@ -132,6 +132,26 @@ sections:
         grid_options:
           columns: full
           rows: 1
+      - type: custom:mushroom-template-card
+        entity: sensor.spa_audio
+        primary: Spa Audio
+        secondary: >-
+          {%- set w = states('sensor.spa_audio') -%}{{ w }}{{ ' · ' ~
+          states('sensor.spa_audio_now_playing') if w not in ['Not connected', 'unknown',
+          'unavailable'] else '' }}
+        icon: >-
+          {{ 'mdi:bluetooth-audio' if states('sensor.spa_audio') not in ['Not connected', 'unknown',
+          'unavailable'] else 'mdi:bluetooth-off' }}
+        icon_color: >-
+          {{ 'blue' if states('sensor.spa_audio') not in ['Not connected', 'unknown', 'unavailable']
+          else 'grey' }}
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+        card_mod:
+          style: 'ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }'
       - type: custom:apexcharts-card
         grid_options:
           columns: full

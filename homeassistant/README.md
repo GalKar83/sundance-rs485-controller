@@ -392,6 +392,31 @@ Not tested on a real drop since the rewrite.
 The schedule is read from the spa at the time of the outage, so a changed filter schedule is
 followed automatically.
 
+### Spa audio (who is connected, what is playing)
+
+The spa's Bluetooth audio system is powered from the controller board but reports nothing on the
+RS-485 bus (and its connection is invisible to a nearby ESP32: a classic Bluetooth audio link is
+not a BLE advertisement, and phones use random addresses). So the phones report it themselves,
+with the Home Assistant Companion app on Android:
+
+1. In each phone's app: *Settings → Companion app → Manage sensors* → enable **Bluetooth
+   connection** (Nearby devices permission) and **Media session** (Notification access).
+2. `input_text.spa_audio_bluetooth_mac` holds the **MAC address** of the spa's audio system (not the
+   name, which can be renamed), e.g. `AA:BB:CC:DD:EE:FF`. The Bluetooth connection sensor lists its
+   connected devices as `"AA:BB:CC:DD:EE:FF (name)"`; connect once and read the address there.
+3. Two template binary sensors, one per phone (*Spa Audio Person 1 / Person 2 Connected*), are on
+   when the MAC is in that phone's `connected_paired_devices`.
+4. *Spa Audio* (template sensor) gives `Person 1`, `Person 2` or `Not connected` (the one that
+   connected last if both are).
+5. *Spa Audio Now Playing* reads that person's **Media session** sensor, which keeps one set of
+   attributes per app (`title_<package>`, `artist_<package>`, `playback_state_<package>`): it takes
+   the app that is playing, otherwise the first, and gives `Title – Artist` (or `Paused: …`). This
+   covers any app that publishes a media session (Spotify, YouTube, YouTube Music, podcasts).
+
+The Hot Tub page shows one row, *Spa Audio*, under *Current Status*: the person and what is playing.
+Replace the phone entity ids in the templates (`sensor.person1_phone_bluetooth_connection`,
+`..._media_session`) with your own. iPhones have no such sensors.
+
 ## 5. Dashboard
 
 There are three pages: **Hot Tub**, **Settings** (`hot-tub-settings`) and **Scheduled Plans**
