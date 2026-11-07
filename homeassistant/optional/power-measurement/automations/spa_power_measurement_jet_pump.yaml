@@ -14,6 +14,8 @@ description: >-
   setting and ClearRay value read from number.sundance_spa_power_* (on the ESP). Revised 2026-11-06:
   each result (measured W and difference, or a skipped soak) is also appended to
   input_text.spa_power_measure_jet_pump for the weekly summary; the setting is still never changed.
+  Revised 2026-11-07: the helper list ignores a non-numeric start value (unknown), so only real
+  results count towards the last 10.
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_pumps_running
@@ -96,10 +98,10 @@ actions:
           entity_id: input_text.spa_power_measure_jet_pump
         data:
           value: >-
-            {% set items = states('input_text.spa_power_measure_jet_pump').split(';') | select |
-            list %}{% set e = ((as_timestamp(now()) / 60) | int | string) ~ ',' ~ (measured | float
-            | round(0) | int | string) ~ ',' ~ (((measured | float - old) / old * 100) | round(1) |
-            string) %}{{ (items + [e])[-10:] | join(';') }}
+            {% set items = states('input_text.spa_power_measure_jet_pump').split(';') |
+            select('match', '[0-9]') | list %}{% set e = ((as_timestamp(now()) / 60) | int | string)
+            ~ ',' ~ (measured | float | round(0) | int | string) ~ ',' ~ (((measured | float - old)
+            / old * 100) | round(1) | string) %}{{ (items + [e])[-10:] | join(';') }}
     else:
       - action: logbook.log
         data:
@@ -113,7 +115,7 @@ actions:
           entity_id: input_text.spa_power_measure_jet_pump
         data:
           value: >-
-            {% set items = states('input_text.spa_power_measure_jet_pump').split(';') | select |
-            list %}{% set e = ((as_timestamp(now()) / 60) | int | string) ~ ',x' %}{{ (items +
-            [e])[-10:] | join(';') }}
+            {% set items = states('input_text.spa_power_measure_jet_pump').split(';') |
+            select('match', '[0-9]') | list %}{% set e = ((as_timestamp(now()) / 60) | int | string)
+            ~ ',x' %}{{ (items + [e])[-10:] | join(';') }}
 mode: single
