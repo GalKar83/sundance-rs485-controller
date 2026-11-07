@@ -40,7 +40,8 @@ spot mistakes.
 
 Contents
 
-0. [Installation (quick start)](#installation-quick-start)
+[**Installation (quick start)**](#installation-quick-start)
+
 1. [Credits and upstream](#1-credits-and-upstream)
 2. [Hardware and wiring](#2-hardware-and-wiring)
 3. [What is different from the 780 code](#3-what-is-different-from-the-780-code)
