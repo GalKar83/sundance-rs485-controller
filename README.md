@@ -148,8 +148,17 @@ for the component; it is the owner's complete setup. To use it, in this order:
   repository root (not under `components/`), so it cannot be used with `source: github://…`
   directly; here it is cloned into `config/esphome/components/sundance_spa` and used with
   `source: type: local`.
-- Protocol background: HyperActiveJ `sundanceRS485` decoding notes (the 780 bit names in the code
-  come from there).
+- Protocol decoding: [pete-jorgensen/SundanceHotTub2MQTT](https://github.com/pete-jorgensen/SundanceHotTub2MQTT)
+  by Peter Jorgensen (published earlier as HyperActiveJ/sundance780-jacuzzi-balboa-rs485-tcp; the
+  author name in its commits is HyperActiveJ), a Sundance 780 RS-485 → MQTT bridge (Apache 2.0). Its
+  `DECODING.md` documents the frame layout, the XOR fold and the field map; the 780 bit names in the
+  code come from there.
+- Protocol and hardware lineage, as credited by the original component:
+  [garbled1/pybalboa](https://github.com/garbled1/pybalboa) (the Balboa Wi-Fi library this decoding
+  line started from), [ccutrer/balboa_worldwide_app](https://github.com/ccutrer/balboa_worldwide_app)
+  (Balboa protocol notes), and the hardware approach of
+  [cribskip/esp8266_spa](https://github.com/cribskip/esp8266_spa) and
+  [jrowny/ESPHomeSpa](https://github.com/jrowny/ESPHomeSpa).
 - **Licence and credit.** The upstream repository has no LICENSE file, so this fork is shared as a
   free hobby project, with all credit for the original work going to its author. If the original
   author (or anyone else whose work is included) asks for something to be changed or removed, it
