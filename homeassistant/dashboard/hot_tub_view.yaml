@@ -152,6 +152,62 @@ sections:
           rows: 1
         card_mod:
           style: 'ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }'
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:skip-previous
+        icon_color: blue
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_audio_control
+          data:
+            command: previous
+        grid_options:
+          columns: 4
+          rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.spa_audio
+            state_not: Not connected
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: >-
+          {{ 'mdi:play' if states('sensor.spa_audio_now_playing').startswith('Paused') else
+          'mdi:pause' }}
+        icon_color: blue
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_audio_control
+          data:
+            command: toggle
+        grid_options:
+          columns: 4
+          rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.spa_audio
+            state_not: Not connected
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: ''
+        layout: vertical
+        icon: mdi:skip-next
+        icon_color: blue
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_audio_control
+          data:
+            command: next
+        grid_options:
+          columns: 4
+          rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.spa_audio
+            state_not: Not connected
       - type: custom:apexcharts-card
         grid_options:
           columns: full

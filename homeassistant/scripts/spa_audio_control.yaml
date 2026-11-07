@@ -1,0 +1,46 @@
+alias: Spa - Audio control
+description: >-
+  Controls the phone that is connected to the spa's Bluetooth audio (sensor.spa_audio): play/pause
+  toggle, next or previous, through the Companion app's media command (notify command_media; needs
+  Notification access for the app, the same as the Media session sensor). The target app is the one
+  the phone's Media session sensor reports as playing, otherwise its first session. Called by the
+  buttons under the Spa Audio row on the Hot Tub page.
+mode: queued
+max: 5
+fields:
+  command:
+    description: toggle, next or previous
+    required: true
+    selector:
+      select:
+        options:
+          - toggle
+          - next
+          - previous
+sequence:
+  - variables:
+      who: '{{ states(''sensor.spa_audio'') }}'
+      media: >-
+        {{ 'sensor.person1_phone_media_session' if states('sensor.spa_audio') == 'Person 1' else
+        'sensor.person2_phone_media_session' }}
+      svc: >-
+        {{ 'notify.mobile_app_your_phone' if states('sensor.spa_audio') == 'Person 1' else
+        'notify.mobile_app_partner_phone' }}
+  - condition: template
+    value_template: '{{ who in [''Person 1'', ''Person 2''] }}'
+  - variables:
+      pkg: >-
+        {%- set m = states[media] -%}{%- set ns = namespace(pkg='', playing=false) -%}{%- if m is
+        not none -%}{%- for k in m.attributes.keys() | list if k.startswith('playback_state_')
+        -%}{%- set p = k[15:] -%}{%- if ns.pkg == '' or (m.attributes[k] == 'Playing' and not
+        ns.playing) -%}{%- set ns.pkg = p -%}{%- set ns.playing = m.attributes[k] == 'Playing'
+        -%}{%- endif -%}{%- endfor -%}{%- endif -%}{{ ns.pkg }}
+      is_playing: '{{ is_state(media, ''Playing'') }}'
+  - condition: template
+    value_template: '{{ pkg != '''' }}'
+  - action: '{{ svc }}'
+    data:
+      message: command_media
+      data:
+        media_command: '{{ (''pause'' if is_playing else ''play'') if command == ''toggle'' else command }}'
+        media_package_name: '{{ pkg }}'

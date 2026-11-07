@@ -414,6 +414,11 @@ with the Home Assistant Companion app on Android:
    covers any app that publishes a media session (Spotify, YouTube, YouTube Music, podcasts).
 
 The Hot Tub page shows one row, *Spa Audio*, under *Current Status*: the person and what is playing.
+While someone is connected, three buttons under it (previous, play/pause, next) call
+`script.spa_audio_control`, which sends the Companion app's media command (`notify` with
+`message: command_media`, `media_command: play|pause|next|previous`, `media_package_name`) to the
+connected person's phone, for the app that the Media session sensor reports (the playing one,
+otherwise the first). It does nothing when nobody is connected.
 Replace the phone entity ids in the templates (`sensor.person1_phone_bluetooth_connection`,
 `..._media_session`) with your own. iPhones have no such sensors.
 
