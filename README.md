@@ -426,8 +426,8 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f0 | hour (24 h) | `f0 ^ 6` | ✅ |
 | f11 bits 0–6 | minute | plain | ✅ |
 | f11 bit 7 | ? | never seen set | ❓ |
-| f7 | day + month | `f7 = (((day ^ 1) << 3) + (month ^ 8)) & 0xFF` — ambiguous; the decoder tries `f7` and `f7 + 256` for all candidates and picks the one nearest the HA date | ✅ (all days of a year checked) |
-| f9 | year | `(year - 2000) ^ 1` (power-up default decodes to 2014-01-01) | ✅ |
+| f7 | day + month | `f7 = (day << 3) XOR month` (the same formula as in [Pete Jorgensen's 780 notes](https://github.com/pete-jorgensen/SundanceHotTub2MQTT)). Still ambiguous (22 Oct and 23 Feb both give 186), so the decoder picks the candidate nearest the HA date. The firmware currently uses an earlier formula, `((day ^ 1) << 3) + (month ^ 8)`, which gives the same values for odd days and for months 8–12 but is two days off on even days from January to July; setting the spa to 8 July (2026-11-07) showed it, and the update is in progress | ✅ (checked on the spa, 8 Jul → read as 6 Jul by the old formula) |
+| f9 | year | `(year - 2000) ^ 1` (power-up default decodes to 2014-01-01); on the 780 in Pete Jorgensen's notes it is `year - 2000` without the XOR, so this differs between boards | ✅ |
 | f5 | water temperature | `f5 ^ 2`; °C mode: half degrees (69 → 34.5 °C); °F mode: whole °F | ✅ |
 | f8 | set point | plain; °C: half degrees, °F: whole °F | ✅ |
 | f6 | heater mode | 32 Auto, 34 Eco, 36 Day (16 for <1 s at power-up) | ✅ |
@@ -768,7 +768,7 @@ issue with timestamps and what the panel showed.
 4. **f4** (always 6), **f11 bit 7**, remaining lights-frame bytes.
 5. **f1 bit 5 vs bit 6** — command vs. confirmation?
 6. **Light behaviour for presses 3.4–5.2 s apart.**
-7. Does the f7 date formula hold for every day (only verified against samples and by reasoning)?
+7. *(Answered 2026-11-07.)* The f7 date formula: `(day << 3) XOR month`, checked on an even day in July (see §6).
 8. Does Jets 1 low → high restart the 20 min jet timer?
 9. How Auto / Eco / Day change when the heater runs.
 10. **Language.** (a) How does f15 on the LANG edit screen depend on the screen key? Only three
