@@ -40,6 +40,7 @@ spot mistakes.
 
 Contents
 
+0. [Installation (quick start)](#installation-quick-start)
 1. [Credits and upstream](#1-credits-and-upstream)
 2. [Hardware and wiring](#2-hardware-and-wiring)
 3. [What is different from the 780 code](#3-what-is-different-from-the-780-code)
@@ -56,6 +57,86 @@ Contents
 14. [Known issues and limitations](#14-known-issues-and-limitations)
 15. [How to test / reproduce](#15-how-to-test--reproduce)
 16. [Development history](#16-development-history)
+
+---
+
+## Installation (quick start)
+
+You can download everything at once (**Code → Download ZIP** on GitHub, or `git clone`), but it is
+not a one-click install: the ESP32 part is copied into your ESPHome folder, and the Home Assistant
+part (optional) is pasted into Home Assistant by hand.
+
+**What you need**
+
+- A Sundance 680-series spa (see the tested model at the top), an ESP32, a TTL↔RS-485 module with
+  automatic direction control and a cable to header J15 (wiring and parts: [§2](#2-hardware-and-wiring)).
+- ESPHome 2026.10 or newer (tested with the ESPHome Device Builder add-on) and Home Assistant
+  (tested on core 2026.11).
+- Optional, for the phone features (Spa Audio): the Home Assistant Companion app on Android.
+
+**Steps**
+
+1. **Put the component in your ESPHome folder.** The component files are at the repository root,
+   so the whole repository goes into a folder called `sundance_spa` inside `components`:
+
+   ```bash
+   git clone --depth 1 https://github.com/GalKar83/sundance-rs485-controller /config/esphome/components/sundance_spa
+   ```
+
+   (or unzip the download there, so that `/config/esphome/components/sundance_spa/sundance_spa.h`
+   exists). The folder `components` must sit next to your device YAML.
+2. **Copy [example-680.yaml](example-680.yaml)** to `/config/esphome/sundance-spa.yaml` (any name).
+3. **Fill in `secrets.yaml`** (ESPHome Device Builder → *Secrets*) with the five values the example
+   refers to: `wifi_ssid`, `wifi_password`, `api_encryption_key` (a 32-byte base64 key; the Device
+   Builder can generate one, or `openssl rand -base64 32`), `ota_password` and
+   `fallback_ap_password`.
+4. **Check these places in the YAML** (everything else can stay as it is):
+
+   | Where | What to set |
+   |---|---|
+   | `substitutions: name / friendly_name` | the device name. Entity ids in Home Assistant start with it (`sundance_spa_…`); the Home Assistant files below assume `sundance-spa` / "Sundance Spa", so keep it, or replace the entity ids there |
+   | `esp32: … minimum_chip_revision: "3.1"` | the owner's chip is revision 3.1 and a firmware built for 3.1 will **not** boot on an older chip. Delete the line, or set your chip's revision |
+   | `uart: tx_pin / rx_pin` | your wiring (GPIO1 / GPIO3 in the example) |
+   | `sundance_spa: flow_control_pin` | only if your RS-485 module has DE/RE pins and no automatic direction (commented out in the example) |
+   | `sundance_spa: temperature_scale` | the unit you want in Home Assistant, `C` or `F` (the panel can show the other; the ESP converts) |
+   | `wifi: manual_ip` | optional static address (commented out; DHCP otherwise) |
+   | `number:` Power Controller / ClearRay / Light / Circulation / Jet Pump / Heater | the electrical power of each load, used only for the energy estimate. The defaults (15 / 20 / 5 / 370 / 1630 / 2700 W) are the tested spa's; change them later on the device page in Home Assistant |
+   | `logger: level` | `DEBUG` while setting up, `INFO` when it works |
+   | `raw_status_sensors`, `Raw …` entities | decoding aids; delete them if you do not need them |
+
+   The `time: platform: homeassistant` block must stay: the spa clock sync needs Home Assistant's time.
+5. **First flash, over USB, before anything is wired.** Connect the bare ESP32 to the computer
+   with a USB cable and compile and flash from the ESPHome Device Builder (*Install → Plug into
+   this computer*). Do this on the bench, before soldering or connecting it to the spa. Once it
+   has the Wi-Fi details and the secrets, every later update goes over Wi-Fi (OTA) and the box
+   never has to be opened again.
+6. **Wire it to the spa** as in §2 and power it from the spa. The example uses the ESP32's UART0
+   (TX = GPIO1, RX = GPIO3), so the serial log is switched off (`baud_rate: 0`) and the logs go
+   over Wi-Fi.
+7. **Check the first start.** The device appears in Home Assistant (*Settings → Devices &
+   services*, ESPHome). Within about a minute *Communication* is on and *Decoder Notice* says `OK`; the
+   menu-only values (Primary Filter, ClearRay days, …) are `unknown` for 2–4 minutes until the boot
+   read has run, and the spa clock is synced about two minutes after the first connection. If
+   *Communication* stays off, check the wiring and §5.
+
+**Home Assistant side (optional).** Nothing in [`homeassistant/`](homeassistant/README.md) is needed
+for the component; it is the owner's complete setup. To use it, in this order:
+
+1. **Helpers** ([`helpers/`](homeassistant/helpers)): create the `input_*` helpers and counters
+   (*Settings → Devices & services → Helpers*), then the template, utility-meter and integration
+   helpers listed in `config_entry_helpers.yaml` (the `device_id` was removed: assign them to your spa
+   device).
+2. **Scripts** ([`scripts/`](homeassistant/scripts)) and **automations**
+   ([`automations/`](homeassistant/automations)): create each one and paste the file with *Edit in YAML*.
+3. **Dashboard** ([`dashboard/`](homeassistant/dashboard)): add each file as a view, with the
+   dashboard's raw configuration editor. The cards use the Mushroom, card-mod and apexcharts custom cards.
+4. **Replace the placeholders** in what you pasted: `notify.mobile_app_your_phone` (and
+   `…_partner_phone`) with your phone's notify action, `person.owner` and
+   `device_tracker.owner_presence` with your person and presence entities, `sensor.load_power` with
+   your whole-house power sensor (only the optional power measurement uses it),
+   `sensor.person1_phone_…` / `Person 1` / `Person 2` with your phones and names (Spa Audio), and
+   enter the spa's Bluetooth MAC address in `input_text.spa_audio_bluetooth_mac` (the
+   [Home Assistant README](homeassistant/README.md#spa-audio-who-is-connected-what-is-playing) explains how).
 
 ---
 
