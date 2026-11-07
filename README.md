@@ -507,8 +507,12 @@ Panel presses last ~0.1 s.
 
 ## 8. Lights frame (0xCA) and the 680 light cycle
 
-Decoded lights frame: L1 = 100 on / 0 off, L4 = mode, L9 = blend speed (2 fast, 4 slow). L0 = 189
-and L5 = 255 constant so far; the rest has always been 0 (❓).
+Decoded lights frame (the fields the lights frame carries on the 680; from the light-cycle test of 30 Oct, in the order of the
+bytes after the fold): L0 = 189, L3 = 100 and L5 = 255 are constant; L1 = 100 on / 0 off (no brightness on the 680);
+L4 = mode; L9 = blend speed (2 fast, 4 slow, 0 for Frozen Blend); **L2, L6 and L8 carry the colour of the
+current mode** as blue, green and red channels (0–255): Blue (mode 2) L2 = 255, Green (3) L6 = 255,
+Red (6) L8 = 255, Violet (7) L2 = L8 = 127, Aqua (9) L2 = L6 = 127. The same byte positions are used by the 780
+bridge notes of Pete Jorgensen (brightness 1, mode 4, B 2, G 6, R 8, cycle time 9). L7 is 0 so far (❓).
 
 Panel cycle (press Light repeatedly, ≤3.4 s apart):
 
