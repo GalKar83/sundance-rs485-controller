@@ -393,6 +393,9 @@ Frame layout (unchanged from the 780):
 - Payloads of status (0xC4), lights (0xCA) and button (0xCC) frames are **XOR-folded**: each pair of
   bytes `(a, b)` decodes to one value `a ^ b ^ 0x01`. The field numbers below (f0…f15) refer to the
   decoded values.
+- The status (0xC4) and lights (0xCA) payloads have an odd length (33 and 29 bytes), so the fold leaves
+  the **last payload byte** unread. It is inside the CRC, it changes with every frame and its meaning is
+  not known (the diagnostic sensor *Raw Frame Tail* shows it, §12).
 
 Message types seen on a 680 (sensor *Bus Message Types*):
 
@@ -426,7 +429,7 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f0 | hour (24 h) | `f0 ^ 6` | ✅ |
 | f11 bits 0–6 | minute | plain | ✅ |
 | f11 bit 7 | ? | never seen set | ❓ |
-| f7 | day + month | `f7 = (day << 3) XOR month` (the same formula as in [Pete Jorgensen's 780 notes](https://github.com/pete-jorgensen/SundanceHotTub2MQTT)). Still ambiguous (22 Oct and 23 Feb both give 186), so the decoder picks the candidate nearest the HA date. The firmware currently uses an earlier formula, `((day ^ 1) << 3) + (month ^ 8)`, which gives the same values for odd days and for months 8–12 but is two days off on even days from January to July; setting the spa to 8 July (2026-11-07) showed it, and the update is in progress | ✅ (checked on the spa, 8 Jul → read as 6 Jul by the old formula) |
+| f7 | day + month | `f7 = (day << 3) XOR month` (the same formula as in [Pete Jorgensen's 780 notes](https://github.com/pete-jorgensen/SundanceHotTub2MQTT)). Still ambiguous (22 Oct and 23 Feb both give 186), so the decoder picks the candidate nearest the HA date | ✅ (checked on the spa: date set to 8 Jul 2026 → f7 = 71) |
 | f9 | year | `(year - 2000) ^ 1` (power-up default decodes to 2014-01-01); on the 780 in Pete Jorgensen's notes it is `year - 2000` without the XOR, so this differs between boards | ✅ |
 | f5 | water temperature | `f5 ^ 2`; °C mode: half degrees (69 → 34.5 °C); °F mode: whole °F | ✅ |
 | f8 | set point | plain; °C: half degrees, °F: whole °F | ✅ |
@@ -748,7 +751,8 @@ Temporary, `entity_category: diagnostic`, numeric where possible so they stay ou
 
 | Entity | Purpose |
 |---|---|
-| Raw F1, F2, F4, F10, F11, F13, F14, F15 | raw decoded status bytes in HA history (correlate with events without a live log) |
+| Raw F1, F2, F4, F7, F9, F10, F11, F13, F14, F15 | raw decoded status bytes in HA history (correlate with events without a live log) |
+| Raw Frame Tail | the unread last payload byte of the status and lights frames, with the screen key and each byte XOR the key; at most one update per 5 s |
 | Screen Key | the learned k |
 | Panel Button | last topside button (name, `Idle` from boot), held 1 s so short presses survive API state batching |
 | Raw Lights | decoded lights frame |

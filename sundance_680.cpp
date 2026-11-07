@@ -160,10 +160,12 @@ static const char *heater_mode_name_(int raw) {
   }
 }
 
-// f7 = ((day XOR 1) << 3) + (month XOR 8). Fits every sample: reset JAN 01 = 9, 22 Oct = 186,
-// 23 Feb = 186, 23 Oct = 178 (the midnight rollover that exposed the old day*8+month guess).
-// Still ambiguous (22 Oct == 23 Feb), so pick the candidate nearest HA's date.
-static int encode_spa_date_(int day, int month) { return (((day ^ 1) << 3) + (month ^ 8)) & 0xFF; }
+// f7 = (day << 3) XOR month. Verified on the spa on 2026-11-07 by setting the date to 8 Jul 2026 (= 71);
+// fits every earlier sample too: reset JAN 01 = 9, 22 Oct = 186, 23 Feb = 186, 23 Oct = 178. The old
+// ((day ^ 1) << 3) + (month ^ 8) matched those but gave the wrong day for even days Jan-Jul.
+// A day (1-31) never overflows the byte. Still ambiguous (22 Oct == 23 Feb: months m and m+8 differ
+// only in day bit 0), so pick the candidate nearest HA's date.
+static int encode_spa_date_(int day, int month) { return ((day << 3) ^ month) & 0xFF; }
 
 bool SundanceSpa::decode_spa_date_(int &year, int &month, int &day) const {
   if (this->prior_status_.size() < 16)
@@ -177,14 +179,13 @@ bool SundanceSpa::decode_spa_date_(int &year, int &month, int &day) const {
     if (now.is_valid())
       ref = (now.month - 1) * 31 + now.day_of_month;
   }
-  // The 30th of Jan-Jul overflows the byte (raw 257-263), so also try f7 + 256.
-  for (int i = 0; i < 24; i++) {
-    const int m = i % 12 + 1;
-    const int raw = f7 + (i < 12 ? 0 : 256);
-    const int rest = raw - (m ^ 8);
-    if (rest < 0 || rest % 8 != 0)
+  // f7 = (day << 3) XOR month: the low three bits are the month's, the rest the day (bit 0 of the day
+  // is flipped for months 9-12), so each month gives at most one day.
+  for (int m = 1; m <= 12; m++) {
+    const int rest = f7 ^ m;
+    if ((rest & 7) != 0)
       continue;
-    const int d = (rest >> 3) ^ 1;
+    const int d = rest >> 3;
     if (d < 1 || d > 31 || encode_spa_date_(d, m) != f7)
       continue;
     int dist = 0;

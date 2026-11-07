@@ -62,6 +62,7 @@ ACTIVITY_ITEMS = {
 }
 CONF_PANEL_BUTTON_SENSOR = "panel_button_sensor"
 CONF_RAW_LIGHTS_TEXT_SENSOR = "raw_lights_text_sensor"
+CONF_RAW_TAIL_TEXT_SENSOR = "raw_tail_text_sensor"
 CONF_MSG_TYPES_TEXT_SENSOR = "msg_types_text_sensor"
 CONF_RAW_OTHER_TEXT_SENSOR = "raw_other_text_sensor"
 CONF_TIME_TEXT_SENSOR = "time_text_sensor"
@@ -160,6 +161,9 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_RAW_LIGHTS_TEXT_SENSOR): text_sensor.text_sensor_schema(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC, icon="mdi:lightbulb-on-outline"
+            ),
+            cv.Optional(CONF_RAW_TAIL_TEXT_SENSOR): text_sensor.text_sensor_schema(
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC, icon="mdi:code-brackets"
             ),
             cv.Optional(CONF_MSG_TYPES_TEXT_SENSOR): text_sensor.text_sensor_schema(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC, icon="mdi:message-text-outline"
@@ -306,6 +310,10 @@ async def to_code(config):
     if CONF_RAW_LIGHTS_TEXT_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_RAW_LIGHTS_TEXT_SENSOR])
         cg.add(var.set_raw_lights_text_sensor(sens))
+
+    if CONF_RAW_TAIL_TEXT_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_RAW_TAIL_TEXT_SENSOR])
+        cg.add(var.set_raw_tail_text_sensor(sens))
 
     if CONF_MSG_TYPES_TEXT_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_MSG_TYPES_TEXT_SENSOR])

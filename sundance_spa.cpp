@@ -891,6 +891,10 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
     return;
 
   std::vector<uint8_t> data = xormsg(enc, enc_len);
+  if (enc_len % 2 == 1) {
+    this->status_tail_ = enc[enc_len - 1];
+    this->publish_raw_tail_();
+  }
   if (data.size() < 15) {
     ESP_LOGW(TAG, "Decoded status too short (%u)", static_cast<unsigned>(data.size()));
     return;
@@ -1010,6 +1014,26 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
   this->service_command_retries_();
 }
 
+// Shows the unread last payload byte of C4 and CA next to the screen key, so the "tail = key XOR constant" idea can
+// be checked from the history: C4^key and CA^key should then be the same number every day.
+void SundanceSpa::publish_raw_tail_() {
+  if (this->raw_tail_text_sensor_ == nullptr)
+    return;
+  // At most one update per 5 s, in case the byte changes on every frame (it would flood the recorder).
+  if (this->raw_tail_ms_ != 0 && millis() - this->raw_tail_ms_ < 5000)
+    return;
+  char buf[96];
+  const int key = this->screen_key_;
+  snprintf(buf, sizeof(buf), "C4 %d CA %d key %d C4^key %d CA^key %d", this->status_tail_, this->lights_tail_, key,
+           this->status_tail_ >= 0 ? (this->status_tail_ ^ key) : -1,
+           this->lights_tail_ >= 0 ? (this->lights_tail_ ^ key) : -1);
+  if (this->raw_tail_published_ == buf)
+    return;
+  this->raw_tail_published_ = buf;
+  this->raw_tail_ms_ = millis() | 1;
+  this->raw_tail_text_sensor_->publish_state(buf);
+}
+
 void SundanceSpa::parse_lights_update_(const std::vector<uint8_t> &frame) {
   if (frame.size() < 10)
     return;
@@ -1018,6 +1042,10 @@ void SundanceSpa::parse_lights_update_(const std::vector<uint8_t> &frame) {
   if (enc_len < 2)
     return;
   std::vector<uint8_t> data = xormsg(enc, enc_len);
+  if (enc_len % 2 == 1) {
+    this->lights_tail_ = enc[enc_len - 1];
+    this->publish_raw_tail_();
+  }
   if (data.size() < 5)
     return;
 
@@ -1196,7 +1224,8 @@ void SundanceSpa::handle_frame_(const std::vector<uint8_t> &frame) {
     case MSG_CC_REQ:
     case MSG_CC_REQ_ALT: {
       // Log topside button presses so the 680's button codes (light, menu, arrows) can be mapped
-      // from real presses. Payload is XOR-folded like status: code = b5 ^ b6 ^ 1. The panel sends
+      // from real presses. Payload is XOR-folded like status, so the logged value is b5 ^ b6 ^ 1 and the real
+      // button code is b5 ^ b6 (same as Pete's 780 codes; see btn below). The panel sends
       // this frame continuously with an idle code, so only log when a channel's code changes.
       if (this->channel_ < 0 || channel != static_cast<uint8_t>(this->channel_)) {
         static int16_t last_code[256];

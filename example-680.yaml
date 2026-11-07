@@ -172,6 +172,10 @@ sundance_spa:
       name: "Raw F2"
     - field: 4
       name: "Raw F4"
+    - field: 7
+      name: "Raw F7"
+    - field: 9
+      name: "Raw F9"
     - field: 10
       name: "Raw F10"
     - field: 11
@@ -188,6 +192,8 @@ sundance_spa:
     name: "Panel Button"
   raw_lights_text_sensor:
     name: "Raw Lights"
+  raw_tail_text_sensor:
+    name: "Raw Frame Tail"
   msg_types_text_sensor:
     name: "Bus Message Types"
   raw_other_text_sensor:

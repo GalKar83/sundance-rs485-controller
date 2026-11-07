@@ -162,6 +162,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   void set_raw_lights_text_sensor(text_sensor::TextSensor *s) { this->raw_lights_text_sensor_ = s; }
   void set_msg_types_text_sensor(text_sensor::TextSensor *s) { this->msg_types_text_sensor_ = s; }
   void set_raw_other_text_sensor(text_sensor::TextSensor *s) { this->raw_other_text_sensor_ = s; }
+  void set_raw_tail_text_sensor(text_sensor::TextSensor *s) { this->raw_tail_text_sensor_ = s; }
   void set_time_text_sensor(text_sensor::TextSensor *s) { this->time_text_sensor_ = s; }
   void set_heater_mode_text_sensor(text_sensor::TextSensor *s) { this->heater_mode_text_sensor_ = s; }
   void set_clearray_text_sensor(text_sensor::TextSensor *s) { this->clearray_text_sensor_ = s; }
@@ -323,6 +324,14 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   text_sensor::TextSensor *raw_lights_text_sensor_{nullptr};
   text_sensor::TextSensor *msg_types_text_sensor_{nullptr};
   text_sensor::TextSensor *raw_other_text_sensor_{nullptr};
+  // Diagnostic: the last payload byte of the status (0xC4) and lights (0xCA) frames, which the pair fold
+  // leaves unread (odd payload length). -1 = not seen yet. Pete (780): probably "frame key XOR 38", no data.
+  text_sensor::TextSensor *raw_tail_text_sensor_{nullptr};
+  int status_tail_{-1};
+  int lights_tail_{-1};
+  std::string raw_tail_published_;
+  uint32_t raw_tail_ms_{0};
+  void publish_raw_tail_();
   std::map<uint16_t, std::string> raw_other_last_;
   uint32_t raw_other_pub_ms_{0};
   text_sensor::TextSensor *uv_change_sensor_{nullptr};  // read from the UV menu, then counted down by the screen key
