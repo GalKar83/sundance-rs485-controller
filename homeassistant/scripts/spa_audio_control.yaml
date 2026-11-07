@@ -3,8 +3,9 @@ description: >-
   Controls the phone that is connected to the spa's Bluetooth audio (sensor.spa_audio): play/pause
   toggle, next or previous, through the Companion app's media command (notify command_media; needs
   Notification access for the app, the same as the Media session sensor). The target app is the one
-  the phone's Media session sensor reports as playing, otherwise its first session. Called by the
-  buttons under the Spa Audio row on the Hot Tub page.
+  the phone's Media session sensor reports as playing, otherwise its first session. After the
+  command the app is told to send its sensors at once (command_update_sensors), so the Spa Audio row
+  updates sooner. Called by the buttons under the Spa Audio row on the Hot Tub page.
 mode: queued
 max: 5
 fields:
@@ -44,3 +45,8 @@ sequence:
       data:
         media_command: '{{ (''pause'' if is_playing else ''play'') if command == ''toggle'' else command }}'
         media_package_name: '{{ pkg }}'
+  - delay:
+      milliseconds: 800
+  - action: '{{ svc }}'
+    data:
+      message: command_update_sensors
