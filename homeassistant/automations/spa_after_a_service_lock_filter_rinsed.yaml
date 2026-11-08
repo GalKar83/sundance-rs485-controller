@@ -1,0 +1,103 @@
+alias: 'Spa - After a Service Lock: filter rinsed?'
+description: >-
+  When a Service Lock (sensor.sundance_spa_lock) ends after 5+ minutes - released with Off in the
+  Lock dropdown, or by the spa itself after its 2 hours - the end time is stored in
+  input_datetime.spa_last_service_lock_end (also in the quiet hours; 'Spa - Ask: Filter/ClearRay
+  Bulb/Water Replaced?' uses it for the Filter counter). Outside the spa quiet hours 23:00-06:30 by
+  default, set on the Hot Tub Settings page it then asks the owner's phone 'Did you rinse your
+  filter?' (Rinsed / No); Rinsed sets input_datetime.last_rinse_filter to the time the lock ended
+  (the same as 'Spa - After an ESP outage: power cut or Wi-Fi drop' does after a power cut). When
+  the Filter Change counter is at 0 (sensor.sundance_spa_remaining_days_filter_change = Change Now)
+  the question also has a Replaced button, which sets input_datetime.last_replacement_filter_date to
+  the date the lock ended. Service Lock is used instead of switching the spa off only for filter
+  work (rinse or replace); a UV bulb or water change still needs the power off, so
+  input_datetime.spa_last_power_cut is NOT set here. No answer within 12 h: nothing changes. Created
+  2026-11-08.
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_lock
+    from: Service Lock
+    to: Off
+conditions:
+  - alias: Locked for at least 5 minutes
+    condition: template
+    value_template: '{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 300 }}'
+actions:
+  - variables:
+      ended: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
+      mins: >-
+        {{ ((as_timestamp(trigger.to_state.last_changed) -
+        as_timestamp(trigger.from_state.last_changed)) / 60) | round(0) | int }}
+      tag: spa_svl_rinse_{{ as_timestamp(now()) | int }}
+      repl: '{{ is_state(''sensor.sundance_spa_remaining_days_filter_change'', ''Change Now'') }}'
+  - alias: Remember when the lock ended (the filter replaced question looks at it)
+    action: input_datetime.set_datetime
+    target:
+      entity_id: input_datetime.spa_last_service_lock_end
+    data:
+      timestamp: '{{ ended }}'
+  - alias: Not in the spa quiet hours (the time is remembered above in any case)
+    condition: state
+    entity_id: binary_sensor.spa_quiet_hours
+    state: off
+  - action: notify.mobile_app_your_phone
+    data:
+      title: Spa Service Lock ended
+      message: >-
+        The spa was in Service Lock for about {{ mins }} min and was released at {{ ended |
+        timestamp_custom('%H:%M') }}. Did you rinse your filter?{{ ' The Filter Change counter is at
+        0 - was the filter replaced?' if repl else '' }}
+      data:
+        tag: '{{ tag }}'
+        actions: >-
+          {{ [{'action': 'YES_' ~ tag, 'title': 'Rinsed'}] + ([{'action': 'REPL_' ~ tag, 'title':
+          'Replaced'}] if repl else []) + [{'action': 'NO_' ~ tag, 'title': 'No'}] }}
+        sticky: true
+        persistent: true
+        clickAction: noAction
+        priority: high
+        ttl: 0
+  - wait_for_trigger:
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: YES_{{ tag }}
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: REPL_{{ tag }}
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: NO_{{ tag }}
+    timeout:
+      hours: 12
+    continue_on_timeout: true
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''YES_'' ~ tag }}'
+        sequence:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_rinse_filter
+            data:
+              timestamp: '{{ ended }}'
+            note: Time the lock ended, not the time of the answer
+      - conditions:
+          - condition: template
+            value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''REPL_'' ~ tag }}'
+        sequence:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: input_datetime.last_replacement_filter_date
+            data:
+              date: '{{ ended | timestamp_custom(''%Y-%m-%d'') }}'
+            note: Date the lock ended, not the date of the answer
+  - action: notify.mobile_app_your_phone
+    data:
+      message: clear_notification
+      data:
+        tag: '{{ tag }}'
+mode: parallel
+max: 3

@@ -17,21 +17,22 @@ description: >-
   unavailable -> off was missed on 31/10 07:41), with the run start from
   input_datetime.spa_in_use_since (set by "Spa - Track In Use Start", reset to 1970 once used); runs
   under 10 min are ignored as before. Revised 2026-11-01: no question in the spa quiet hours
-  23:00-06:30 - it waits and asks at 06:30. Revised 2026-11-06: a recorded soak first copies the old
-  input_datetime.last_soak to input_datetime.spa_previous_soak (shown as 'Previous Soak' on the Hot
-  Tub page).
+  23:00-06:30 by default, set on the Hot Tub Settings page - it waits and asks when they end.
+  Revised 2026-11-06: a recorded soak first copies the old input_datetime.last_soak to
+  input_datetime.spa_previous_soak (shown as 'Previous Soak' on the Hot Tub page). Revised
+  2026-11-08: quiet hours from binary_sensor.spa_quiet_hours (the two time helpers).
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_in_use
-    not_from: 'off'
-    to: 'off'
+    not_from: off
+    to: off
     note: >-
       Any change to off, also via unavailable (a WiFi blip at the moment the jets stop) - the run
       start comes from input_datetime.spa_in_use_since.
 conditions:
   - condition: state
     entity_id: input_boolean.spa_session_merging
-    state: 'off'
+    state: off
     note: >-
       A run that ends while an earlier session is still collecting follow-up runs is merged into
       that one, not asked about separately.
@@ -62,7 +63,7 @@ actions:
         - wait_for_trigger:
             - trigger: state
               entity_id: binary_sensor.sundance_spa_in_use
-              to: 'on'
+              to: on
           timeout:
             minutes: 5
           continue_on_timeout: true
@@ -76,7 +77,7 @@ actions:
             - wait_for_trigger:
                 - trigger: state
                   entity_id: binary_sensor.sundance_spa_in_use
-                  to: 'off'
+                  to: off
               timeout:
                 hours: 3
               continue_on_timeout: true
@@ -105,11 +106,11 @@ actions:
   - variables:
       prompt: '{{ minutes | round(0) | int }} min. Was it soaking or maintenance?'
     note: After the follow-up runs are merged.
-  - wait_template: '{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}'
+  - wait_template: '{{ is_state(''binary_sensor.spa_quiet_hours'', ''off'') }}'
     timeout:
       hours: 8
     continue_on_timeout: true
-    note: 'Spa quiet hours 23:00-06:30: ask at 06:30. The recorded times stay those of the session.'
+    note: 'Spa quiet hours (set on the Hot Tub Settings page): ask when they end.'
   - repeat:
       sequence:
         - action: notify.mobile_app_your_phone

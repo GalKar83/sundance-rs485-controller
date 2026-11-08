@@ -5,12 +5,15 @@ description: >-
   or type a new one (in the unit the panel shows, °C 18-40 in 0.5 steps or °F 65-104). Asked when a
   soak is recorded (input_datetime.last_soak from 1 h before the water should be ready), or 2 h
   after it should have been ready if nobody soaked (ready = the event start for ready-by, start +
-  estimated heating time for a 'start' event). Never in the spa quiet hours 23:00-06:30: then at
-  06:30. No answer within 12 h: nothing changes. Created 2026-11-03. Revised 2026-11-03:
-  answer/typed/new_c pre-defined before the repeat - set only inside it they stayed local, so Back
-  and Set would not have applied. A one-off plan stays listed until this ends (state 'done'); the
-  5-min cleanup of 'Spa - Heating plans' then removes it. Revised 2026-11-05: after the answer or
-  the 12 h timeout, a Heater Mode that the plan switched to Auto goes back to Eco / Day.
+  estimated heating time for a 'start' event). Never in the spa quiet hours 23:00-06:30 by default,
+  set on the Hot Tub Settings page: then when they end. No answer within 12 h: nothing changes.
+  Created 2026-11-03. Revised 2026-11-03: answer/typed/new_c pre-defined before the repeat - set
+  only inside it they stayed local, so Back and Set would not have applied. A one-off plan stays
+  listed until this ends (state 'done'); the 5-min cleanup of 'Spa - Heating plans' then removes it.
+  Revised 2026-11-05: after the answer or the 12 h timeout, a Heater Mode that the plan switched to
+  Auto goes back to Eco / Day. Revised 2026-11-08: quiet hours from binary_sensor.spa_quiet_hours
+  (the two time helpers). Revised 2026-11-08: after the question a Temperature or Settings Lock that
+  the plan released (input_text.spa_plan_previous_lock) is put back.
 triggers:
   - trigger: state
     entity_id: input_datetime.last_soak
@@ -58,11 +61,11 @@ actions:
       answer / typed / new_c are defined here so the values set inside the repeat reach the choose
       after it (a variables action inside a sequence only changes variables that already exist
       outside it).
-  - wait_template: '{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}'
+  - wait_template: '{{ is_state(''binary_sensor.spa_quiet_hours'', ''off'') }}'
     timeout:
       hours: 8
     continue_on_timeout: true
-    note: 'Spa quiet hours 23:00-06:30: ask at 06:30.'
+    note: 'Spa quiet hours (set on the Hot Tub Settings page): ask when they end.'
   - repeat:
       sequence:
         - action: notify.mobile_app_your_phone
@@ -181,4 +184,26 @@ actions:
         data:
           value: ''
     note: Heater Mode back to Eco / Day after the plan ('Spa - Heating plans' switched it to Auto).
+  - alias: Put a Temperature or Settings Lock back that the plan released
+    if:
+      - condition: template
+        value_template: '{{ states(''input_text.spa_plan_previous_lock'') in [''Temperature Lock'', ''Settings Lock''] }}'
+    then:
+      - if:
+          - condition: state
+            entity_id: sensor.sundance_spa_lock
+            state: Off
+        then:
+          - action: select.select_option
+            target:
+              entity_id: select.sundance_spa_lock_setting
+            data:
+              option: '{{ states(''input_text.spa_plan_previous_lock'') }}'
+        note: Not if someone already set another lock meanwhile.
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_plan_previous_lock
+        data:
+          value: ''
+    note: '''Spa - Heating plans'' released the lock when the heating started.'
 mode: single

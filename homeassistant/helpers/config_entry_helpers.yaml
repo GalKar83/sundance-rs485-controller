@@ -580,3 +580,18 @@
       default('', true) -%}{%- set a = m.attributes['artist_' ~ ns.pkg] | default('', true) -%}{{
       ('' if ns.playing else 'Paused: ') ~ t ~ ((' – ' ~ a) if a else '') }}{%- endif -%}
     template_type: sensor
+- domain: template
+  title: Spa Unmapped Alert Bits
+  options:
+    name: Spa Unmapped Alert Bits
+    device_class: problem
+    state: >-
+      {{ (states('sensor.sundance_spa_raw_f10') | float(0) | int | bitwise_and(47)) > 0 }}
+    template_type: binary_sensor
+- domain: template
+  title: Spa Quiet Hours
+  options:
+    name: Spa Quiet Hours
+    state: >-
+      {%- set n = now().strftime('%H:%M:%S') -%}{%- set s = states('input_datetime.spa_quiet_hours_start') -%}{%- set e = states('input_datetime.spa_quiet_hours_end') -%}{%- if s in ['unknown', 'unavailable', ''] or e in ['unknown', 'unavailable', ''] -%}false{%- elif s > e -%}{{ n >= s or n < e }}{%- else -%}{{ s <= n < e }}{%- endif -%}
+    template_type: binary_sensor

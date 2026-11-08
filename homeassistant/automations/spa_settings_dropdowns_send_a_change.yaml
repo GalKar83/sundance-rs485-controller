@@ -4,7 +4,11 @@ description: >-
   to the spa through the ESP's setting controls (number.sundance_spa_primary_filter_start_hour /
   _filter_change_days / _clearray_days / _water_refresh_days; Off = 0). The ESP walks the topside
   menu; the dropdown then follows the value read back ('Spa - Settings dropdowns: follow the spa'),
-  so a failed change returns to the old value. Created 2026-11-03.
+  so a failed change returns to the old value. Created 2026-11-03. Revised 2026-11-08: only a change
+  made by a person (context user_id set) is sent. The follow-the-spa automation also changes these
+  dropdowns, copying the live values the ESP publishes while it walks the menu (e.g. 165, 170, 180,
+  Off, 10), and that fed back into a second write: Filter Change 165 -> 10 was saved, then the stale
+  intermediate Off was written.
 triggers:
   - trigger: state
     entity_id: input_select.spa_set_pf_start
@@ -31,6 +35,9 @@ triggers:
       - unknown
       - unavailable
 actions:
+  - alias: Only a pick made by a person on the dashboard
+    condition: template
+    value_template: '{{ trigger.to_state.context.user_id is not none }}'
   - variables:
       src: >-
         {{ {'pf': 'sensor.sundance_spa_primary_filter_start', 'fc':

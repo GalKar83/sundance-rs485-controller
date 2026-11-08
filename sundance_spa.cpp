@@ -503,12 +503,16 @@ void SundanceSpa::send_existing_client_response_() {
   this->send_raw_(frame);
 }
 
-void SundanceSpa::on_set_temp(float temp) {
+bool SundanceSpa::on_set_temp(float temp) {
   const float tmin = this->get_min_temperature();
   const float tmax = this->get_max_temperature();
   if (std::isnan(temp) || temp < tmin - 0.25f || temp > tmax + 0.25f) {
     ESP_LOGW(TAG, "Set temperature %.1f out of range [%.1f, %.1f]", temp, tmin, tmax);
-    return;
+    return false;
+  }
+  if (const char *lk = this->lock_blocking_(LOCKUSE_TEMP)) {
+    this->decoder_notice_(std::string("Temperature not changed: ") + lk + " is on");
+    return false;
   }
   this->wanted_temp_ = this->display_to_native_temp_(temp);
   this->command_attempts_ = 0;
@@ -516,6 +520,7 @@ void SundanceSpa::on_set_temp(float temp) {
   ESP_LOGI(TAG, "Target temperature %.1f requested (native=%d, current set=%.1f)", temp, this->wanted_temp_,
            this->set_temp_);
   this->service_command_retries_();
+  return true;
 }
 
 void SundanceSpa::set_light_level(const std::string &level_name) {
@@ -580,6 +585,10 @@ void SundanceSpa::set_light_color(const std::string &color_name) {
 }
 
 void SundanceSpa::on_toggle_circ() {
+  if (const char *lk = this->lock_blocking_(LOCKUSE_JETS)) {
+    this->decoder_notice_(std::string("Circulation not changed: ") + lk + " is on");
+    return;
+  }
   // One ClearRay / circ button press — same as the topside. Do not enter the
   // wanted_pump_ retry loop: during auto filter/heat the spa often will not
   // latch a separate "manual" bit, and retries just thrash the button.
@@ -597,6 +606,10 @@ void SundanceSpa::set_pump(uint8_t pump, bool on) {
   }
   // Circ is not a reliable on/off target while auto filter/heat may own it.
   // Prefer the Circulation button (single ClearRay press) instead of a switch.
+  if (const char *lk = this->lock_blocking_(LOCKUSE_JETS)) {
+    this->decoder_notice_(std::string(pump == 2 ? "Circulation" : "Jet") + " not changed: " + lk + " is on");
+    return;
+  }
   if (pump == 2) {
     ESP_LOGI(TAG, "Circ set_pump(%s) → single ClearRay press (no state seek)", on ? "ON" : "OFF");
     this->wanted_pump_[2] = NO_CHANGE_REQUESTED;
@@ -638,6 +651,10 @@ bool SundanceSpa::auto_filtration_() const { return this->circ_on_ && (!this->ma
 void SundanceSpa::set_jet1_mode(int mode) {
   if (this->channel_ < 0) {
     ESP_LOGW(TAG, "Cannot set Jet 1 — no channel yet");
+    return;
+  }
+  if (const char *lk = this->lock_blocking_(LOCKUSE_JETS)) {
+    this->decoder_notice_(std::string("Jet 1 not changed: ") + lk + " is on");
     return;
   }
   if (mode == JET1_LOW && this->auto_filtration_() && this->jet1_mode_() == JET1_OFF) {

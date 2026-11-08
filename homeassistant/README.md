@@ -5,10 +5,10 @@ scripts and the dashboard pages. It is the owner's complete working setup, expor
 Assistant's own files with the personal names replaced. Nothing in it is needed for the component
 to work; take what you want.
 
-- [`automations/`](automations) — one YAML file per automation (19; the optional power-measurement ones are in
+- [`automations/`](automations) — one YAML file per automation (23; the optional power-measurement ones are in
   [`optional/`](optional/power-measurement)). Paste it into a new
   automation with *Edit in YAML*.
-- [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), and the plan scripts
+- [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), `spa_deliver_night_alerts_now` (sends the queue at once), and the plan scripts
   `spa_plan_add`, `spa_plan_delete` and `spa_target_step`.
 - [`helpers/`](helpers) — the helpers the automations use: `input_boolean`, `input_number`,
   `input_text`, `input_datetime`, `input_select` and `counter` (create them in the UI with these
@@ -58,10 +58,13 @@ Contents
 
 ## 1. Design rules
 
-- **Quiet hours 23:00–06:30.** No spa notification reaches the phone at night:
+- **Quiet hours (default 23:00–06:30, set on the Settings page).** No spa notification reaches the phone at night.
+  The window is the two time helpers `input_datetime.spa_quiet_hours_start` / `_end` (shown as *Quiet Hours Start / End*
+  on the Settings page, with a status card); `binary_sensor.spa_quiet_hours` says whether it is on now. Never hard-code the hours.
   - *Information* goes through `script.spa_notify`, which queues it in
-    `input_text.spa_night_alerts`. The queue is sent as one notification at 06:30.
-  - *Questions* (with Yes/No buttons) wait until 06:30 inside their own automation, so the
+    `input_text.spa_night_alerts`. The queue is sent as one notification when the quiet hours end, or at once
+    by tapping the status card (`script.spa_deliver_night_alerts_now`).
+  - *Questions* (with Yes/No buttons) wait until the quiet hours end inside their own automation, so the
     buttons stay attached. The times they record are those of the event, not of the answer.
 - **No long-lived state in waits.** Saving any automation reloads all automations and cancels
   every running wait. Anything that must survive (an open heating run, the start of a jet run) is
@@ -100,6 +103,9 @@ Contents
 | `input_text.spa_temp_last_drop` | text, max 60 | last temperature drop `ts;temp` |
 | `input_text.spa_night_alerts` | text, max 255 | notifications queued in the quiet hours |
 | `input_text.spa_decoder_seen` | text, max 255 | keys already reported by the raw-decoding automation |
+| `input_select.spa_set_lock` | Off / Access Lock / Temperature Lock / Settings Lock / Service Lock | the Lock dropdown on the Settings page (see *Locks* below) |
+| `input_datetime.spa_quiet_hours_start`, `input_datetime.spa_quiet_hours_end` | time only | the quiet hours, set on the Settings page |
+| `input_datetime.spa_last_service_lock_end` | date and time | when the last Service Lock (5+ min) ended |
 
 ### Template helpers (sensor; assigned to the Sundance Spa device)
 
@@ -115,6 +121,12 @@ Contents
 
 The date sensors only exist to show a date in DD/MM/YYYY format on the dashboard. They show
 nothing until the first date is recorded.
+
+Two template **binary sensors** (also in `config_entry_helpers.yaml`):
+
+- `binary_sensor.spa_quiet_hours` — on while now is inside the quiet hours (the window may cross midnight).
+- `binary_sensor.spa_unmapped_alert_bits` — on while one of the status bits `f10` 0–3 or 5 is set. Nobody has seen them set yet
+  (main README §6); it is a guess that an error sets them, used for the "the spa reports an error" banner.
 
 ### Heating plans, reminders and settings (added 3–6 Nov)
 
@@ -243,7 +255,10 @@ The chain from power to energy:
 | `spa_after_esp_outage` | after the ESP was offline: power cut → filter-rinse question; Wi-Fi drop → adds the estimated energy | details below |
 | `spa_record_last_heating` | "lowest → highest °C · minutes · start" of each heating run | stateless, see §1 |
 | `spa_decoder_notice` | forwards the ESP's Decoder Notice | through `spa_notify` |
-| `spa_deliver_night_alerts` | sends the overnight queue at 06:30 | also on HA start, if HA was down at 06:30 |
+| `spa_deliver_night_alerts` | sends the held queue when the quiet hours end | also on HA start, if HA was down then |
+| `spa_lock_dropdown_follow_the_spa` / `send_a_change` | the Lock dropdown shows the spa's lock and sends a pick through `select.sundance_spa_lock_setting` | see *Locks* below |
+| `spa_after_a_service_lock_filter_rinsed` | after a Service Lock of 5+ min: "Did you rinse your filter?" (Rinsed / Replaced / No) | *Replaced* only when the Filter Change counter is at 0; stores the end time for the replaced question |
+| `spa_service_counter_reached_0` | phone notice when Filter Change, ClearRay or Water reaches 0 (`Change Now`) | through `spa_notify`, so held in the quiet hours |
 | `spa_panel_used_while_away` | alerts once per absence when someone presses a panel button | the Panel Button entity sees only physical presses |
 | `spa_raw_decoding_values_changed` | optional, diagnostic: reports unknown status values once | only while the raw entities exist |
 | `Spa - Heating plans` | runs the plans of the Scheduled Plans page | details below |
@@ -306,6 +321,32 @@ matching ESP control when the dropdown is set to a different grid value; the ESP
 (main README §10), and a failed change makes the dropdown return to the old value because it
 follows the read-back. Primary Filter cycles and duration, Heater Mode and the temperature format
 are plain ESP selects shown on the page.
+
+### Locks
+
+The Settings page has a **Lock** dropdown (`input_select.spa_set_lock`) with the same names as the ESP's Lock sensor.
+`follow the spa` keeps it on `sensor.sundance_spa_lock`; `send a change` (only for a pick made by a person) calls
+`select.sundance_spa_lock_setting`, and puts the dropdown back on the real lock if the spa has not taken it within 120 s.
+Off releases any lock, including a Service Lock, which also ends by itself after 2 hours.
+There is no confirmation question, on purpose.
+
+While a lock is on, the controls it blocks are **greyed out** on the Hot Tub and Settings pages (a grey, non-tappable twin
+of the card is shown instead, selected by the card's `visibility` on `sensor.sundance_spa_lock`): Temperature Lock — the
+temperature card and −/+; Access and Service Lock — also Jet 1, Jet 2, Manual circulation and the light; Settings, Access
+and Service Lock — the settings, *Sync Clock* and *Read Settings*. The ESP also refuses these commands at once
+(a Decoder Notice such as `Temperature not changed: Temperature Lock is on`), and a heating plan that starts under a lock
+sends a phone notice instead of failing silently. A **Temperature or Settings Lock is released when a plan's heating starts** (kept in
+`input_text.spa_plan_previous_lock`) and put back by *Ready by: ask what next* after the plan; an Access or Service Lock is never
+released automatically, the plan then sends the "Spa heating plan blocked" notice. After a Service Lock the filter-rinse question is asked
+(`spa_after_a_service_lock_filter_rinsed`), because a Service Lock replaces switching the spa off for filter work.
+
+### Alerts
+
+A red banner at the top of the Hot Tub page shows while a service counter is at 0 (`Change Now` — filter, ClearRay bulb,
+water) and while `binary_sensor.spa_unmapped_alert_bits` is on ("the spa reports an error", not decoded yet). It disappears
+when the counter is reset or the bits clear. The phone notice for a counter at 0 is `spa_service_counter_reached_0`; the
+raw-decoding automation reports a new unknown status value once. What a real panel alert looks like in the frames is
+still being captured (main README §13).
 
 ### Reminders
 
@@ -435,6 +476,8 @@ The Hot Tub view uses the *sections* layout and has these sections:
   row. A Temperature row with −/+ (one panel step), and *Current Status*, which also says
   `Heating blocked (Eco until 17:00)` when the heater mode keeps the heater off and the water is
   at least 1° under the target.
+- **Alert banner:** red rows at the very top, only while a counter is at 0 or the spa reports an error (see *Alerts*).
+  Controls blocked by an active lock are greyed out (see *Locks*).
 - **Next plan:** one row that appears only when an enabled future plan exists (`sensor.spa_next_plan`).
 - **Temperature chart:** 24 h of water and target temperature, with heating runs in red; the
   header numbers use the raw value and `update_delay` so they follow live.
@@ -452,8 +495,9 @@ A plan is deleted only with the trash icon, never by tapping its row.
 
 **Settings:** Heating (Heater Mode with an Eco/Day explanation card, Primary Filter start / cycles /
 duration — the cycles and duration are not greyed out in Eco or Day because they apply in every
-mode), the three service counters as dropdowns, temperature format, language (display only, with
-no write), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 hours* line under them (the measured
+mode), the three service counters as dropdowns, temperature format, the **Lock** dropdown with an explanation of the
+selected lock, language (display only, with no write), the **Notifications** block (quiet hours start and end, and a card that
+says whether the quiet hours are on and how many messages wait; tap it to send them), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 hours* line under them (the measured
 power against the setting from the optional power measurement, same text as its weekly summary;
 without a house power sensor it only says "no valid measurement"), and a Diagnostics block
 (Status, Wi-Fi signal, Decoder Notice).

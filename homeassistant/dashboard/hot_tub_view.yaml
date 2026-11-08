@@ -8,6 +8,80 @@ max_columns: 4
 sections:
   - type: grid
     cards:
+      - type: custom:mushroom-template-card
+        primary: 'Spa alert: change the filter'
+        secondary: The Filter Change counter reached 0. Shown until the counter is reset.
+        icon: mdi:air-filter
+        icon_color: red
+        multiline_secondary: true
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+        card_mod:
+          style: 'ha-card { border: 2px solid var(--error-color); }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_remaining_days_filter_change
+            state: Change Now
+      - type: custom:mushroom-template-card
+        primary: 'Spa alert: change the ClearRay bulb'
+        secondary: The ClearRay Bulb counter reached 0. Shown until the counter is reset.
+        icon: mdi:lightbulb-fluorescent-tube
+        icon_color: red
+        multiline_secondary: true
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+        card_mod:
+          style: 'ha-card { border: 2px solid var(--error-color); }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_remaining_days_clearray_bulb
+            state: Change Now
+      - type: custom:mushroom-template-card
+        primary: 'Spa alert: change the water'
+        secondary: The Water Refresh counter reached 0. Shown until the counter is reset.
+        icon: mdi:water-sync
+        icon_color: red
+        multiline_secondary: true
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+        card_mod:
+          style: 'ha-card { border: 2px solid var(--error-color); }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_remaining_days_water_refresh
+            state: Change Now
+      - type: custom:mushroom-template-card
+        primary: 'Spa alert: the spa reports an error'
+        secondary: >-
+          There is an error on the spa (not decoded yet - see the spa panel). Shown until the spa
+          clears it.
+        icon: mdi:alert-circle
+        icon_color: red
+        multiline_secondary: true
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+        card_mod:
+          style: 'ha-card { border: 2px solid var(--error-color); }'
+        visibility:
+          - condition: state
+            entity: binary_sensor.spa_unmapped_alert_bits
+            state: 'on'
       - type: heading
         heading: Control Panel
         heading_style: title
@@ -17,14 +91,95 @@ sections:
         name: Jet 1
         grid_options:
           columns: 6
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Jet 1
+        secondary: '{{ states(''switch.sundance_spa_jet_1'') | capitalize }} · locked'
+        icon: mdi:lock
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Service Lock
+        grid_options:
+          columns: 6
       - type: tile
         entity: switch.sundance_spa_jet_2
         name: Jet 2
         grid_options:
           columns: 6
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Jet 2
+        secondary: '{{ states(''switch.sundance_spa_jet_2'') | capitalize }} · locked'
+        icon: mdi:lock
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Service Lock
+        grid_options:
+          columns: 6
       - type: tile
         entity: switch.sundance_spa_circulation
         name: Manual
+        grid_options:
+          columns: 6
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Manual
+        secondary: '{{ states(''switch.sundance_spa_circulation'') | capitalize }} · locked'
+        icon: mdi:lock
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Service Lock
         grid_options:
           columns: 6
       - type: tile
@@ -52,6 +207,34 @@ sections:
         grid_options:
           columns: full
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Light
+        secondary: '{{ states(''select.sundance_spa_light'') }} · locked'
+        icon: mdi:lightbulb
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Service Lock
+        grid_options:
+          columns: full
+          rows: 1
       - type: custom:mushroom-template-card
         entity: climate.sundance_spa
         primary: Temperature
@@ -70,6 +253,43 @@ sections:
           rows: 1
         card_mod:
           style: 'ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Temperature Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Temperature
+        secondary: >-
+          {%- set pf = is_state('sensor.sundance_spa_temperature_format', '°F') -%}{%- set w =
+          state_attr('climate.sundance_spa', 'current_temperature') | float(0) -%}{%- set g =
+          state_attr('climate.sundance_spa', 'temperature') | float(0) -%}{%- if pf -%}Water {{ (w *
+          9 / 5 + 32) | round(0) | int }}°F · Target {{ (g * 9 / 5 + 32) | round(0) | int }}°F{%-
+          else -%}Water {{ '%.1f' % w }}°C · Target {{ '%.1f' % g }}°C{%- endif -%} · locked
+        icon: mdi:thermometer
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: >-
+            ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }
+            ha-card { opacity: 0.45; }
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Temperature Lock
+              - Service Lock
+        grid_options:
+          columns: 8
+          rows: 1
       - type: custom:mushroom-template-card
         primary: ''
         secondary: ''
@@ -84,6 +304,37 @@ sections:
         grid_options:
           columns: 2
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Temperature Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: Locked
+        icon: mdi:minus
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Temperature Lock
+              - Service Lock
+        grid_options:
+          columns: 2
+          rows: 1
+        layout: vertical
       - type: custom:mushroom-template-card
         primary: ''
         secondary: ''
@@ -98,6 +349,37 @@ sections:
         grid_options:
           columns: 2
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Temperature Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: ''
+        secondary: Locked
+        icon: mdi:plus
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Temperature Lock
+              - Service Lock
+        grid_options:
+          columns: 2
+          rows: 1
+        layout: vertical
       - type: custom:mushroom-template-card
         entity: sensor.sundance_spa_primary_filter
         primary: Current Status

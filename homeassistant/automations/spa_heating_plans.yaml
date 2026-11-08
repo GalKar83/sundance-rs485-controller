@@ -39,7 +39,13 @@ description: >-
   once; its own writes re-run it once with no effect. Revised 2026-11-03 (owner): a one-off plan is
   removed not before its plan time and not before the water reached the target (triggers:
   ready_check at the plan time, input_text.spa_ready_notified when the target is reached). The
-  Back/Keep/Set question follows independently (state).
+  Back/Keep/Set question follows independently (state). Revised 2026-11-08: when a lock (Access,
+  Temperature or Service Lock; Settings Lock only for the Eco/Day Heater Mode switch) blocks the
+  plan start, a phone notice says so; the ESP refuses the command at once with a Decoder Notice.
+  Revised 2026-11-08 (owner): a Temperature or Settings Lock is released when the plan's heating
+  starts (the lock is kept in input_text.spa_plan_previous_lock) and put back by 'Spa - Ready by:
+  ask what next'; an Access or Service Lock is never released automatically - then the phone notice
+  'Spa heating plan blocked' is sent.
 triggers:
   - trigger: homeassistant
     event: start
@@ -76,7 +82,7 @@ triggers:
     id: params
   - trigger: state
     entity_id: binary_sensor.sundance_spa_status
-    to: 'on'
+    to: on
     id: esp_back
   - trigger: state
     entity_id: input_text.spa_ready_by_state
@@ -87,7 +93,7 @@ triggers:
 conditions:
   - condition: state
     entity_id: binary_sensor.sundance_spa_status
-    state: 'on'
+    state: on
     note: >-
       Settings can only be sent while the ESP is connected; the esp_back trigger catches up after a
       drop.
@@ -225,6 +231,38 @@ actions:
           entity_id: input_text.spa_ready_by_state
         data:
           value: '{{ pick.start }};{{ prev }};{{ pick.target }};heat;{{ ref }}'
+      - alias: Release a Temperature or Settings Lock for the plan
+        if:
+          - condition: state
+            entity_id: sensor.sundance_spa_lock
+            state:
+              - Temperature Lock
+              - Settings Lock
+        then:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ states('input_text.spa_plan_previous_lock') in ['', 'unknown', 'unavailable']
+                  }}
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.spa_plan_previous_lock
+                data:
+                  value: '{{ states(''sensor.sundance_spa_lock'') }}'
+            note: Keeps the first lock if the plan event is replaced by another one.
+          - action: select.select_option
+            target:
+              entity_id: select.sundance_spa_lock_setting
+            data:
+              option: Off
+          - wait_template: '{{ is_state(''sensor.sundance_spa_lock'', ''Off'') }}'
+            timeout: 00:00:30
+            continue_on_timeout: true
+        note: >-
+          Temperature and Settings Lock would block the set point or the Heater Mode switch. 'Spa -
+          Ready by: ask what next' puts the lock back after the plan. Access and Service Lock are
+          never released automatically.
       - if:
           - condition: template
             value_template: '{{ setp != pick.target }}'
@@ -280,4 +318,16 @@ actions:
             min of heating).{%- endif -%}{{ ' Heater Mode switched to Auto for this plan (was ' ~
             old_mode ~ ').' if old_mode in ['Eco', 'Day'] else '' }}
           tag: spa_ready_by
+      - alias: Tell the phone when a lock blocks the plan
+        if:
+          - condition: template
+            value_template: '{{ states(''sensor.sundance_spa_lock'') not in [''Off'', ''unknown'', ''unavailable''] }}'
+        then:
+          - action: script.spa_notify
+            data:
+              title: Spa heating plan blocked
+              message: >-
+                The spa is in {{ states('sensor.sundance_spa_lock') }}, so the heating plan may not
+                have started. Release the lock in Hot Tub Settings.
+              tag: spa_ready_by
 mode: queued

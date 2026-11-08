@@ -35,6 +35,36 @@ sections:
         grid_options:
           columns: full
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Heater Mode
+        secondary: '{{ states(''select.sundance_spa_heater_mode_setting'') }} · locked'
+        icon: mdi:radiator
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+        grid_options:
+          columns: full
+          rows: 1
       - type: heading
         heading: Primary Filter
         heading_style: subtitle
@@ -49,6 +79,36 @@ sections:
         features_position: inline
         tap_action:
           action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Start
+        secondary: '{{ states(''input_select.spa_set_pf_start'') }} · locked'
+        icon: mdi:clock-start
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
         grid_options:
           columns: full
           rows: 1
@@ -68,6 +128,38 @@ sections:
         grid_options:
           columns: full
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Cycles
+        secondary: >-
+          {%- set x = states('select.sundance_spa_primary_filter_cycles_setting') -%}{{ (x ~ ' per
+          day') if x | is_number else x }} · locked
+        icon: mdi:sync
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+        grid_options:
+          columns: full
+          rows: 1
       - type: custom:mushroom-template-card
         entity: select.sundance_spa_primary_filter_duration_setting
         primary: Duration
@@ -81,6 +173,38 @@ sections:
         features_position: inline
         tap_action:
           action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Duration
+        secondary: >-
+          {%- set x = states('select.sundance_spa_primary_filter_duration_setting') -%}{{ x ~ ('
+          hour' if x == '1' else ' hours') if x | is_number else x }} · locked
+        icon: mdi:timer-outline
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
         grid_options:
           columns: full
           rows: 1
@@ -114,6 +238,38 @@ sections:
         grid_options:
           columns: full
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Filter Change
+        secondary: >-
+          {%- set x = states('input_select.spa_set_filter_change') -%}{{ (x ~ ' days') if x |
+          is_number else x }} · locked
+        icon: mdi:air-filter
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+        grid_options:
+          columns: full
+          rows: 1
       - type: custom:mushroom-template-card
         entity: input_select.spa_set_clearray
         primary: ClearRay
@@ -130,6 +286,38 @@ sections:
         grid_options:
           columns: full
           rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: ClearRay
+        secondary: >-
+          {%- set x = states('input_select.spa_set_clearray') -%}{{ (x ~ ' days') if x | is_number
+          else x }} · locked
+        icon: mdi:lightbulb-fluorescent-tube
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+        grid_options:
+          columns: full
+          rows: 1
       - type: custom:mushroom-template-card
         entity: input_select.spa_set_water_refresh
         primary: Water Refresh
@@ -143,6 +331,38 @@ sections:
         features_position: inline
         tap_action:
           action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Water Refresh
+        secondary: >-
+          {%- set x = states('input_select.spa_set_water_refresh') -%}{{ (x ~ ' days') if x |
+          is_number else x }} · locked
+        icon: mdi:water-sync
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
         grid_options:
           columns: full
           rows: 1
@@ -163,12 +383,66 @@ sections:
         grid_options:
           columns: full
           rows: 1
-      - type: tile
-        entity: sensor.sundance_spa_lock
-        name: Lock
-        icon: mdi:lock
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Temperature Format
+        secondary: '{{ states(''select.sundance_spa_temperature_format_setting'') }} · locked'
+        icon: mdi:temperature-celsius
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
         grid_options:
-          columns: 6
+          columns: full
+          rows: 1
+      - type: custom:mushroom-template-card
+        entity: input_select.spa_set_lock
+        primary: Lock
+        secondary: '{{ states(''input_select.spa_set_lock'') }}'
+        icon: mdi:lock
+        icon_color: '{{ ''blue'' if states(''input_select.spa_set_lock'') == ''Off'' else ''orange'' }}'
+        features:
+          - type: select-options
+        features_position: inline
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+      - type: markdown
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_set_lock
+            state_not: 'Off'
+        content: >-
+          {% set l = states('input_select.spa_set_lock') %}<small>**{{ l }}**: {{ {'Access Lock':
+          'disables manual operation and adjustment of every spa function. Scheduled operations,
+          such as filtration cycles, still run.', 'Temperature Lock': 'only the temperature up/down
+          buttons are locked. Everything else works.', 'Settings Lock': 'user settings cannot be
+          changed. Jets and light still work.', 'Service Lock': 'locks all functions so the spa can
+          be serviced. It releases itself after 2 hours. Choose Off to release it earlier; the spa
+          then runs a purge of about 2 minutes.'}.get(l, '') }} Controls this lock blocks are greyed
+          out below and on the Hot Tub page.</small>
       - type: custom:mushroom-template-card
         entity: sensor.sundance_spa_language
         primary: Language
@@ -182,6 +456,51 @@ sections:
           rows: 1
         hold_action:
           action: none
+      - type: heading
+        heading: Notifications
+        heading_style: subtitle
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>No spa message reaches the phone during the quiet hours. Messages are collected and
+          delivered together when they end; questions with buttons are asked then.</small>
+      - type: tile
+        entity: input_datetime.spa_quiet_hours_start
+        name: Quiet Hours Start
+        icon: mdi:bell-sleep
+        grid_options:
+          columns: 6
+      - type: tile
+        entity: input_datetime.spa_quiet_hours_end
+        name: Quiet Hours End
+        icon: mdi:bell-ring
+        grid_options:
+          columns: 6
+      - type: custom:mushroom-template-card
+        entity: binary_sensor.spa_quiet_hours
+        primary: >-
+          {{ 'Quiet hours: active now' if is_state('binary_sensor.spa_quiet_hours', 'on') else
+          'Quiet hours: not active' }}
+        secondary: >-
+          {%- set q = states('binary_sensor.spa_quiet_hours') == 'on' -%}{%- set w =
+          states('input_text.spa_night_alerts') -%}{%- set n = (w.split('; ') | count) if w not in
+          ['', 'unknown', 'unavailable'] else 0 -%}{{ ('Until ' ~
+          states('input_datetime.spa_quiet_hours_end')[0:5]) if q else ('Starts at ' ~
+          states('input_datetime.spa_quiet_hours_start')[0:5]) }}{{ ' · ' ~ n ~ ' message(s) waiting
+          - tap to send now' if n > 0 else '' }}
+        icon: >-
+          {{ 'mdi:bell-sleep' if is_state('binary_sensor.spa_quiet_hours', 'on') else
+          'mdi:bell-ring' }}
+        icon_color: '{{ ''purple'' if is_state(''binary_sensor.spa_quiet_hours'', ''on'') else ''green'' }}'
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_deliver_night_alerts_now
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+          rows: 1
       - type: heading
         heading: Clock
         heading_style: subtitle
@@ -230,6 +549,35 @@ sections:
             entity_id: button.sundance_spa_clock_sync_now
           confirmation:
             text: Sync the spa clock now? The ESP will go through the spa menu.
+        grid_options:
+          columns: 12
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Sync Clock
+        secondary: Locked
+        icon: mdi:clock-edit-outline
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
         grid_options:
           columns: 12
   - type: grid
@@ -351,6 +699,35 @@ sections:
             entity_id: button.sundance_spa_read_settings
           confirmation:
             text: Read the settings from the spa now? The ESP will go through the spa menu.
+        grid_options:
+          columns: 6
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
+      - type: custom:mushroom-template-card
+        primary: Read Settings
+        secondary: Locked
+        icon: mdi:book-open-variant
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        visibility:
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
         grid_options:
           columns: 6
       - type: tile

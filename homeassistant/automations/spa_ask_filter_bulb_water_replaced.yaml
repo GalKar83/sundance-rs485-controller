@@ -7,10 +7,16 @@ description: >-
   are ignored. Counters are text since ESP patch 17 (2026-10-25): days, 'Change Now' or 'Off'.
   Revised 2026-10-28: entities renamed (sensor.sundance_spa_remaining_days_*,
   input_datetime.last_replacement_*_date). Revised 2026-11-01: no question in the spa quiet hours
-  23:00-06:30 - it waits and asks at 06:30. Revised 2026-11-03: asked only within 12 h after a real
-  power cut (input_datetime.spa_last_power_cut, set by the outage automation when the spa date was
-  reset) - counters are also edited from HA now, and a real replacement always follows switching the
-  spa off.
+  23:00-06:30 by default, set on the Hot Tub Settings page - it waits and asks when they end.
+  Revised 2026-11-03: asked only within 12 h after a real power cut
+  (input_datetime.spa_last_power_cut, set by the outage automation when the spa date was reset) -
+  counters are also edited from HA now, and a real replacement always follows switching the spa off.
+  Revised 2026-11-08: for the Filter counter only, a Service Lock that ended within the last 12 h
+  (input_datetime.spa_last_service_lock_end, set by Spa - After a Service Lock: filter rinsed?) also
+  allows the question; ClearRay bulb and Water still need a real power cut. Revised 2026-11-08: the
+  Filter question is skipped when input_datetime.last_replacement_filter_date is already today (the
+  Replaced button of the rinse question set it). Revised 2026-11-08: quiet hours from
+  binary_sensor.spa_quiet_hours (the two time helpers).
 triggers:
   - trigger: state
     entity_id: sensor.sundance_spa_remaining_days_filter_change
@@ -33,23 +39,37 @@ conditions:
       state.
   - condition: template
     value_template: >-
-      {{ as_timestamp(now()) - (state_attr('input_datetime.spa_last_power_cut', 'timestamp') |
-      float(0)) < 12 * 3600 }}
+      {%- set now_ts = as_timestamp(now()) -%}{%- set cut =
+      state_attr('input_datetime.spa_last_power_cut', 'timestamp') | float(0) -%}{%- set svl =
+      state_attr('input_datetime.spa_last_service_lock_end', 'timestamp') | float(0) -%}{{ now_ts -
+      cut < 12 * 3600 or (trigger.id == 'filter' and now_ts - svl < 12 * 3600) }}
     note: >-
       Owner's rule: a filter, bulb or water change always starts with the spa switched off, so a
       reset is only asked about within 12 h after a real power cut (spa date reset to 01/01/2014).
+      Only the filter can also be done under a Service Lock, so for the Filter counter a Service
+      Lock that ended in the last 12 h (input_datetime.spa_last_service_lock_end) counts too.
       Otherwise the value was just edited, e.g. from HA.
+  - alias: Not again when the filter was already marked replaced today
+    condition: template
+    value_template: >-
+      {{ not (trigger.id == 'filter' and states('input_datetime.last_replacement_filter_date') ==
+      (now().date() | string)) }}
+    note: >-
+      The Replaced button of the rinse question (after a power cut or a Service Lock) already set
+      today's date, so the counter reset does not ask again. Filter only.
 actions:
   - variables:
       item: '{{ {''filter'': ''Filter'', ''clearray_bulb'': ''ClearRay bulb'', ''water'': ''Water''}[trigger.id] }}'
       target_entity: '{{ ''input_datetime.last_replacement_'' ~ trigger.id ~ ''_date'' }}'
       reset_date: '{{ now().date() | string }}'
       tag: spa_replace_{{ trigger.id }}_{{ as_timestamp(now()) | int }}
-  - wait_template: '{% set m = now().hour * 60 + now().minute %}{{ 390 <= m < 1380 }}'
+  - wait_template: '{{ is_state(''binary_sensor.spa_quiet_hours'', ''off'') }}'
     timeout:
       hours: 8
     continue_on_timeout: true
-    note: 'Spa quiet hours 23:00-06:30: ask at 06:30. The recorded date stays the reset date.'
+    note: >-
+      Spa quiet hours (set on the Hot Tub Settings page): ask when they end. The recorded date stays
+      the reset date.
   - action: notify.mobile_app_your_phone
     data:
       title: Spa counter reset
@@ -60,9 +80,9 @@ actions:
         tag: '{{ tag }}'
         actions:
           - action: YES_{{ tag }}
-            title: 'Yes'
+            title: Yes
           - action: NO_{{ tag }}
-            title: 'No'
+            title: No
         sticky: true
         persistent: true
         clickAction: noAction

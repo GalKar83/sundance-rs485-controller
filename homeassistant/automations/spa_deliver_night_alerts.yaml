@@ -1,17 +1,19 @@
 alias: Spa - Deliver night alerts
 description: >-
-  At 06:30 (or on HA start between 06:30 and 23:00, in case HA was down at 06:30) sends the spa
-  information notifications queued overnight by script.spa_notify (input_text.spa_night_alerts) as
-  one phone notification, then clears the queue. Created 2026-11-01.
+  When the spa quiet hours end (06:30 by default; or on HA start outside the quiet hours, in case HA
+  was down then) sends the spa information notifications queued overnight by script.spa_notify
+  (input_text.spa_night_alerts) as one phone notification, then clears the queue. Created
+  2026-11-01. Revised 2026-11-08: the quiet hours are the two time helpers set on the Hot Tub
+  Settings page (input_datetime.spa_quiet_hours_start / _end).
 triggers:
   - trigger: time
-    at: '06:30:00'
+    at: input_datetime.spa_quiet_hours_end
   - trigger: homeassistant
     event: start
 conditions:
   - condition: time
-    after: '06:30:00'
-    before: '23:00:00'
+    after: input_datetime.spa_quiet_hours_end
+    before: input_datetime.spa_quiet_hours_start
   - condition: not
     conditions:
       - condition: state

@@ -76,6 +76,12 @@ void SundanceSpa::set_light_680(const std::string &name) {
     ESP_LOGW(TAG, "Unknown light option '%s'", name.c_str());
     return;
   }
+  if (const char *lk = this->lock_blocking_(LOCKUSE_LIGHT)) {
+    this->decoder_notice_(std::string("Light not changed: ") + lk + " is on");
+    this->publish_light_selects_();
+    this->publish_light_status_();
+    return;
+  }
   if (this->light680_index_() == want && this->wanted_light680_ == NO_CHANGE_REQUESTED) {
     ESP_LOGD(TAG, "Light already %s", name.c_str());
     return;
@@ -467,6 +473,22 @@ void SundanceSpa::on_panel_press_(uint8_t btn) {
 // SVL confirm 31 -> 27, unlock 27 -> 63 (with the purge pump). A lock change is accepted only when
 // the matching bit flips (bits 0 and 5 ignored) within 5 s of the panel event that causes it.
 void SundanceSpa::service_lock_event_() {
+  // The controller releases a Service Lock by itself after 2 hours (manual 10.10) without any panel event, so the
+  // tracked flag is cleared 2 h 15 s after it was first seen on (or after boot). Measured 8 Nov 2026: engaged
+  // 12:14:08, the spa released at 14:14:07.6 (f14 27 -> 62, purge until 31 at 14:15:18).
+  if (this->svl_on_) {
+    if (this->svl_since_ms_ == 0) {
+      this->svl_since_ms_ = millis() | 1;
+    } else if (millis() - this->svl_since_ms_ > 2UL * 3600UL * 1000UL + 15000UL) {
+      this->svl_on_ = false;
+      this->svl_since_ms_ = 0;
+      const uint8_t locks = this->sl_on_ ? 1 : 0;
+      this->lock_pref_.save(&locks);
+      this->decoder_notice_("Service Lock timed out after 2 hours: shown as released");
+    }
+  } else {
+    this->svl_since_ms_ = 0;
+  }
   if (this->lock_event_ == 0)
     return;
   const uint8_t diff = (this->prior_status_[14] ^ this->lock_event_f14_) & 0x1E;
@@ -658,6 +680,8 @@ enum SyncStep : int {
   WRITE_SAVE,
   WRITE_TEMP_SHOW,
   WRITE_TEMP_SWITCH,
+  LOCK_PICK,  // on the LOCK menu: Warmer until the wanted lock option is shown
+  LOCK_SAVE,  // Jets 1 sent: wait for the spa to show the lock
 };
 
 static const int NAV_TO_UV[] = {73, 64, 95, 90};
@@ -670,6 +694,16 @@ static const int TASK_SYNC = 1, TASK_UV = 2, TASK_PF = 4, TASK_LANG = 8, TASK_FC
 // Menu screens (normalized) of the settings written from HA; see the README §9 table.
 static const int NAV_ALL[] = {73, 64, 95, 90, 89, 84, 81, 106, 105};  // PF HEAT FC UV H2O TIME DATE TEMP LANG
 static const int NAV_ALL_COUNT = sizeof(NAV_ALL) / sizeof(NAV_ALL[0]);
+// ... and on to LOCK (100): recorded at key 117 on 2026-11-08 (raw f13 17 = LOCK, 16 Access, 23 Settings, 122 Temperature,
+// 120 Service). The first Warmer on LOCK goes straight to the Access option; Jets 1 saves and returns to the main screen.
+static const int NAV_LOCK[] = {73, 64, 95, 90, 89, 84, 81, 106, 105, 100};
+static const int NAV_LOCK_COUNT = sizeof(NAV_LOCK) / sizeof(NAV_LOCK[0]);
+static int lock_screen_(int mode) {
+  return mode == 1 ? SCREEN_LOCK_AL : mode == 2 ? SCREEN_LOCK_TL : mode == 3 ? SCREEN_LOCK_SL : SCREEN_LOCK_SVL;
+}
+static bool is_lock_option_(int screen) {
+  return screen == SCREEN_LOCK_AL || screen == SCREEN_LOCK_SL || screen == SCREEN_LOCK_TL || screen == SCREEN_LOCK_SVL;
+}
 static const int SCREEN_HEAT = 64, SCREEN_HEAT_SHOW = 65, SCREEN_HEAT_EDIT = 94;
 static const int SCREEN_H2O = 89, SCREEN_H2O_SHOW = 86, SCREEN_H2O_EDIT = 87;
 static const int SCREEN_TEMP = 106, SCREEN_TEMP_SHOW = 107, SCREEN_TEMP_EDIT = 104;
@@ -685,6 +719,7 @@ enum WriteKind : int {
   WRITE_TEMP_UNIT = 8,
   WRITE_LANG = 9,
   WRITE_PF = 10,  // internal: one walk for start, cycles and duration
+  WRITE_LOCK = 11,  // engage a lock: LOCK menu, option, Jets 1
 };
 static const uint32_t WRITE_CHANGE_TIMEOUT_MS = 2500;  // f15 must follow a Warmer/Cooler press by then
 
@@ -756,6 +791,8 @@ static int write_menu_screen_(int kind) {
       return SCREEN_TEMP;
     case WRITE_LANG:
       return SCREEN_LANG;
+    case WRITE_LOCK:
+      return SCREEN_LOCK;
     default:
       return -1;
   }
@@ -804,6 +841,8 @@ static const char *write_name_(int kind) {
       return "Temperature Format";
     case WRITE_LANG:
       return "Language";
+    case WRITE_LOCK:
+      return "Lock";
     default:
       return "Setting";
   }
@@ -863,7 +902,7 @@ bool SundanceSpa::start_next_write_() {
   for (int guard = 0; guard < 10; guard++) {
     int kind = WRITE_NONE;
     for (int k : {WRITE_HEAT, WRITE_TEMP_UNIT, WRITE_PF_START, WRITE_PF_CYCLES, WRITE_PF_DURATION, WRITE_FC,
-                  WRITE_UV, WRITE_H2O, WRITE_LANG}) {
+                  WRITE_UV, WRITE_H2O, WRITE_LANG, WRITE_LOCK}) {
       if (this->write_pending_[k] != -1) {
         kind = k;
         break;
@@ -916,6 +955,8 @@ bool SundanceSpa::start_next_write_() {
                             this->uv_days_ != 365) ||
                            this->write_kind_ == WRITE_LANG;
     this->write_verify_kind_ = this->write_kind_;
+    if (this->write_kind_ == WRITE_LOCK)
+      this->lock_mode_ = this->write_target_[0];
     this->write_verify_value_ = this->write_kind_ == WRITE_PF ? -1 : this->write_target_[0];
     ESP_LOGI(TAG, "Changing %s from the topside menu", write_name_(this->write_kind_));
     this->sync_goto_(WRITE_WAIT_MAIN);
@@ -959,12 +1000,15 @@ void SundanceSpa::service_write_(int screen, int value, uint32_t now) {
       return;
     }
     case WRITE_NAV: {
-      const int expect = NAV_ALL[this->sync_nav_index_];
+      const bool lock = this->write_kind_ == WRITE_LOCK;
+      const int *nav = lock ? NAV_LOCK : NAV_ALL;
+      const int nav_count = lock ? NAV_LOCK_COUNT : NAV_ALL_COUNT;
+      const int expect = nav[this->sync_nav_index_];
       if (screen == expect) {
         if (expect == menu) {
-          this->sync_press_(BTN_TEMP_UP);  // the first press only shows the current value
-          this->sync_goto_(this->write_kind_ == WRITE_TEMP_UNIT ? WRITE_TEMP_SHOW : WRITE_SHOW);
-        } else if (this->sync_nav_index_ + 1 < NAV_ALL_COUNT) {
+          this->sync_press_(BTN_TEMP_UP);  // the first press only shows the current value (LOCK: the Access option)
+          this->sync_goto_(lock ? LOCK_PICK : this->write_kind_ == WRITE_TEMP_UNIT ? WRITE_TEMP_SHOW : WRITE_SHOW);
+        } else if (this->sync_nav_index_ + 1 < nav_count) {
           this->sync_nav_index_++;
           this->sync_press_(BTN_MENU);
           this->sync_step_ms_ = now;
@@ -1093,10 +1137,115 @@ void SundanceSpa::service_write_(int screen, int value, uint32_t now) {
       }
       return;
     }
+    case LOCK_PICK: {
+      const int target = lock_screen_(this->lock_mode_);
+      if (screen == target) {
+        if (now - this->sync_press_ms_ >= READ_DWELL_MS) {
+          // Our own Jets 1 saves the lock. It is not a panel event, so register it like one: the f14 flip that follows is
+          // then accepted as the Settings / Service Lock confirmation.
+          if (this->lock_mode_ == 3 || this->lock_mode_ == 4) {
+            this->lock_event_ = this->lock_mode_ == 3 ? 1 : 2;
+            this->lock_event_ms_ = now;
+            this->lock_event_f14_ = this->prior_status_[14];
+          }
+          this->sync_press_(BTN_P1);
+          this->sync_goto_(LOCK_SAVE);
+        }
+      } else if (is_lock_option_(screen)) {
+        if (now - this->sync_press_ms_ >= READ_DWELL_MS) {
+          if (++this->write_presses_ > 5) {
+            this->abort_clock_sync_("lock option not found");
+            return;
+          }
+          this->sync_press_(BTN_TEMP_UP);
+          this->sync_step_ms_ = now;
+        }
+      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS + READ_DWELL_MS) {
+        this->abort_clock_sync_("LOCK menu");
+      }
+      return;
+    }
+    case LOCK_SAVE: {
+      const bool al = (this->prior_status_[1] & 0x08) != 0;
+      const bool tl = (this->prior_status_[10] & 0x10) != 0;
+      const bool done = this->lock_mode_ == 1   ? al
+                        : this->lock_mode_ == 2 ? tl
+                        : this->lock_mode_ == 3 ? this->sl_on_
+                                                : this->svl_on_;
+      if (done) {
+        ESP_LOGI(TAG, "Lock %d set", this->lock_mode_);
+        this->sync_goto_(TASK_WAIT_MAIN);
+      } else if (now - this->sync_step_ms_ > 4000) {
+        this->abort_clock_sync_("not confirmed by the spa");
+      }
+      return;
+    }
     default:
       return;
   }
 }
+
+// ---------------------------------------------------------------- lock from Home Assistant
+// Off = one "Menu held" frame (209): the controller accepts it from our channel for all four locks (verified
+// 2026-11-08). It is not a panel event, so the tracked Settings / Service flags are cleared here, unconditionally.
+void SundanceSpa::release_locks_() {
+  this->queue_press_(BTN_MENU_HOLD);
+  this->lock_event_ = 0;
+  if (this->sl_on_ || this->svl_on_) {
+    this->sl_on_ = false;
+    this->svl_on_ = false;
+    this->svl_since_ms_ = 0;
+    const uint8_t locks = 0;
+    this->lock_pref_.save(&locks);
+  }
+  ESP_LOGI(TAG, "Lock: released (Menu held sent)");
+}
+
+void SundanceSpa::queue_lock_walk_(int mode) {
+  ESP_LOGI(TAG, "Lock walk queued: mode %d", mode);
+  this->write_pending_[WRITE_LOCK] = mode;
+  if (this->sync_step_ == SYNC_IDLE)
+    this->start_next_task_();
+}
+
+const char *SundanceSpa::lock_blocking_(int use) const {
+  const auto &d = this->prior_status_;
+  if (d.size() >= 16) {
+    if (d[1] & 0x08)  // Access Lock: every function
+      return "Access Lock";
+    if ((d[10] & 0x10) && use == LOCKUSE_TEMP)  // Temperature Lock: only the set point
+      return "Temperature Lock";
+  }
+  if (this->svl_on_)  // Service Lock: every function
+    return "Service Lock";
+  return nullptr;
+}
+
+void SundanceSpa::request_lock(int mode) {
+  if (mode < 0 || mode > 4 || this->prior_status_.size() < 16) {
+    ESP_LOGW(TAG, "Lock %d not allowed now", mode);
+    return;
+  }
+  const bool al = (this->prior_status_[1] & 0x08) != 0;
+  const bool tl = (this->prior_status_[10] & 0x10) != 0;
+  const int current = al ? 1 : tl ? 2 : this->sl_on_ ? 3 : this->svl_on_ ? 4 : 0;
+  if (mode == current) {
+    ESP_LOGI(TAG, "Lock already as requested");
+    return;
+  }
+  if (mode == 0) {
+    this->release_locks_();
+    return;
+  }
+  if (current != 0) {
+    // One lock at a time: release the active one, give the controller a moment, then walk the menu.
+    this->release_locks_();
+    this->set_timeout("lock_engage", 4000, [this, mode]() { this->queue_lock_walk_(mode); });
+    return;
+  }
+  this->queue_lock_walk_(mode);
+}
+
 
 bool SundanceSpa::clock_sync_active_() const { return this->sync_step_ != SYNC_IDLE; }
 

@@ -6,26 +6,32 @@ description: >-
   in HA (it needs HA's time) - the date arrives ~80 s after the reconnect, the sync fixes it ~2 min
   later (measured 31 Oct 08:02). POWER CUT (date 01/01/2014): input_datetime.spa_last_power_cut =
   the time the spa came back on (used by the counter-reset question); if off 5+ min and the spa came
-  back ON outside the quiet hours 23:00-06:30, ask the owner's phone 'Did you rinse your filter?';
-  Yes -> input_datetime.last_rinse_filter = the time the spa came back ON = now minus the spa clock
-  reading. Nothing is added to the energy (the spa used none). WI-FI DROP (date correct): since ESP
-  patch 29 the ESP counts energy and run times itself (Energy Counter, *Total Time), so the utility
-  meters get the real figures as soon as it is back, including heating or manual use. Only the
-  hourly bars need help: the jump would land in the hour it came back, so the part the normal
-  schedule explains (controller + circulation in the Primary Filter cycles + the 1-min cleanup, from
-  number.sundance_spa_power_*) is moved back into the hourly statistics of
-  sensor.sundance_spa_energy_total in the hours it belongs to (recorder.import_statistics; scaled
-  down if the ESP counted less), the rest stays in the hour it came back; across a reset the part
-  before it is taken out of the new period's meter; logged to the logbook. No date within 3 min:
-  nothing changes, a notice is sent. Created 2026-10-28 (as 'Spa - Ask: Filter rinsed after power
-  off?'). Revised 2026-11-01/02: detection by the spa date, quiet hours, schedule estimate added to
-  statistics + meters. Revised 2026-11-03 (ESP patch 29): the ESP's own counters are the truth; the
-  estimate only distributes them over the hours.
+  back ON outside the quiet hours 23:00-06:30 by default, set on the Hot Tub Settings page, ask the
+  owner's phone 'Did you rinse your filter?'; Yes -> input_datetime.last_rinse_filter = the time the
+  spa came back ON = now minus the spa clock reading. Nothing is added to the energy (the spa used
+  none). WI-FI DROP (date correct): since ESP patch 29 the ESP counts energy and run times itself
+  (Energy Counter, *Total Time), so the utility meters get the real figures as soon as it is back,
+  including heating or manual use. Only the hourly bars need help: the jump would land in the hour
+  it came back, so the part the normal schedule explains (controller + circulation in the Primary
+  Filter cycles + the 1-min cleanup, from number.sundance_spa_power_*) is moved back into the hourly
+  statistics of sensor.sundance_spa_energy_total in the hours it belongs to
+  (recorder.import_statistics; scaled down if the ESP counted less), the rest stays in the hour it
+  came back; across a reset the part before it is taken out of the new period's meter; logged to the
+  logbook. No date within 3 min: nothing changes, a notice is sent. Created 2026-10-28 (as 'Spa -
+  Ask: Filter rinsed after power off?'). Revised 2026-11-01/02: detection by the spa date, quiet
+  hours, schedule estimate added to statistics + meters. Revised 2026-11-03 (ESP patch 29): the
+  ESP's own counters are the truth; the estimate only distributes them over the hours. Revised
+  2026-11-08: a Service Lock of 5+ minutes asks the same rinse question in its own automation (Spa -
+  After a Service Lock: filter rinsed?); it does not touch input_datetime.spa_last_power_cut, which
+  stays a real power cut only. Revised 2026-11-08: when the Filter Change counter is at 0 (Change
+  Now) the question also has a Replaced button, which sets
+  input_datetime.last_replacement_filter_date to the date the spa came back on; otherwise it is the
+  rinse question only (Rinsed / No). Revised 2026-11-08: quiet hours from the two time helpers.
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_status
-    from: 'off'
-    to: 'on'
+    from: off
+    to: on
 conditions:
   - condition: template
     value_template: '{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 60 }}'
@@ -68,6 +74,7 @@ actions:
                 {{ (on_ts | timestamp_custom('%H', true)) | int * 60 + (on_ts |
                 timestamp_custom('%M', true)) | int }}
               tag: spa_rinse_{{ as_timestamp(now()) | int }}
+              repl: '{{ is_state(''sensor.sundance_spa_remaining_days_filter_change'', ''Change Now'') }}'
           - action: input_datetime.set_datetime
             target:
               entity_id: input_datetime.spa_last_power_cut
@@ -77,21 +84,28 @@ actions:
               Every real power cut: when the spa came back on. The counter-reset question only asks
               after one of these.
           - condition: template
-            value_template: '{{ off_min >= 5 and 390 <= on_min < 1380 }}'
-            note: Rinsing takes minutes; nobody rinses the filter in the quiet hours 23:00-06:30.
+            value_template: >-
+              {%- set sh = states('input_datetime.spa_quiet_hours_start') -%}{%- set eh =
+              states('input_datetime.spa_quiet_hours_end') -%}{%- set s = sh[0:2] | int(23) * 60 +
+              sh[3:5] | int(0) -%}{%- set e = eh[0:2] | int(6) * 60 + eh[3:5] | int(30) -%}{%- set
+              quiet = (on_min >= s or on_min < e) if s > e else (s <= on_min < e) -%}{{ off_min >= 5
+              and not quiet }}
+            note: >-
+              Rinsing takes minutes; nobody rinses the filter in the spa quiet hours (set on the Hot
+              Tub Settings page).
           - action: notify.mobile_app_your_phone
             data:
               title: Spa was switched off
               message: >-
                 The spa was off for about {{ off_min }} min and came back on at {{ on_ts |
-                timestamp_custom('%H:%M') }}. Did you rinse your filter?
+                timestamp_custom('%H:%M') }}. Did you rinse your filter?{{ ' The Filter Change
+                counter is at 0 - was the filter replaced?' if repl else '' }}
               data:
                 tag: '{{ tag }}'
-                actions:
-                  - action: YES_{{ tag }}
-                    title: 'Yes'
-                  - action: NO_{{ tag }}
-                    title: 'No'
+                actions: >-
+                  {{ [{'action': 'YES_' ~ tag, 'title': 'Rinsed'}] + ([{'action': 'REPL_' ~ tag,
+                  'title': 'Replaced'}] if repl else []) + [{'action': 'NO_' ~ tag, 'title': 'No'}]
+                  }}
                 sticky: true
                 persistent: true
                 clickAction: noAction
@@ -102,6 +116,10 @@ actions:
                 event_type: mobile_app_notification_action
                 event_data:
                   action: YES_{{ tag }}
+              - trigger: event
+                event_type: mobile_app_notification_action
+                event_data:
+                  action: REPL_{{ tag }}
               - trigger: event
                 event_type: mobile_app_notification_action
                 event_data:
@@ -119,6 +137,16 @@ actions:
                 data:
                   timestamp: '{{ on_ts }}'
                 note: Time the spa came back on, not the time of the answer
+          - if:
+              - condition: template
+                value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''REPL_'' ~ tag }}'
+            then:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_replacement_filter_date
+                data:
+                  date: '{{ on_ts | int | timestamp_custom(''%Y-%m-%d'') }}'
+                note: Date the spa came back on, not the date of the answer
           - action: notify.mobile_app_your_phone
             data:
               message: clear_notification

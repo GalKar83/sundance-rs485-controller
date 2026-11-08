@@ -81,6 +81,9 @@ static const int SCREEN_FC_EDIT = 93;
 // LOCK menu option screens (Jets 1 on one of them sets that lock; verified 2026-10-23/25)
 static const int SCREEN_LOCK_SL = 98;   // Settings Lock
 static const int SCREEN_LOCK_SVL = 13;  // Service Lock
+static const int SCREEN_LOCK = 100;     // LOCK menu
+static const int SCREEN_LOCK_AL = 101;  // Access Lock option (Warmer from LOCK: Access, Settings, Temperature, Service)
+static const int SCREEN_LOCK_TL = 15;   // Temperature Lock option
 static const uint8_t BTN_MENU_HOLD = 209;  // long Menu press: unlock
 
 static const int NO_CHANGE_REQUESTED = -1;
@@ -187,6 +190,13 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   // heater mode 0 Auto 1 Eco 2 Day; PF start 0-23, cycles 1/2/3/4/8, duration 1-3; FC 0 (Off)/10-180;
   // ClearRay 0 (Off)/10-360/365; Water Refresh 0 (Off)/30-180; unit 0 °C 1 °F; language 0-3.
   void request_setting_write(int kind, int value);
+  // Lock from Home Assistant: 0 Off (one Menu-held frame), 1 Access, 2 Temperature, 3 Settings, 4 Service Lock.
+  void request_lock(int mode);
+  // What the active lock stops (manual 10.10): Access and Service Lock stop everything, Temperature Lock the
+  // set point. Returns the lock name when the use is blocked, else nullptr. Settings Lock stops menu writes
+  // (checked in request_setting_write).
+  enum LockUse { LOCKUSE_TEMP = 0, LOCKUSE_LIGHT = 1, LOCKUSE_JETS = 2 };
+  const char *lock_blocking_(int use) const;
   // Diagnostic: one short topside press (decoding tests only).
   void diag_press(uint8_t button) { this->queue_press_(button); }
   // Runtime switch for the [DIAG] bus/byte logging (HA "Diagnostics" switch); no reflash needed.
@@ -200,7 +210,10 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   void register_sensor_callback(uint8_t datapoint, const std::function<void(float)> &func);
   void register_binary_sensor_callback(uint8_t datapoint, const std::function<void(bool)> &func);
 
-  void on_set_temp(float temp);
+  // Returns false when the request was refused (out of range, or the spa is locked).
+  bool on_set_temp(float temp);
+  bool temp_request_pending() const { return this->wanted_temp_ != NO_CHANGE_REQUESTED; }
+  float get_set_temp() const { return this->set_temp_; }
   void on_toggle_circ();
   void set_light_level(const std::string &level_name);
   void set_light_color(const std::string &color_name);
@@ -398,7 +411,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   int routine_mask_{0};
   int read_task_{0};
   // settings write
-  int write_pending_[10]{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};  // requested value per WRITE_* kind
+  int write_pending_[12]{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};  // requested value per WRITE_* kind
   int write_kind_{0};                // kind being written (WRITE_PF covers start/cycles/duration)
   int write_field_{0};               // PF: 0 start, 1 cycles, 2 duration
   int write_target_[3]{-1, -1, -1};  // f15 code wanted per field (-1 = keep)
@@ -436,6 +449,8 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   // and clear them, each confirmed by its f14 bit flipping (bit1 SL, bit2 SVL) at that moment.
   bool sl_on_{false};
   bool svl_on_{false};
+  uint32_t svl_since_ms_{0};  // Service Lock times out by itself after 2 h (manual 10.10)
+  int lock_mode_{0};          // lock of the running menu walk: 1 Access, 2 Temperature, 3 Settings, 4 Service
   int lock_event_{0};  // 1 SL set, 2 SVL set, 3 unlock (Menu Hold)
   uint32_t lock_event_ms_{0};
   uint8_t lock_event_f14_{0};
@@ -443,6 +458,8 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   ESPPreferenceObject lang_pref_;
   void on_panel_press_(uint8_t btn);
   void service_lock_event_();
+  void release_locks_();
+  void queue_lock_walk_(int mode);
   // Jet 2 started by the controller (daily cleanup / unlock purge), not by a press -> "Cleanup".
   bool jet2_auto_{false};
   // The power-up / Service Lock purge runs Jet 1 low with the *manual* circulation bit (f1 bit7) set

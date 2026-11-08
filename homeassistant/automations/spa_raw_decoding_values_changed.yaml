@@ -6,7 +6,8 @@ description: >-
   that text to re-arm. The ESP's own Decoder Notice (automation 'Spa - Decoder notice') covers
   decoding problems; this one stays while the raw entities exist (owner's choice 2026-10-26: keep
   them locally). Renamed 2026-10-28 (was 'Spa - Decoder notice (new unknown values)'). Revised
-  2026-11-01: sent through script.spa_notify (quiet hours 23:00-06:30).
+  2026-11-01: sent through script.spa_notify (quiet hours 23:00-06:30 by default, set on the Hot Tub
+  Settings page).
 triggers:
   - trigger: state
     entity_id:
@@ -49,6 +50,6 @@ actions:
         {{ new_keys | join(', ') }} at {{ now().strftime('%H:%M') }}. Check the panel display and
         tell Claude what it shows.
       tag: spa_decoder_new_value
-    note: Held until 06:30 in the spa quiet hours (23:00-06:30).
+    note: Held until the spa quiet hours end (set on the Hot Tub Settings page).
 mode: queued
 max: 10

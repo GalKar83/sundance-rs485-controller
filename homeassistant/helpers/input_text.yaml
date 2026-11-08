@@ -71,6 +71,12 @@ spa_plan_previous_heater_mode:
   min: 0
   max: 10
   mode: text
+spa_plan_previous_lock:
+  name: Spa Plan Previous Lock
+  icon: mdi:lock-clock
+  min: 0
+  max: 30
+  mode: text
 spa_audio_bluetooth_mac:
   name: Spa Audio Bluetooth MAC
   min: 0

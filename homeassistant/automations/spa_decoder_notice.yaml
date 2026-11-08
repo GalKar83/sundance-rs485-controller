@@ -8,7 +8,7 @@ description: >-
   2026-10-26 for v1 (entity appears after the v1 flash). Revised 2026-10-29: not_from
   unknown/unavailable, so an HA-ESP reconnect that restores the same notice does not notify again
   (29 Oct 15:01 re-sent code 71). Revised 2026-11-01: sent through script.spa_notify (quiet hours
-  23:00-06:30, delivered together at 06:30).
+  23:00-06:30 by default, set on the Hot Tub Settings page, delivered together when they end).
 triggers:
   - trigger: state
     entity_id: sensor.sundance_spa_decoder_notice

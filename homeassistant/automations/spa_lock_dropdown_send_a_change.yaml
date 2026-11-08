@@ -1,0 +1,47 @@
+alias: 'Spa - Lock dropdown: send a change'
+description: >-
+  When a person picks a lock in the Lock dropdown (input_select.spa_set_lock) that differs from the
+  spa's (sensor.sundance_spa_lock), sends it through select.sundance_spa_lock_setting; the ESP
+  releases the current lock and walks the topside menu to set the new one (about 20-60 s). Every
+  lock, Service Lock included, is sent at once, with no confirmation (decided 2026-11-08: the owner
+  can always release it from HA with Off, and it releases itself after 2 hours; the explanation
+  under the dropdown says what each lock does). If the spa does not report the new lock within 120 s
+  the dropdown returns to the spa's lock. Only a pick made by a person (context user_id set) is
+  sent. Created 2026-11-08.
+triggers:
+  - trigger: state
+    entity_id: input_select.spa_set_lock
+    not_to:
+      - unknown
+      - unavailable
+conditions:
+  - alias: Only a pick made by a person on the dashboard
+    condition: template
+    value_template: '{{ trigger.to_state.context.user_id is not none }}'
+  - alias: Only a real change
+    condition: template
+    value_template: '{{ trigger.to_state.state != states(''sensor.sundance_spa_lock'') }}'
+actions:
+  - variables:
+      pick: '{{ trigger.to_state.state }}'
+  - alias: Send the pick to the spa
+    action: select.select_option
+    target:
+      entity_id: select.sundance_spa_lock_setting
+    data:
+      option: '{{ pick }}'
+  - alias: Wait for the spa to report the new lock
+    wait_template: '{{ states(''sensor.sundance_spa_lock'') == pick }}'
+    timeout: 00:02:00
+    continue_on_timeout: true
+  - alias: If it did not take, show the spa's real lock again
+    if:
+      - condition: template
+        value_template: '{{ states(''input_select.spa_set_lock'') != states(''sensor.sundance_spa_lock'') }}'
+    then:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.spa_set_lock
+        data:
+          option: '{{ states(''sensor.sundance_spa_lock'') }}'
+mode: restart

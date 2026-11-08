@@ -1,0 +1,42 @@
+alias: Spa - Service counter reached 0
+description: >-
+  Tells the owner's phone when a spa service counter reaches 0
+  (sensor.sundance_spa_remaining_days_filter_change / _clearray_bulb / _water_refresh = 'Change
+  Now'): change the filter, the ClearRay bulb or the water. Sent through script.spa_notify, so in
+  the spa quiet hours (23:00-06:30 by default, set on the Hot Tub Settings page) it is held and
+  delivered when they end (the counters reach 0 at midnight). The same condition shows a red banner
+  at the top of the Hot Tub page until the counter is reset. Not sent again after an ESP reconnect
+  (not_from unavailable/unknown). Created 2026-11-08.
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_remaining_days_filter_change
+    to: Change Now
+    not_from:
+      - unavailable
+      - unknown
+    id: filter
+  - trigger: state
+    entity_id: sensor.sundance_spa_remaining_days_clearray_bulb
+    to: Change Now
+    not_from:
+      - unavailable
+      - unknown
+    id: clearray
+  - trigger: state
+    entity_id: sensor.sundance_spa_remaining_days_water_refresh
+    to: Change Now
+    not_from:
+      - unavailable
+      - unknown
+    id: water
+actions:
+  - action: script.spa_notify
+    data:
+      title: Spa alert
+      message: >-
+        {{ {'filter': 'The Filter Change counter reached 0 - change the filter.', 'clearray': 'The
+        ClearRay Bulb counter reached 0 - change the ClearRay bulb.', 'water': 'The Water Refresh
+        counter reached 0 - change the water.'}[trigger.id] }}
+      tag: spa_counter_{{ trigger.id }}
+mode: queued
+max: 5

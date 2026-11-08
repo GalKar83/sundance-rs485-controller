@@ -1,0 +1,28 @@
+alias: 'Spa - Lock dropdown: follow the spa'
+description: >-
+  Keeps input_select.spa_set_lock (the Lock dropdown on the Hot Tub Settings page) showing the lock
+  the spa reports in sensor.sundance_spa_lock (Off, Access Lock, Temperature Lock, Settings Lock,
+  Service Lock). 'Spa - Lock dropdown: send a change' sends a pick to the spa. Created 2026-11-08.
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_lock
+    not_to:
+      - unknown
+      - unavailable
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    hours: /1
+conditions:
+  - condition: template
+    value_template: '{{ states(''sensor.sundance_spa_lock'') in state_attr(''input_select.spa_set_lock'', ''options'') }}'
+  - condition: template
+    value_template: '{{ states(''input_select.spa_set_lock'') != states(''sensor.sundance_spa_lock'') }}'
+actions:
+  - action: input_select.select_option
+    target:
+      entity_id: input_select.spa_set_lock
+    data:
+      option: '{{ states(''sensor.sundance_spa_lock'') }}'
+mode: queued
+max: 5

@@ -58,3 +58,18 @@ spa_previous_soak:
   name: Spa Previous Soak
   has_date: true
   has_time: true
+spa_last_service_lock_end:
+  name: Spa Last Service Lock End
+  icon: mdi:lock-open-check
+  has_date: true
+  has_time: true
+spa_quiet_hours_start:
+  name: Spa Quiet Hours Start
+  icon: mdi:bell-sleep
+  has_date: false
+  has_time: true
+spa_quiet_hours_end:
+  name: Spa Quiet Hours End
+  icon: mdi:bell-ring
+  has_date: false
+  has_time: true

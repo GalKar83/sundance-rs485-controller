@@ -238,7 +238,7 @@ topside:
 | Heater mode | rest/ready | **Auto / Eco / Day** (f6 = 32/34/36) |
 | Clock | time only | time **and date** decoded; HA→spa sync by navigating the menu |
 | Service counters | not mapped | Water Refresh, Filter Change (status frame), ClearRay bulb (menu read); each as days / `Change Now` / `Off` |
-| Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu); **written from HA** by walking the menu (heater mode, Primary Filter, service counters, °C/°F — never the locks, §10) |
+| Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu); **written from HA** by walking the menu (heater mode, Primary Filter, service counters, °C/°F, and the four locks — §10) |
 | Run time / energy | — | counted **in the ESP** from the debounced states × the Power settings; restored across reboots, so Wi-Fi drops and reboots do not lose them |
 | Screen codes | — | **XOR-masked by a key derived from the ClearRay counter** — it changes every midnight (see §9) |
 | Climate modes | heat/off | **Heat only** — the 680 has no heater-off mode (ESPHome's traits start with OFF, so the set is replaced) |
@@ -349,8 +349,9 @@ long drops.
 | Primary Filter Start Hour (number) | 0–23 |
 | Filter Change Days / ClearRay Days / Water Refresh Days (number) | 0 = Off, otherwise the grid the spa offers (10 steps for Filter Change and ClearRay up to 360 and 365, 30 steps for Water Refresh) |
 | Temperature Format Setting (select) | °C / °F |
+| Lock Setting (select) | Off / Access Lock / Temperature Lock / Settings Lock / Service Lock — the same names as the Lock sensor (p35). Off releases the active lock with one Menu-held frame; a lock walks the LOCK menu (§10). One lock at a time: choosing another releases the first, then sets the new one. |
 
-Each change walks the menu on the topside (§10) and is refused while Settings or Service Lock is on.
+Each change walks the menu on the topside (§10) and is refused while Settings or Service Lock is on (the lock select itself is the way out: Off).
 A failed walk leaves a Decoder Notice (`<setting> not changed: <why>`) and re-reads the menu so Home
 Assistant shows the spa's real value. There is **no language setting** (see §10 and §13). Six
 diagnostic buttons, *Panel Press Warmer / Cooler / Menu / Jets 1 / Jets 2 / Light*, send one short
@@ -606,8 +607,9 @@ during power-up.
 
 ## 10. Driving the menu from the ESP32
 
-The ESP32 can only send **short** presses, so it never sets or releases locks (it only follows them,
-§6).
+The ESP32 sends **short** presses, but the long Menu hold that releases a lock is a single frame (209)
+on the bus, and the ESP can send that too — so since p35 it both sets and releases the four locks
+(see *Locks from the ESP* below).
 
 **How the spa clock behaves** (four syncs and two owner panel tests, 26–28 Oct):
 
@@ -659,11 +661,40 @@ last reported screen is the one expected, any panel press aborts), plus:
    assumed). A value off the grid — e.g. 141 days — is left alone until it is the starting point.
 4. Heater Mode is verified afterwards in f6 and the unit in f14 bit 6 on the main screen; the others
    by the re-read that follows every write.
-5. Refused while Settings or Service Lock is on. **The locks themselves are never written.**
+5. Refused while Settings or Service Lock is on (the lock walk of the Lock Setting select is the one exception: it
+   starts only after the previous lock was released).
 6. A failed or aborted walk leaves *Decoder Notice* `<setting> not changed: <why>` and re-reads the
    menu; a later successful write clears that notice (other notices keep their hour).
 
 A walk takes about 6 s once started. 8 cycles a day allow only a 1 h duration.
+
+**Locks from the ESP** (p35, verified on the 680 on 8 Nov 2026):
+
+- **Release = one `209` frame.** The panel sends Menu (254) continuously for about 10 s and then a single
+  209 ("Menu held"); the controller releases the lock on that one frame, and it accepts it from the ESP's channel
+  without any 254 stream. Verified for all four modes (Access, Temperature, Settings, Service). A Service Lock
+  release is followed by the usual ~2 min purge.
+- **Engage = a menu walk.** Menu ×10 to the LOCK screen (main 78 → PF 73 → HEAT 64 → FC 95 → UV 90 → H2O 89 →
+  TIME 84 → DATE 81 → TEMP 106 → LANG 105 → LOCK 100), then Warmer until the wanted option screen is shown (each
+  press at least 1 s apart, inside the 5 s display window; **Warmer cycles AL (101) → SL (98) → TL (15) → SVL (13)**),
+  then Jets 1 saves. Two Warmer presses 76 ms apart are not two presses (the second only re-displays). The walk is
+  confirmed from the status frame: Access Lock = f1 bit 3, Temperature Lock = f10 bit 4, Settings / Service Lock = the
+  f14 bit flip (§6) within 5 s of the Jets 1 press; otherwise it is aborted with a Decoder Notice. It takes 20–45 s.
+- **Switching** from one lock to another = release, ~4 s gap, then the walk (tested Settings → Access).
+- **The controller applies the locks to the ESP's own presses too.** With Temperature Lock on, a set point sent by
+  the ESP is never accepted (9 attempts, then `Command not confirmed by the spa after 9 attempts`); with Access Lock on,
+  the light does not change. So a lock cannot be bypassed from the bus, and the ESP must release it first.
+- The ESP's own lock presses are registered as lock events (otherwise the Settings / Service flags would drift: the
+  state is tracked from events, §6); the flags are kept in flash and survived an ESP restart (tested with Settings Lock).
+- Service Lock stops all functions and **releases itself after exactly 2 h** (manual 10.10; measured 8 Nov 2026:
+  engaged 12:14:08, released 14:14:07.6 with no panel event — f14 27 → 62, the purge, back to 31 at 14:15:18). The ESP
+  clears its Service Lock flag 2 h 15 s after it first saw it.
+- **p36: the ESP refuses what the active lock blocks, at once** (verified 8 Nov 2026): the set point under Access, Temperature or
+  Service Lock (Decoder Notice `Temperature not changed: Temperature Lock is on`), and the light, Jets and circulation under Access or
+  Service Lock (`Light not changed: Access Lock is on`). Without it each command was retried nine times before
+  `Command not confirmed by the spa after 9 attempts`. A refused or given-up set point also clears the climate entity's pending
+  target, which used to keep showing the value that was asked for. Menu writes are refused under Settings or Service Lock (not
+  yet under Access Lock — untested).
 
 **Language is read-only.** The ESP can walk the LANG menu and save, and the bus shows the save
 (screen back to LANG, no notice), but the **panel stays in the old language** — while the same

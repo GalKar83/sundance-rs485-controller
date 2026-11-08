@@ -15,81 +15,141 @@ description: >-
   and difference, or a skipped night) is also appended to input_text.spa_power_measure_circulation
   for the weekly summary; the setting is still never changed. Revised 2026-11-07: the helper list
   ignores a non-numeric start value (unknown), so only real results count towards the last 10.
+  Revised 2026-11-08 (owner): a short ESP disconnect no longer voids the night (the checks use the
+  states, not last_changed); a real disturbance (heater or jets on, pump off during the circulation
+  window, pump on during the quiet window) is caught by triggers in the waits.
 triggers:
   - trigger: time
-    at: '00:05:00'
+    at: 00:05:00
 conditions:
   - condition: state
     entity_id: binary_sensor.sundance_spa_pumps_running
-    state: 'on'
+    state: on
   - condition: state
     entity_id: binary_sensor.sundance_spa_heater
-    state: 'off'
+    state: off
   - condition: state
     entity_id: binary_sensor.sundance_spa_in_use
-    state: 'off'
+    state: off
 actions:
   - variables:
       start_ts: '{{ as_timestamp(now()) }}'
       e0: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
   - wait_for_trigger:
       - trigger: time
-        at: '01:55:00'
+        at: 01:55:00
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heater
+        to: on
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        to: on
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        to: off
+        id: disturbed
     timeout:
       hours: 2
     continue_on_timeout: false
   - condition: template
-    value_template: >-
-      {{ is_state('binary_sensor.sundance_spa_pumps_running', 'on') and
-      as_timestamp(states.binary_sensor.sundance_spa_pumps_running.last_changed) < start_ts }}
-  - condition: template
-    value_template: >-
-      {{ is_state('binary_sensor.sundance_spa_heater', 'off') and
-      as_timestamp(states.binary_sensor.sundance_spa_heater.last_changed) < start_ts }}
-  - condition: template
-    value_template: >-
-      {{ is_state('binary_sensor.sundance_spa_in_use', 'off') and
-      as_timestamp(states.binary_sensor.sundance_spa_in_use.last_changed) < start_ts }}
+    value_template: '{{ wait.trigger is not none and wait.trigger.id != ''disturbed'' }}'
+    note: 'The heater, a jet or the pump changed during this window: the night does not count.'
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_pumps_running
+    state: on
+    note: >-
+      State only: a short ESP disconnect (unavailable) no longer voids the night; real disturbances
+      are caught by the triggers of the waits.
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_heater
+    state: off
+    note: >-
+      State only: a short ESP disconnect (unavailable) no longer voids the night; real disturbances
+      are caught by the triggers of the waits.
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_in_use
+    state: off
+    note: >-
+      State only: a short ESP disconnect (unavailable) no longer voids the night; real disturbances
+      are caught by the triggers of the waits.
   - variables:
       e1: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
   - wait_for_trigger:
       - trigger: time
-        at: '02:05:00'
+        at: 02:05:00
     timeout:
       minutes: 20
     continue_on_timeout: false
   - condition: state
     entity_id: binary_sensor.sundance_spa_pumps_running
-    state: 'off'
+    state: off
   - variables:
       e2: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
       quiet_ts: '{{ as_timestamp(now()) }}'
   - wait_for_trigger:
       - trigger: time
-        at: '03:00:00'
+        at: 03:00:00
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heater
+        to: on
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        to: on
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        to: on
+        id: disturbed
     timeout:
       hours: 1
     continue_on_timeout: false
+  - condition: template
+    value_template: '{{ wait.trigger is not none and wait.trigger.id != ''disturbed'' }}'
+    note: 'The heater, a jet or the pump changed during this window: the night does not count.'
   - variables:
       e3: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
   - wait_for_trigger:
       - trigger: time
-        at: '03:55:00'
+        at: 03:55:00
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heater
+        to: on
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        to: on
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        to: on
+        id: disturbed
     timeout:
       hours: 1
     continue_on_timeout: false
   - condition: template
-    value_template: >-
-      {{ is_state('binary_sensor.sundance_spa_pumps_running', 'off') and
-      as_timestamp(states.binary_sensor.sundance_spa_pumps_running.last_changed) < quiet_ts }}
-  - condition: template
-    value_template: >-
-      {{ is_state('binary_sensor.sundance_spa_heater', 'off') and
-      as_timestamp(states.binary_sensor.sundance_spa_heater.last_changed) < start_ts }}
-  - condition: template
-    value_template: >-
-      {{ is_state('binary_sensor.sundance_spa_in_use', 'off') and
-      as_timestamp(states.binary_sensor.sundance_spa_in_use.last_changed) < start_ts }}
+    value_template: '{{ wait.trigger is not none and wait.trigger.id != ''disturbed'' }}'
+    note: 'The heater, a jet or the pump changed during this window: the night does not count.'
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_pumps_running
+    state: off
+    note: >-
+      State only: a short ESP disconnect (unavailable) no longer voids the night; real disturbances
+      are caught by the triggers of the waits.
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_heater
+    state: off
+    note: >-
+      State only: a short ESP disconnect (unavailable) no longer voids the night; real disturbances
+      are caught by the triggers of the waits.
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_in_use
+    state: off
+    note: >-
+      State only: a short ESP disconnect (unavailable) no longer voids the night; real disturbances
+      are caught by the triggers of the waits.
   - variables:
       e4: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
   - condition: template

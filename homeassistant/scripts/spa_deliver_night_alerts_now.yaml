@@ -1,0 +1,23 @@
+alias: Spa - Deliver held alerts now
+description: >-
+  Sends the spa notifications held by the quiet hours (input_text.spa_night_alerts) to the owner's
+  phone right away, as one notification, and clears the queue. Run by tapping the Quiet hours card
+  on the Hot Tub Settings page, also during the quiet hours. Does nothing when nothing is waiting.
+  Created 2026-11-08.
+mode: single
+sequence:
+  - condition: template
+    value_template: '{{ states(''input_text.spa_night_alerts'') not in ['''', ''unknown'', ''unavailable''] }}'
+  - action: notify.mobile_app_your_phone
+    data:
+      title: 'Spa: held alerts'
+      message: '{{ states(''input_text.spa_night_alerts'') | replace(''; '', ''\n'') }}'
+      data:
+        tag: spa_night_alerts
+        ttl: 0
+        priority: high
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_night_alerts
+    data:
+      value: ''

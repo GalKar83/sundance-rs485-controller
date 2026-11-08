@@ -125,6 +125,7 @@ sundance_spa:
     id: temp_format_txt
     name: "Temperature Format"
   lock_text_sensor:
+    id: lock_txt
     name: "Lock"
   language_text_sensor:
     id: language_txt
@@ -697,6 +698,21 @@ select:
     set_action:
       - lambda: |-
           id(sundance_spa_id).request_setting_write(1, x == "Eco" ? 1 : x == "Day" ? 2 : 0);
+  # Lock: Off / Access Lock / Temperature Lock / Settings Lock / Service Lock (the same names as the Lock sensor).
+  # Off sends one Menu-held frame; a lock walks the topside menu (LOCK, option, Jets 1). One lock at a time.
+  - platform: template
+    name: "Lock Setting"
+    icon: "mdi:lock"
+    entity_category: config
+    options: ["Off", "Access Lock", "Temperature Lock", "Settings Lock", "Service Lock"]
+    update_interval: 2s
+    lambda: |-
+      const std::string &v = id(lock_txt).state;
+      if (v == "Off" || v == "Access Lock" || v == "Temperature Lock" || v == "Settings Lock" || v == "Service Lock") return v;
+      return {};
+    set_action:
+      - lambda: |-
+          id(sundance_spa_id).request_lock(x == "Access Lock" ? 1 : x == "Temperature Lock" ? 2 : x == "Settings Lock" ? 3 : x == "Service Lock" ? 4 : 0);
   - platform: template
     name: "Primary Filter Cycles Setting"
     icon: "mdi:sync"

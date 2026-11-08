@@ -55,6 +55,11 @@ void SundanceClimate::setup() {
     } else {
       this->target_temperature = this->to_climate_temp_(temp);
     }
+    // The command was given up on (not confirmed after all attempts): drop the request, show the real value.
+    if (!std::isnan(this->pending_spa_target_) && !this->parent_->temp_request_pending()) {
+      this->pending_spa_target_ = NAN;
+      this->target_temperature = this->to_climate_temp_(temp);
+    }
     this->publish_climate_state_();
   });
   this->parent_->register_binary_sensor_callback(DP_HEATER, [this](const bool on) {
@@ -113,7 +118,13 @@ void SundanceClimate::control(const climate::ClimateCall &call) {
     this->target_temperature = this->to_climate_temp_(spa_temp);
     this->mode = climate::CLIMATE_MODE_HEAT;
     this->publish_state();
-    this->parent_->on_set_temp(spa_temp);
+    if (!this->parent_->on_set_temp(spa_temp)) {
+      // Refused (out of range or a lock is on): show the spa's real set point again.
+      this->pending_spa_target_ = NAN;
+      if (!std::isnan(this->parent_->get_set_temp()))
+        this->target_temperature = this->to_climate_temp_(this->parent_->get_set_temp());
+      this->publish_state();
+    }
   }
 }
 

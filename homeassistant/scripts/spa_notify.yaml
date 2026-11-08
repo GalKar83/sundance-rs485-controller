@@ -1,10 +1,12 @@
 alias: Spa - Notify (quiet hours aware)
 description: >-
   Sends a spa information notification to the owner's phone, except in the spa quiet hours
-  23:00-06:30: then the message is appended to input_text.spa_night_alerts ('HH:MM title: message;
-  ...', 255 chars max, oldest dropped) and 'Spa - Deliver night alerts' sends them all as one
-  notification at 06:30. Used by the decoder notices; questions with Yes/No buttons wait for 06:30
-  inside their own automation instead. Created 2026-11-01.
+  23:00-06:30 by default, set on the Hot Tub Settings page (input_datetime.spa_quiet_hours_start /
+  _end): then the message is appended to input_text.spa_night_alerts ('HH:MM title: message; ...',
+  255 chars max, oldest dropped) and 'Spa - Deliver night alerts' sends them all as one notification
+  when the quiet hours end. Used by the decoder notices; questions with Yes/No buttons wait for
+  06:30 inside their own automation instead. Created 2026-11-01. Revised 2026-11-08: the quiet hours
+  are read from the two time helpers, not fixed.
 mode: queued
 max: 10
 fields:
@@ -26,9 +28,9 @@ fields:
 sequence:
   - if:
       - condition: time
-        after: '23:00:00'
-        before: '06:30:00'
-        note: Spa quiet hours (window crosses midnight).
+        after: input_datetime.spa_quiet_hours_start
+        before: input_datetime.spa_quiet_hours_end
+        note: Spa quiet hours, set on the Hot Tub Settings page (the window may cross midnight).
     then:
       - action: input_text.set_value
         target:

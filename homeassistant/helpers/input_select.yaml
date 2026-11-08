@@ -98,3 +98,12 @@ spa_set_water_refresh:
   name: Spa Set Water Refresh
   options:
     - '-'
+spa_set_lock:
+  name: Spa Set Lock
+  icon: mdi:lock
+  options:
+    - Off
+    - Access Lock
+    - Temperature Lock
+    - Settings Lock
+    - Service Lock
