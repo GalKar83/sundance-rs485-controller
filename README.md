@@ -322,7 +322,8 @@ Settings* button) **or when someone saves the value at the panel**:
 | Language | English / French / Spanish / German — **not readable from the spa**: shows the last language saved at the panel (kept in flash), see §10 |
 
 **Event-driven**: *Clock Sync* (`Not synced yet` after boot / `Waiting for main screen` /
-`OK HH:MM` / `OK (already within ±n s)` / `Failed: <reason>`).
+`OK HH:MM` / `OK (already within ±n s)` / `Failed: <reason>`); *Last Settings Read* (`DD/MM/YYYY HH:MM`
+when a settings read ended without an abort, `unknown` until the first one after boot).
 
 **Counted in the ESP** (since p29; `total_increasing`, restored from flash, nothing counted while
 *Communication* is off):
@@ -394,8 +395,12 @@ Frame layout (unchanged from the 780):
   bytes `(a, b)` decodes to one value `a ^ b ^ 0x01`. The field numbers below (f0…f15) refer to the
   decoded values.
 - The status (0xC4) and lights (0xCA) payloads have an odd length (33 and 29 bytes), so the fold leaves
-  the **last payload byte** unread. It is inside the CRC, it changes with every frame and its meaning is
-  not known (the diagnostic sensor *Raw Frame Tail* shows it, §12).
+  the **last payload byte** unread. It is inside the CRC and it changes with every frame: it is a
+  per-frame random **mask** (the first payload byte XOR the last is 38 in 0xC4 and 102 in 0xCA, on the
+  680 as on the 780). The fold cancels it, which is why decoding works without reading it. In 0xCA
+  every byte can be read alone (payload XOR last byte XOR `0x24 + position`); in 0xC4 only known fields
+  moved in the set point, light, Jets 1 and heater tests (see [Pete Jorgensen's
+  DECODING.md](https://github.com/pete-jorgensen/SundanceHotTub2MQTT/blob/master/DECODING.md) §3.8 and §7).
 
 Message types seen on a 680 (sensor *Bus Message Types*):
 
@@ -752,7 +757,8 @@ Temporary, `entity_category: diagnostic`, numeric where possible so they stay ou
 | Entity | Purpose |
 |---|---|
 | Raw F1, F2, F4, F7, F9, F10, F11, F13, F14, F15 | raw decoded status bytes in HA history (correlate with events without a live log) |
-| Raw Frame Tail | the unread last payload byte of the status and lights frames, with the screen key and each byte XOR the key; at most one update per 5 s |
+| Raw Frame Tail | the last payload byte (the per-frame mask) of the status and lights frames, with the screen key and each byte XOR the key; at most one update per 5 s |
+| Raw Frame C4, Raw Frame CA | the full payload of a status / lights frame in hex, including the mask byte, at most once per 10 s. They write a state every 10 s, so disable them in Home Assistant unless you are capturing frames |
 | Screen Key | the learned k |
 | Panel Button | last topside button (name, `Idle` from boot), held 1 s so short presses survive API state batching |
 | Raw Lights | decoded lights frame |
@@ -798,8 +804,9 @@ issue with timestamps and what the panel showed.
 - The service counters are text sensors (to show `Off` / `Change Now`), so HA cannot use them in
   numeric conditions or graphs.
 - After an ESP reboot the menu-only values are `unknown` for ~2–4 minutes until the boot read runs.
-- A good *Read Settings* leaves no trace in Home Assistant: the values do not change, so nothing is
-  recorded, and the Decoder Notice appears only when the read fails.
+- A good *Read Settings* leaves no trace in the values (they do not change) and the Decoder Notice
+  appears only when the read fails; *Last Settings Read* shows when the last read finished without an
+  abort.
 - The Language sensor is not read from the spa (§10); right after a first install it is `unknown`
   until a language is saved at the panel.
 - The spa's thermostat overshoots the set point by about 0.25 °C (§11).

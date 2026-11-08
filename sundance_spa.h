@@ -163,6 +163,9 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   void set_msg_types_text_sensor(text_sensor::TextSensor *s) { this->msg_types_text_sensor_ = s; }
   void set_raw_other_text_sensor(text_sensor::TextSensor *s) { this->raw_other_text_sensor_ = s; }
   void set_raw_tail_text_sensor(text_sensor::TextSensor *s) { this->raw_tail_text_sensor_ = s; }
+  void set_last_settings_read_text_sensor(text_sensor::TextSensor *s) { this->last_settings_read_text_sensor_ = s; }
+  void set_raw_c4_text_sensor(text_sensor::TextSensor *s) { this->raw_c4_text_sensor_ = s; }
+  void set_raw_ca_text_sensor(text_sensor::TextSensor *s) { this->raw_ca_text_sensor_ = s; }
   void set_time_text_sensor(text_sensor::TextSensor *s) { this->time_text_sensor_ = s; }
   void set_heater_mode_text_sensor(text_sensor::TextSensor *s) { this->heater_mode_text_sensor_ = s; }
   void set_clearray_text_sensor(text_sensor::TextSensor *s) { this->clearray_text_sensor_ = s; }
@@ -331,6 +334,17 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   int lights_tail_{-1};
   std::string raw_tail_published_;
   uint32_t raw_tail_ms_{0};
+  // Time of the last settings read that finished without an abort (a good read leaves no other trace).
+  text_sensor::TextSensor *last_settings_read_text_sensor_{nullptr};
+  bool read_ran_{false};
+  bool read_failed_{false};
+  // Diagnostic: the full payload (hex, including the unread last byte) of a status / lights frame, at most
+  // once per 10 s, to test whether the last byte is a per-frame mask over the payload.
+  text_sensor::TextSensor *raw_c4_text_sensor_{nullptr};
+  text_sensor::TextSensor *raw_ca_text_sensor_{nullptr};
+  uint32_t raw_c4_ms_{0};
+  uint32_t raw_ca_ms_{0};
+  void publish_raw_payload_(text_sensor::TextSensor *s, uint32_t *last_ms, const uint8_t *enc, size_t len);
   void publish_raw_tail_();
   std::map<uint16_t, std::string> raw_other_last_;
   uint32_t raw_other_pub_ms_{0};

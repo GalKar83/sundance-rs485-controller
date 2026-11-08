@@ -895,6 +895,7 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
     this->status_tail_ = enc[enc_len - 1];
     this->publish_raw_tail_();
   }
+  this->publish_raw_payload_(this->raw_c4_text_sensor_, &this->raw_c4_ms_, enc, enc_len);
   if (data.size() < 15) {
     ESP_LOGW(TAG, "Decoded status too short (%u)", static_cast<unsigned>(data.size()));
     return;
@@ -1034,6 +1035,15 @@ void SundanceSpa::publish_raw_tail_() {
   this->raw_tail_text_sensor_->publish_state(buf);
 }
 
+void SundanceSpa::publish_raw_payload_(text_sensor::TextSensor *s, uint32_t *last_ms, const uint8_t *enc, size_t len) {
+  if (s == nullptr)
+    return;
+  if (*last_ms != 0 && millis() - *last_ms < 10000)
+    return;
+  *last_ms = millis() | 1;
+  s->publish_state(diag_hex_(enc, len));
+}
+
 void SundanceSpa::parse_lights_update_(const std::vector<uint8_t> &frame) {
   if (frame.size() < 10)
     return;
@@ -1046,6 +1056,7 @@ void SundanceSpa::parse_lights_update_(const std::vector<uint8_t> &frame) {
     this->lights_tail_ = enc[enc_len - 1];
     this->publish_raw_tail_();
   }
+  this->publish_raw_payload_(this->raw_ca_text_sensor_, &this->raw_ca_ms_, enc, enc_len);
   if (data.size() < 5)
     return;
 

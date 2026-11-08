@@ -1184,6 +1184,7 @@ void SundanceSpa::abort_clock_sync_(const char *why) {
     else if (this->write_kind_ == WRITE_LANG)
       this->routine_mask_ |= TASK_LANG;
   } else {
+    this->read_failed_ = true;
     this->decoder_notice_(std::string("Settings read aborted: ") + why);
   }
   this->start_next_task_();
@@ -1232,12 +1233,28 @@ void SundanceSpa::start_next_task_() {
                        : (this->routine_mask_ & TASK_LANG) ? TASK_LANG
                                                             : TASK_FC;
     this->routine_mask_ &= ~this->read_task_;
+    this->read_ran_ = true;
     this->sync_goto_(READ_WAIT_MAIN);
     ESP_LOGI(TAG, "Reading %s from the topside menu",
              this->read_task_ == TASK_UV     ? "ClearRay Bulb"
              : this->read_task_ == TASK_PF   ? "Primary Filter"
              : this->read_task_ == TASK_LANG ? "Language"
                                              : "Filter Change");
+    return;
+  }
+  // Nothing left to run: if reads ran and none was aborted, stamp the time of this settings read.
+  if (this->read_ran_) {
+    if (!this->read_failed_ && this->last_settings_read_text_sensor_ != nullptr) {
+      char buf[24];
+      auto t = this->time_ != nullptr ? this->time_->now() : ESPTime{};
+      if (t.is_valid())
+        snprintf(buf, sizeof(buf), "%02d/%02d/%04d %02d:%02d", t.day_of_month, t.month, t.year, t.hour, t.minute);
+      else
+        snprintf(buf, sizeof(buf), "OK (no time)");
+      this->last_settings_read_text_sensor_->publish_state(buf);
+    }
+    this->read_ran_ = false;
+    this->read_failed_ = false;
   }
 }
 
