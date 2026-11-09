@@ -183,6 +183,9 @@ sections:
               - Access Lock
               - Settings Lock
               - Service Lock
+          - condition: state
+            entity: select.sundance_spa_primary_filter_cycles_setting
+            state_not: '8'
       - type: custom:mushroom-template-card
         primary: Duration
         secondary: >-
@@ -205,9 +208,38 @@ sections:
               - Access Lock
               - Settings Lock
               - Service Lock
+          - condition: state
+            entity: select.sundance_spa_primary_filter_cycles_setting
+            state_not: '8'
         grid_options:
           columns: full
           rows: 1
+      - type: custom:mushroom-template-card
+        primary: Duration
+        secondary: 1 hour · fixed with 8 cycles a day
+        icon: mdi:timer-outline
+        icon_color: grey
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+        icon_tap_action:
+          action: none
+        card_mod:
+          style: ' ha-card { opacity: 0.45; }'
+        grid_options:
+          columns: full
+          rows: 1
+        visibility:
+          - condition: state
+            entity: select.sundance_spa_primary_filter_cycles_setting
+            state: '8'
+          - condition: state
+            entity: sensor.sundance_spa_lock
+            state_not:
+              - Access Lock
+              - Settings Lock
+              - Service Lock
       - type: markdown
         grid_options:
           columns: full
@@ -452,55 +484,10 @@ sections:
         tap_action:
           action: none
         grid_options:
-          columns: 6
+          columns: 12
           rows: 1
         hold_action:
           action: none
-      - type: heading
-        heading: Notifications
-        heading_style: subtitle
-      - type: markdown
-        grid_options:
-          columns: full
-        content: >-
-          <small>No spa message reaches the phone during the quiet hours. Messages are collected and
-          delivered together when they end; questions with buttons are asked then.</small>
-      - type: tile
-        entity: input_datetime.spa_quiet_hours_start
-        name: Quiet Hours Start
-        icon: mdi:bell-sleep
-        grid_options:
-          columns: 6
-      - type: tile
-        entity: input_datetime.spa_quiet_hours_end
-        name: Quiet Hours End
-        icon: mdi:bell-ring
-        grid_options:
-          columns: 6
-      - type: custom:mushroom-template-card
-        entity: binary_sensor.spa_quiet_hours
-        primary: >-
-          {{ 'Quiet hours: active now' if is_state('binary_sensor.spa_quiet_hours', 'on') else
-          'Quiet hours: not active' }}
-        secondary: >-
-          {%- set q = states('binary_sensor.spa_quiet_hours') == 'on' -%}{%- set w =
-          states('input_text.spa_night_alerts') -%}{%- set n = (w.split('; ') | count) if w not in
-          ['', 'unknown', 'unavailable'] else 0 -%}{{ ('Until ' ~
-          states('input_datetime.spa_quiet_hours_end')[0:5]) if q else ('Starts at ' ~
-          states('input_datetime.spa_quiet_hours_start')[0:5]) }}{{ ' · ' ~ n ~ ' message(s) waiting
-          - tap to send now' if n > 0 else '' }}
-        icon: >-
-          {{ 'mdi:bell-sleep' if is_state('binary_sensor.spa_quiet_hours', 'on') else
-          'mdi:bell-ring' }}
-        icon_color: '{{ ''purple'' if is_state(''binary_sensor.spa_quiet_hours'', ''on'') else ''green'' }}'
-        tap_action:
-          action: perform-action
-          perform_action: script.spa_deliver_night_alerts_now
-        hold_action:
-          action: none
-        grid_options:
-          columns: full
-          rows: 1
       - type: heading
         heading: Clock
         heading_style: subtitle
@@ -521,7 +508,8 @@ sections:
         name: Last Sync
         icon: mdi:clock-check-outline
         grid_options:
-          columns: 12
+          columns: 6
+          rows: 1
       - type: custom:mushroom-template-card
         entity: button.sundance_spa_clock_sync_now
         primary: Sync Clock
@@ -550,7 +538,8 @@ sections:
           confirmation:
             text: Sync the spa clock now? The ESP will go through the spa menu.
         grid_options:
-          columns: 12
+          columns: 6
+          rows: 1
         visibility:
           - condition: state
             entity: sensor.sundance_spa_lock
@@ -579,7 +568,8 @@ sections:
               - Settings Lock
               - Service Lock
         grid_options:
-          columns: 12
+          columns: 6
+          rows: 1
   - type: grid
     cards:
       - type: heading
@@ -654,6 +644,85 @@ sections:
           action: none
         grid_options:
           columns: full
+  - type: grid
+    cards:
+      - type: heading
+        heading: Notifications
+        heading_style: title
+        icon: mdi:bell
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>No spa message reaches the phone during the quiet hours. Messages are collected and
+          delivered together when they end; questions with buttons are asked then.</small>
+      - type: custom:mushroom-template-card
+        primary: >-
+          Quiet hours · {{ states('input_datetime.spa_quiet_hours_start')[0:5] }} – {{
+          states('input_datetime.spa_quiet_hours_end')[0:5] }}
+        icon: >-
+          {{ 'mdi:bell-sleep' if is_state('binary_sensor.spa_quiet_hours', 'on') else
+          'mdi:bell-ring' }}
+        icon_color: '{{ ''purple'' if is_state(''binary_sensor.spa_quiet_hours'', ''on'') else ''green'' }}'
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+          rows: 1
+        secondary: >-
+          {%- set q = is_state('binary_sensor.spa_quiet_hours', 'on') -%}{%- set w =
+          states('input_text.spa_night_alerts') -%}{%- set n = (w.split('; ') | count) if w not in
+          ['', 'unknown', 'unavailable'] else 0 -%}{{ ('Active now · until ' ~
+          states('input_datetime.spa_quiet_hours_end')[0:5]) if q else ('Not active · starts at ' ~
+          states('input_datetime.spa_quiet_hours_start')[0:5]) }}{{ ' · ' ~ n ~ ' message(s) waiting
+          - tap to send now' }}
+        tap_action:
+          action: perform-action
+          perform_action: script.spa_deliver_night_alerts_now
+        visibility:
+          - condition: state
+            entity: binary_sensor.spa_quiet_hours
+            state: 'on'
+          - condition: state
+            entity: input_text.spa_night_alerts
+            state_not:
+              - ''
+              - unknown
+              - unavailable
+      - type: custom:mushroom-template-card
+        primary: >-
+          Quiet hours · {{ states('input_datetime.spa_quiet_hours_start')[0:5] }} – {{
+          states('input_datetime.spa_quiet_hours_end')[0:5] }}
+        icon: >-
+          {{ 'mdi:bell-sleep' if is_state('binary_sensor.spa_quiet_hours', 'on') else
+          'mdi:bell-ring' }}
+        icon_color: '{{ ''purple'' if is_state(''binary_sensor.spa_quiet_hours'', ''on'') else ''green'' }}'
+        hold_action:
+          action: none
+        grid_options:
+          columns: full
+          rows: 1
+        secondary: >-
+          {%- set q = is_state('binary_sensor.spa_quiet_hours', 'on') -%}{%- set w =
+          states('input_text.spa_night_alerts') -%}{%- set n = (w.split('; ') | count) if w not in
+          ['', 'unknown', 'unavailable'] else 0 -%}{{ ('Active now · until ' ~
+          states('input_datetime.spa_quiet_hours_end')[0:5]) if q else ('Not active · starts at ' ~
+          states('input_datetime.spa_quiet_hours_start')[0:5]) }} · tap to edit
+        tap_action:
+          action: navigate
+          navigation_path: /home-control/hot-tub-quiet-hours
+        visibility:
+          - condition: or
+            conditions:
+              - condition: state
+                entity: binary_sensor.spa_quiet_hours
+                state: 'off'
+              - condition: state
+                entity: input_text.spa_night_alerts
+                state:
+                  - ''
+                  - unknown
+                  - unavailable
   - type: grid
     cards:
       - type: heading

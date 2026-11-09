@@ -582,6 +582,14 @@ void SundanceSpa::observe_menu_values_() {
       this->pf_cycles_sensor_->publish_state(prev_value);
     if (prev == SCREEN_PF_DURATION && screen == SCREEN_PF && this->pf_duration_sensor_ != nullptr)
       this->pf_duration_sensor_->publish_state(prev_value);
+    // 8 cycles a day: the spa fixes the duration at 1 h and goes from the cycles screen straight back to PF, with no
+    // duration screen (manual 10.x; seen 2026-11-09 06:27: 113 -> 14 -> 73).
+    if ((prev == SCREEN_PF_CYCLES || prev == SCREEN_PF_CYCLES_EDIT) && screen == SCREEN_PF && prev_value == 8) {
+      if (this->pf_cycles_sensor_ != nullptr)
+        this->pf_cycles_sensor_->publish_state(8);
+      if (this->pf_duration_sensor_ != nullptr)
+        this->pf_duration_sensor_->publish_state(1);
+    }
     // Language: Jets 1 on the LANG edit screen saves the language shown (from the display
     // screen it keeps the current one, which f15 does not show).
     if (prev == SCREEN_LANG_EDIT && screen == SCREEN_LANG)
@@ -891,6 +899,11 @@ void SundanceSpa::request_setting_write(int kind, int value) {
     this->decoder_notice_(std::string(write_name_(kind)) + " not changed: the panel is locked");
     return;
   }
+  if (kind == WRITE_PF_DURATION && value != 1 && this->pf_cycles_sensor_ != nullptr && this->pf_cycles_sensor_->has_state() &&
+      this->pf_cycles_sensor_->state == 8 && this->write_pending_[WRITE_PF_CYCLES] == -1) {
+    this->decoder_notice_("Primary Filter duration not changed: 8 cycles a day allow only 1 hour");
+    return;
+  }
   ESP_LOGI(TAG, "Setting write queued: %s = %d", write_name_(kind), value);
   this->write_pending_[kind] = value;
   if (this->sync_step_ == SYNC_IDLE)
@@ -1095,7 +1108,10 @@ void SundanceSpa::service_write_(int screen, int value, uint32_t now) {
       if (now - this->sync_press_ms_ < READ_DWELL_MS)
         return;
       this->sync_press_(BTN_P1);
-      if (this->write_kind_ == WRITE_PF && this->write_field_ < 2) {
+      if (this->write_kind_ == WRITE_PF && this->write_field_ == 1 && value == 8) {
+        // 8 cycles a day: no duration screen follows, the spa goes straight back to the PF menu (duration fixed at 1 h).
+        this->sync_goto_(WRITE_SAVE);
+      } else if (this->write_kind_ == WRITE_PF && this->write_field_ < 2) {
         this->write_field_++;
         this->write_presses_ = 0;
         this->write_no_change_ = 0;
@@ -1795,6 +1811,9 @@ void SundanceSpa::service_clock_sync_() {
       if (screen == ok1 || screen == ok2) {
         if (value != 0 && now - this->sync_step_ms_ > READ_DWELL_MS && now - this->sync_press_ms_ > READ_DWELL_MS) {
           this->sync_press_(BTN_P1);
+          // 8 cycles a day: the spa goes straight back to the PF menu, there is no duration screen (fixed at 1 h).
+          if (this->sync_step_ == READ_PF_CYCLES && value == 8)
+            next = READ_PF_SAVE;
           this->sync_goto_(next);
         }
       } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS + READ_DWELL_MS) {

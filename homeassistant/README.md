@@ -8,18 +8,23 @@ to work; take what you want.
 - [`automations/`](automations) — one YAML file per automation (23; the optional power-measurement ones are in
   [`optional/`](optional/power-measurement)). Paste it into a new
   automation with *Edit in YAML*.
-- [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), `spa_deliver_night_alerts_now` (sends the queue at once), and the plan scripts
-  `spa_plan_add`, `spa_plan_delete` and `spa_target_step`.
+- [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), `spa_deliver_night_alerts_now` (sends the queue at once), the plan scripts
+  `spa_plan_add`, `spa_plan_delete` and `spa_target_step`, and `spa_audio_control` (the Spa Audio previous / play-pause / next buttons;
+  see [Spa audio](#spa-audio-who-is-connected-what-is-playing)).
 - [`helpers/`](helpers) — the helpers the automations use: `input_boolean`, `input_number`,
   `input_text`, `input_datetime`, `input_select` and `counter` (create them in the UI with these
   options, or paste them into `configuration.yaml`), and `config_entry_helpers.yaml` with the template,
   utility-meter, integration and statistics helpers that the UI creates as config entries
   (`domain` = helper type, `options` = its settings; the `device_id` was removed — assign them to
   your own spa device).
-- [`dashboard/`](dashboard) — the three pages: `hot_tub_view.yaml`, `hot_tub_settings_view.yaml`
-  and `hot_tub_plans_view.yaml` (screenshots in the main README §4). They are *sections* views;
+- [`dashboard/`](dashboard) — the four pages: `hot_tub_view.yaml`, `hot_tub_settings_view.yaml`,
+  `hot_tub_quiet_hours_view.yaml` and `hot_tub_plans_view.yaml` (screenshots in the main README §4). They are *sections* views;
   add each to a dashboard with its raw configuration editor. The owner's outdoor weather block was
   left out of the Hot Tub page.
+- **Spa Audio** (optional, Android Companion app): who is connected to the spa's Bluetooth audio and what is playing, with
+  previous / play-pause / next buttons. It needs the helpers `input_text.spa_audio_bluetooth_mac`, three template sensors, the
+  script `spa_audio_control` and one row on the Hot Tub page; see [Spa audio](#spa-audio-who-is-connected-what-is-playing)
+  (a subsection of §4).
 - [`optional/power-measurement/`](optional/power-measurement) — measuring the spa's power against
   the whole-house consumption, with a weekly phone summary. **Only relevant if you have a
   whole-house power sensor**, and then the entity names will differ; its own README explains it.
@@ -49,7 +54,7 @@ Contents
 1. [Design rules](#1-design-rules)
 2. [Helpers](#2-helpers)
 3. [Electrical power and energy](#3-electrical-power-and-energy)
-4. [Automations](#4-automations)
+4. [Automations](#4-automations) (including [Spa audio](#spa-audio-who-is-connected-what-is-playing))
 5. [Dashboard](#5-dashboard)
 6. [Things learned the hard way](#6-things-learned-the-hard-way)
 7. [Ideas not built yet](#7-ideas-not-built-yet)
@@ -465,8 +470,8 @@ Replace the phone entity ids in the templates (`sensor.person1_phone_bluetooth_c
 
 ## 5. Dashboard
 
-There are three pages: **Hot Tub**, **Settings** (`hot-tub-settings`) and **Scheduled Plans**
-(`hot-tub-plans`), all in one dashboard. Most rows are Mushroom template cards, one line each, with
+There are four pages: **Hot Tub**, **Settings** (`hot-tub-settings`), **Quiet Hours** (`hot-tub-quiet-hours`, opened from the
+Settings page) and **Scheduled Plans** (`hot-tub-plans`), all in one dashboard. Most rows are Mushroom template cards, one line each, with
 the numbers and units in smaller type (card-mod); several are shown in °C or °F depending on
 `sensor.sundance_spa_temperature_format`.
 
@@ -496,8 +501,9 @@ A plan is deleted only with the trash icon, never by tapping its row.
 **Settings:** Heating (Heater Mode with an Eco/Day explanation card, Primary Filter start / cycles /
 duration — the cycles and duration are not greyed out in Eco or Day because they apply in every
 mode), the three service counters as dropdowns, temperature format, the **Lock** dropdown with an explanation of the
-selected lock, language (display only, with no write), the **Notifications** block (quiet hours start and end, and a card that
-says whether the quiet hours are on and how many messages wait; tap it to send them), the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 hours* line under them (the measured
+selected lock, language (display only, with no write), a separate **Notifications** section (between Power Values and Diagnostics) with one *Quiet hours*
+card that shows the start and end and whether the quiet hours are on (icon and colour change); when messages wait during the quiet
+hours a tap sends them, otherwise a tap opens the **Quiet Hours** page where the start and end are edited, the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 hours* line under them (the measured
 power against the setting from the optional power measurement, same text as its weekly summary;
 without a house power sensor it only says "no valid measurement"), and a Diagnostics block
 (Status, Wi-Fi signal, Decoder Notice).

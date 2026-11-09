@@ -1,0 +1,31 @@
+title: Quiet Hours
+path: hot-tub-quiet-hours
+icon: mdi:bell-sleep
+subview: true
+back_path: /home-control/hot-tub-settings
+type: sections
+max_columns: 1
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Quiet Hours
+        heading_style: title
+        icon: mdi:bell-sleep
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>No spa message reaches the phone during the quiet hours. Messages are collected and
+          delivered together when they end; questions with buttons are asked then. The window may
+          cross midnight.</small>
+      - type: entities
+        grid_options:
+          columns: full
+        entities:
+          - entity: input_datetime.spa_quiet_hours_start
+            name: Start
+            icon: mdi:bell-sleep
+          - entity: input_datetime.spa_quiet_hours_end
+            name: End
+            icon: mdi:bell-ring

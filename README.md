@@ -164,7 +164,13 @@ for the component; it is the owner's complete setup. To use it, in this order:
   author (or anyone else whose work is included) asks for something to be changed or removed, it
   will be done promptly — please open an issue on this repository.
 - Reference manual: Sundance *2020 680 Series Owner's Manual* (menu order, value ranges, heat modes,
-  lock modes, error codes).
+  lock modes, error codes), copyright Sundance Spas, not included in this repository. It can be downloaded from
+  [a dealer's copy](https://clientassets.normalbear.com/wp-content/uploads/2022/08/2020-680-series-manual-eng.pdf)
+  (the same file the notes here were checked against; SHA-256 df2182496ec421fa…), from its
+  [Wayback Machine snapshot](https://web.archive.org/web/20260416041505/https://clientassets.normalbear.com/wp-content/uploads/2022/08/2020-680-series-manual-eng.pdf)
+  (byte-identical), or from Sundance Spas' own manuals page.
+  Sections the notes refer to: the Primary Filter settings (for the 8 cycles per day option only a 1 hour duration can be
+  selected) and lock modes (10.10).
 
 ## 2. Hardware and wiring
 
@@ -666,7 +672,8 @@ last reported screen is the one expected, any panel press aborts), plus:
 6. A failed or aborted walk leaves *Decoder Notice* `<setting> not changed: <why>` and re-reads the
    menu; a later successful write clears that notice (other notices keep their hour).
 
-A walk takes about 6 s once started. 8 cycles a day allow only a 1 h duration.
+A walk takes about 6 s once started. 8 cycles a day allow only a 1 h duration (manual: "For the 8 cycles per day option, you can only select 1 hour duration").
+With 8 cycles the cycles screen is followed straight by the PF menu — **there is no duration screen** (seen 9 Nov 2026: 113 → 14 → 73), so since p37 the write and the settings read do not wait for it, 8 cycles publish a duration of 1 h, and a duration other than 1 h is refused while 8 cycles are set (Decoder Notice `Primary Filter duration not changed: 8 cycles a day allow only 1 hour`). All 12 combinations of 1–4 cycles and 1–3 h, and 8 cycles with 1 h, were written and read back on the 680 (9 Nov 2026).
 
 **Locks from the ESP** (p35, verified on the 680 on 8 Nov 2026):
 
