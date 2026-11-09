@@ -127,9 +127,6 @@ sundance_spa:
   lock_text_sensor:
     id: lock_txt
     name: "Lock"
-  language_text_sensor:
-    id: language_txt
-    name: "Language"
   # Run time since each item was turned on (counts up, resets when off)
   jet1_run_time_sensor:
     name: "Jet 1 Run Time"

@@ -239,11 +239,6 @@ void SundanceSpa::setup() {
     this->sl_on_ = (locks & 1) != 0;
     this->svl_on_ = (locks & 2) != 0;
   }
-  // Language: f15 never shows the current one, so the last confirmed change is kept across restarts.
-  this->lang_pref_ = global_preferences->make_preference<uint8_t>(0x5D10C4A2UL);
-  uint8_t lang = 255;
-  if (this->lang_pref_.load(&lang) && lang < 4)
-    this->publish_language_(lang, false);
 }
 
 static std::string diag_hex_(const uint8_t *data, size_t len) {

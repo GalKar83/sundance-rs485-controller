@@ -172,12 +172,22 @@ static const char *heater_mode_name_(int raw) {
 // A day (1-31) never overflows the byte. Still ambiguous (22 Oct == 23 Feb: months m and m+8 differ
 // only in day bit 0), so pick the candidate nearest HA's date.
 static int encode_spa_date_(int day, int month) { return ((day << 3) ^ month) & 0xFF; }
+// f9 holds (year - 2000) XOR 1; its bit 0 is ignored (see decode_spa_date_).
+static bool spa_year_matches_(int f9, int year) { return (f9 >> 1) == (((year - 2000) ^ 1) >> 1); }
 
 bool SundanceSpa::decode_spa_date_(int &year, int &month, int &day) const {
   if (this->prior_status_.size() < 16)
     return false;
   const int f7 = this->prior_status_[7];
+  // f9 = (year - 2000) XOR 1, but its bit 0 is not reliable: on 2026-11-09 it read 26 instead of 27 (year 2027 instead
+  // of 2026) whenever the ClearRay counter was 10, and 27 again at 320 and at 58/59. Only the other bits are used;
+  // when they match HA's year, HA's year is taken.
   year = 2000 + (this->prior_status_[9] ^ 1);
+  if (this->time_ != nullptr) {
+    auto ty = this->time_->now();
+    if (ty.is_valid() && spa_year_matches_(this->prior_status_[9], ty.year))
+      year = ty.year;
+  }
   int best_m = 0, best_d = 0, best_dist = 100000;
   int ref = -1;
   if (this->time_ != nullptr) {
@@ -511,36 +521,6 @@ void SundanceSpa::service_lock_event_() {
   }
 }
 
-// LANG edit screen f15 for languages 0 English, 1 French, 2 Spanish, 3 German (Warmer order).
-// Observed: key 0 (2026-10-23) and key 115 (2026-11-06) plain; key 14 (2026-11-03) shifted by 2
-// (1 German, 2 English). PROVISIONAL model: shifted by 2 when key bit 2 is set (14 yes; 0, 112, 115 no) -
-// only three keys seen. The LANG display screen (first Warmer) always shows f15 0 and carries no value.
-static int lang_code_(int lang, int key) { return (key & 4) ? (lang ^ 2) & 3 : lang & 3; }
-
-// from_screen: value is an f15 code (decoded here) and is kept for the next boot; otherwise it is the
-// language restored at boot.
-void SundanceSpa::publish_language_(int value, bool from_screen) {
-  static const char *const NAMES[] = {"English", "French", "Spanish", "German"};
-  if (from_screen && value >= 0 && value < 4) {
-    value = lang_code_(value, this->screen_key_);  // XOR is its own inverse
-    uint8_t saved = 255;
-    if (!this->lang_pref_.load(&saved) || saved != value) {
-      saved = static_cast<uint8_t>(value);
-      this->lang_pref_.save(&saved);
-    }
-  }
-  if (this->language_text_sensor_ == nullptr)
-    return;
-  char buf[16];
-  const char *name = buf;
-  if (value >= 0 && value < 4)
-    name = NAMES[value];
-  else
-    snprintf(buf, sizeof(buf), "Unknown (%d)", value);
-  if (!this->language_text_sensor_->has_state() || this->language_text_sensor_->state != name)
-    this->language_text_sensor_->publish_state(name);
-}
-
 void SundanceSpa::observe_menu_values_() {
   const int prev = this->menu_prev_screen_;
   const int prev_value = this->menu_prev_value_;
@@ -590,10 +570,6 @@ void SundanceSpa::observe_menu_values_() {
       if (this->pf_duration_sensor_ != nullptr)
         this->pf_duration_sensor_->publish_state(1);
     }
-    // Language: Jets 1 on the LANG edit screen saves the language shown (from the display
-    // screen it keeps the current one, which f15 does not show).
-    if (prev == SCREEN_LANG_EDIT && screen == SCREEN_LANG)
-      this->publish_language_(prev_value);
     // Filter Change: Jets 1 on an FC value screen saves it; 128 = Off (2026-10-22/25).
     if ((prev == SCREEN_FC_SHOW || prev == SCREEN_FC_EDIT) && screen == SCREEN_FC && prev_value == 128) {
       this->fc_zero_kind_ = 1;
@@ -674,8 +650,6 @@ enum SyncStep : int {
   READ_PF_CYCLES,
   READ_PF_DURATION,
   READ_PF_SAVE,
-  READ_LANG_NAV,
-  READ_LANG_SHOW,
   TASK_WAIT_MAIN,
   READ_FC_NAV,
   READ_FC_SHOW,
@@ -694,9 +668,8 @@ enum SyncStep : int {
 
 static const int NAV_TO_UV[] = {73, 64, 95, 90};
 static const uint32_t READ_DWELL_MS = 1500;  // let f15 settle before confirming a PF value
-static const int NAV_TO_LANG[] = {73, 64, 95, 90, 89, 84, 81, 106, 105};
 static const int NAV_TO_FC[] = {73, 64, 95};
-static const int TASK_SYNC = 1, TASK_UV = 2, TASK_PF = 4, TASK_LANG = 8, TASK_FC = 16;
+static const int TASK_SYNC = 1, TASK_UV = 2, TASK_PF = 4, TASK_FC = 16;
 
 // ---------------------------------------------------------------- settings write
 // Menu screens (normalized) of the settings written from HA; see the README §9 table.
@@ -884,8 +857,8 @@ void SundanceSpa::request_setting_write(int kind, int value) {
       ok = value == 0 || value == 1;
       break;
     case WRITE_LANG:
-      // Disabled (p31b): the ESP's presses do not change the panel language, and the code mapping per key
-      // is not settled. Re-enable (ok = value >= 0 && value <= 3) once both are understood.
+      // Disabled (p31b): the ESP's presses do not change the panel language, and it cannot be read from the bus
+      // either (README §9/§10, tests of 2026-11-09).
       ESP_LOGW(TAG, "Language write is disabled");
       break;
     default:
@@ -942,8 +915,6 @@ bool SundanceSpa::start_next_write_() {
         this->write_target_[0] = uv_code_(v);
       else if (kind == WRITE_FC || kind == WRITE_H2O)
         this->write_target_[0] = v == 0 ? 128 : v;
-      else if (kind == WRITE_LANG)
-        this->write_target_[0] = lang_code_(v, this->screen_key_);
       else
         this->write_target_[0] = v;
       if (kind == WRITE_TEMP_UNIT && (v == 1) == this->spa_fahrenheit_) {
@@ -1312,7 +1283,7 @@ void SundanceSpa::request_clock_sync(bool manual) {
     auto t = this->time_->now();
     const bool date_ok = this->prior_status_.size() >= 16 &&
                          this->prior_status_[7] == encode_spa_date_(t.day_of_month, t.month) &&
-                         this->prior_status_[9] == ((t.year - 2000) ^ 1);
+                         spa_year_matches_(this->prior_status_[9], t.year);
     if (this->sync_delta_min_ == 0 && date_ok) {
       char buf[48];
       snprintf(buf, sizeof(buf), "OK (already within %+d s)", off);
@@ -1346,8 +1317,6 @@ void SundanceSpa::abort_clock_sync_(const char *why) {
       this->routine_mask_ |= TASK_PF;
     else if (this->write_kind_ == WRITE_UV)
       this->routine_mask_ |= TASK_UV;
-    else if (this->write_kind_ == WRITE_LANG)
-      this->routine_mask_ |= TASK_LANG;
   } else {
     this->read_failed_ = true;
     this->decoder_notice_(std::string("Settings read aborted: ") + why);
@@ -1366,7 +1335,7 @@ bool SundanceSpa::clock_needs_sync_() const {
   int drift = std::abs(ha_min - spa_min);
   drift = std::min(drift, 1440 - drift);
   const bool date_ok = this->prior_status_[7] == encode_spa_date_(t.day_of_month, t.month) &&
-                       this->prior_status_[9] == ((t.year - 2000) ^ 1);
+                       spa_year_matches_(this->prior_status_[9], t.year);
   // The spa only reports whole minutes, but the moment its minute rolls over gives its offset to the
   // second (see track_spa_offset_()). Sync from SYNC_AUTO_LIMIT_S when a whole-minute move actually
   // improves it (otherwise every check would end in "already within"), or from 120 s after two syncs in a
@@ -1381,7 +1350,7 @@ bool SundanceSpa::clock_needs_sync_() const {
   return drift > 1 || !date_ok;
 }
 
-// Runs the queued tasks one after another: clock sync, then UV, PF and language reads.
+// Runs the queued tasks one after another: clock sync, then UV, PF and Filter Change reads.
 void SundanceSpa::start_next_task_() {
   if (this->sync_step_ != SYNC_IDLE)
     return;
@@ -1392,19 +1361,17 @@ void SundanceSpa::start_next_task_() {
   }
   if (this->start_next_write_())
     return;
-  if (this->routine_mask_ & (TASK_UV | TASK_PF | TASK_LANG | TASK_FC)) {
-    this->read_task_ = (this->routine_mask_ & TASK_UV)     ? TASK_UV
-                       : (this->routine_mask_ & TASK_PF)   ? TASK_PF
-                       : (this->routine_mask_ & TASK_LANG) ? TASK_LANG
-                                                            : TASK_FC;
+  if (this->routine_mask_ & (TASK_UV | TASK_PF | TASK_FC)) {
+    this->read_task_ = (this->routine_mask_ & TASK_UV)   ? TASK_UV
+                       : (this->routine_mask_ & TASK_PF) ? TASK_PF
+                                                          : TASK_FC;
     this->routine_mask_ &= ~this->read_task_;
     this->read_ran_ = true;
     this->sync_goto_(READ_WAIT_MAIN);
     ESP_LOGI(TAG, "Reading %s from the topside menu",
-             this->read_task_ == TASK_UV     ? "ClearRay Bulb"
-             : this->read_task_ == TASK_PF   ? "Primary Filter"
-             : this->read_task_ == TASK_LANG ? "Language"
-                                             : "Filter Change");
+             this->read_task_ == TASK_UV   ? "ClearRay Bulb"
+             : this->read_task_ == TASK_PF ? "Primary Filter"
+                                           : "Filter Change");
     return;
   }
   // Nothing left to run: if reads ran and none was aborted, stamp the time of this settings read.
@@ -1428,7 +1395,7 @@ void SundanceSpa::request_settings_read(bool with_sync) {
     ESP_LOGW(TAG, "Menu task already running");
     return;
   }
-  this->routine_mask_ = TASK_UV | TASK_PF | TASK_LANG;
+  this->routine_mask_ = TASK_UV | TASK_PF;
   // FC at 0 is either Off or due; only the FC menu tells which.
   if (this->prior_status_.size() >= 16 && this->prior_status_[3] == 0xFA && this->fc_zero_kind_ == 0)
     this->routine_mask_ |= TASK_FC;
@@ -1717,10 +1684,9 @@ void SundanceSpa::service_clock_sync_() {
       this->sync_started_ms_ = now;
       this->sync_nav_index_ = 0;
       this->sync_press_(BTN_MENU);
-      this->sync_goto_(this->read_task_ == TASK_UV     ? READ_UV_NAV
-                       : this->read_task_ == TASK_PF   ? READ_PF_NAV
-                       : this->read_task_ == TASK_LANG ? READ_LANG_NAV
-                                                       : READ_FC_NAV);
+      this->sync_goto_(this->read_task_ == TASK_UV   ? READ_UV_NAV
+                       : this->read_task_ == TASK_PF ? READ_PF_NAV
+                                                     : READ_FC_NAV);
       return;
     }
     case READ_FC_NAV: {
@@ -1827,35 +1793,6 @@ void SundanceSpa::service_clock_sync_() {
         this->sync_goto_(TASK_WAIT_MAIN);
       } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS) {
         this->abort_clock_sync_("PF confirm");
-      }
-      return;
-    }
-    case READ_LANG_NAV: {
-      const int expect = NAV_TO_LANG[this->sync_nav_index_];
-      if (screen == expect) {
-        if (expect == SCREEN_LANG) {
-          this->sync_press_(BTN_TEMP_UP);  // first press only displays the current language
-          this->sync_goto_(READ_LANG_SHOW);
-        } else {
-          this->sync_nav_index_++;
-          this->sync_press_(BTN_MENU);
-          this->sync_step_ms_ = now;
-        }
-      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS) {
-        this->abort_clock_sync_("LANG menu navigation");
-      }
-      return;
-    }
-    case READ_LANG_SHOW: {
-      // English is 0, so wait for f15 to settle instead of waiting for a non-zero value.
-      if (screen == SCREEN_LANG_SHOW) {
-        if (now - this->sync_step_ms_ > READ_DWELL_MS) {
-          // f15 here is always 0: the language is known only from a confirmed change.
-          ESP_LOGI(TAG, "Language display screen (f15 %d, no value)", value);
-          this->sync_goto_(TASK_WAIT_MAIN);  // no further presses: the menu times out unsaved
-        }
-      } else if (now - this->sync_step_ms_ > SYNC_STEP_TIMEOUT_MS) {
-        this->abort_clock_sync_("LANG display");
       }
       return;
     }

@@ -71,7 +71,6 @@ CONF_RAW_OTHER_TEXT_SENSOR = "raw_other_text_sensor"
 CONF_TIME_TEXT_SENSOR = "time_text_sensor"
 CONF_HEATER_MODE_TEXT_SENSOR = "heater_mode_text_sensor"
 CONF_CLEARRAY_TEXT_SENSOR = "clearray_text_sensor"
-CONF_LANGUAGE_TEXT_SENSOR = "language_text_sensor"
 CONF_LOCK_TEXT_SENSOR = "lock_text_sensor"
 CONF_TEMP_FORMAT_TEXT_SENSOR = "temp_format_text_sensor"
 CONF_DATE_TEXT_SENSOR = "date_text_sensor"
@@ -184,7 +183,6 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_TIME_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:clock-outline"),
             cv.Optional(CONF_HEATER_MODE_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:radiator"),
             cv.Optional(CONF_CLEARRAY_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:lightbulb-fluorescent-tube"),
-            cv.Optional(CONF_LANGUAGE_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:translate"),
             cv.Optional(CONF_LOCK_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:lock"),
             cv.Optional(CONF_TEMP_FORMAT_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:thermometer"),
             cv.Optional(CONF_DATE_TEXT_SENSOR): text_sensor.text_sensor_schema(icon="mdi:calendar"),
@@ -352,10 +350,6 @@ async def to_code(config):
     if CONF_CLEARRAY_TEXT_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_CLEARRAY_TEXT_SENSOR])
         cg.add(var.set_clearray_text_sensor(sens))
-
-    if CONF_LANGUAGE_TEXT_SENSOR in config:
-        sens = await text_sensor.new_text_sensor(config[CONF_LANGUAGE_TEXT_SENSOR])
-        cg.add(var.set_language_text_sensor(sens))
 
     if CONF_LOCK_TEXT_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_LOCK_TEXT_SENSOR])

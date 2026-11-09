@@ -26,7 +26,7 @@ spot mistakes.
 > Status (2026-11-06): running daily on one spa. Temperature, set point, heater, both jets,
 > circulation, lights, heater mode, clock/date (read + automatic sync to within a minute, incl. DST
 > changes), service counters (with Off / Change Now), Primary Filter settings and states (incl.
-> Cleanup and Purge), language (display only), all four lock modes, temperature unit, run timers,
+> Cleanup and Purge), all four lock modes, temperature unit, run timers,
 > activity sessions and a Decoder Notice are exposed to Home Assistant. **Settings can also be
 > written from Home Assistant** (heater mode, Primary Filter start / cycles / duration, the three
 > service counters, °C/°F) by walking the topside menu (§10). Run time, energy and power are
@@ -35,7 +35,7 @@ spot mistakes.
 > Electrical power was measured against the house load (§11); the power value of each load is a
 > setting on the device. The Home Assistant side (helpers, heating plans, reminders, dashboard) is
 > documented in [`homeassistant/`](homeassistant/README.md). A few status bits are still unknown
-> and the language code is only partly decoded — see
+> and the panel language cannot be read from the bus (§10) — see
 > [Open questions](#13-open-questions--help-wanted).
 
 Contents
@@ -244,7 +244,7 @@ topside:
 | Heater mode | rest/ready | **Auto / Eco / Day** (f6 = 32/34/36) |
 | Clock | time only | time **and date** decoded; HA→spa sync by navigating the menu |
 | Service counters | not mapped | Water Refresh, Filter Change (status frame), ClearRay bulb (menu read); each as days / `Change Now` / `Off` |
-| Settings | — | Primary Filter start/cycles/duration, language, lock, °C/°F (status or menu); **written from HA** by walking the menu (heater mode, Primary Filter, service counters, °C/°F, and the four locks — §10) |
+| Settings | — | Primary Filter start/cycles/duration, lock, °C/°F (status or menu); **written from HA** by walking the menu (heater mode, Primary Filter, service counters, °C/°F, and the four locks — §10) |
 | Run time / energy | — | counted **in the ESP** from the debounced states × the Power settings; restored across reboots, so Wi-Fi drops and reboots do not lose them |
 | Screen codes | — | **XOR-masked by a key derived from the ClearRay counter** — it changes every midnight (see §9) |
 | Climate modes | heat/off | **Heat only** — the 680 has no heater-off mode (ESPHome's traits start with OFF, so the set is replaced) |
@@ -325,7 +325,7 @@ Settings* button) **or when someone saves the value at the panel**:
 | Primary Filter Start | HH:00 (24 h) |
 | Primary Filter Cycles | 1–4 |
 | Primary Filter Duration | hours |
-| Language | English / French / Spanish / German — **not readable from the spa**: shows the last language saved at the panel (kept in flash), see §10 |
+| Language | English / French / Spanish / German — **cannot be read from the spa** (§10). The *Language* sensor of this firmware only guesses from the saves it happens to see and is wrong after a change that is not seen: do not use it; it is going to be removed |
 
 **Event-driven**: *Clock Sync* (`Not synced yet` after boot / `Waiting for main screen` /
 `OK HH:MM` / `OK (already within ±n s)` / `Failed: <reason>`); *Last Settings Read* (`DD/MM/YYYY HH:MM`
@@ -604,7 +604,7 @@ The menu times out (≈5–25 s) without saving. **Each Jets 1 press saves the s
 | TIME | Warmer → 85 hour (display) / **82 hour (editing)** → Jets 1 → 83 minute → Jets 1 → 80 AM/PM → Jets 1 saves → 84 | hour and minute are XOR-masked like f13 (the mask changes); AM/PM: 1 = PM. **Hour (1–12) and minute (0–59) each wrap on their own** — 59 → 00 does not change the hour, 12 → 1 does not change AM/PM (owner's panel tests, 27 Oct) |
 | DATE | Warmer → 110 (scroll) → Warmer → 111 year → Jets 1 → 108 month → Jets 1 → 109 day → Jets 1 saves → 81 | year as yy; month; day |
 | TEMP | Warmer → 107 (shows current unit) → Warmer → 104 (unit switched) → Jets 1 saves → 106 | f15 1 on 107, 0 on 104 in **both** directions — it does not encode the unit; the unit is f14 bit 6 (owner panel test 3 Nov: °C→°F and back, same screens) |
-| LANG | Warmer → 102 (shows the current language **on the panel only**; f15 is always 0 here) → further presses 103 (the language being chosen) | order of the cycle: English → French → Spanish → German → English. f15 codes seen: key 0 (23 Oct) and key 115 (6 Nov): 0 English, 1 French, 2 Spanish, 3 German; key 14 (3 Nov): 1 German, 2 English, 3 French, 0 Spanish (shifted by 2). **Provisional model:** shifted by 2 when bit 2 of the key is set — three keys only |
+| LANG | Warmer → 102 (shows the current language **on the panel only**; f15 is always 0 here) → further presses 103 (the language being chosen) | **The language is not on the bus** (tests of 9 Nov, keys 14 and 68). f15 on the edit screen is a number that rises by 1 per Warmer press (mod 4) from a first value that does **not** depend on the stored language (at key 14 it was 1 on English and also 1 on Spanish; at key 68 it was 0 and later 1), and the order of the cycle changes with the stored language (from English: English → French → Spanish → German; from Spanish: Spanish → French → German → English). A quick Warmer followed by Jets 1 (about a second) can leave no frame and no Panel Button event at all, so the last step of a change is lost (2 of 3 blind tests). Nothing in f1–f15 changes after a save |
 | LOCK | Cooler → 101 AL → 13 SVL → 15 TL → 98 SL (option screens) → Jets 1 saves | — (option is in the screen code) |
 
 Other screens seen: 114 when Menu is pressed while Settings Lock is on; 10 right after an unlock;
@@ -703,12 +703,14 @@ With 8 cycles the cycles screen is followed straight by the PF menu — **there 
   target, which used to keep showing the value that was asked for. Menu writes are refused under Settings or Service Lock (not
   yet under Access Lock — untested).
 
-**Language is read-only.** The ESP can walk the LANG menu and save, and the bus shows the save
+**Language: neither writable nor readable.** The ESP can walk the LANG menu and save, and the bus shows the save
 (screen back to LANG, no notice), but the **panel stays in the old language** — while the same
-presses made by hand do change it. The cause is unknown (the setting may belong to the topside).
-The f15 code also depends on the screen key (§9). So the language write and its select were
-removed; the Language sensor shows what the ESP last saw saved at the panel, kept in flash across
-reboots (the LANG display screen carries no value, so a fresh ESP cannot read it).
+presses made by hand do change it. It also cannot be read: the LANG display screen carries f15 = 0,
+the first f15 on the edit screen is the same for every stored language, the cycle order depends on the
+stored language, and a quick change can leave no frame (§9, tests of 9 Nov). The language write and its select
+were removed, and the **Language sensor of this firmware (p37) is not reliable**: it counts steps from the
+last language it believes, and is wrong after any change it did not see. It is removed from the Home Assistant
+dashboard and will be removed from the firmware.
 
 The spa clock does **not** follow daylight-saving changes; the automatic sync corrects it within a
 few minutes (seen at the end of DST on 2026-10-25).
@@ -823,12 +825,11 @@ issue with timestamps and what the panel showed.
 7. *(Answered 2026-11-07.)* The f7 date formula: `(day << 3) XOR month`, checked on an even day in July (see §6).
 8. Does Jets 1 low → high restart the 20 min jet timer?
 9. How Auto / Eco / Day change when the heater runs.
-10. **Language.** (a) How does f15 on the LANG edit screen depend on the screen key? Only three
-    keys are known (0 and 115 plain, 14 shifted by 2; provisional model: shifted when key bit 2 is
-    set) — readings at other keys, taken by pressing Warmer at LANG without saving, would settle it.
-    (b) Why does a language save made by the ESP's presses leave the panel unchanged when the same
-    presses by hand change it? (c) Is the current language anywhere on the bus? The display screen
-    always sends f15 = 0.
+10. **Language.** On the 680 it cannot be read from the bus (§9, §10): the first f15 on the edit screen
+    is the same for every stored language, the cycle order depends on the stored language, and a quick change
+    can leave no frame. (a) Is the stored language anywhere on the bus, e.g. in another message type or on a
+    780? (b) Why does a language save made by the ESP's presses leave the panel unchanged when the same
+    presses by hand change it?
 11. Does the Water Refresh list really step by 30 in both directions (150 → 120 was one press), and
     is the Filter Change grid really 10-day steps up to 180?
 
@@ -845,8 +846,8 @@ issue with timestamps and what the panel showed.
 - A good *Read Settings* leaves no trace in the values (they do not change) and the Decoder Notice
   appears only when the read fails; *Last Settings Read* shows when the last read finished without an
   abort.
-- The Language sensor is not read from the spa (§10); right after a first install it is `unknown`
-  until a language is saved at the panel.
+- The Language sensor of this firmware cannot know the panel language (§10); it is wrong after a change it did not
+  see, and right after a first install it is `unknown`. Do not use it.
 - The spa's thermostat overshoots the set point by about 0.25 °C (§11).
 - The `Clock Time` sensor changes every minute; exclude it from the logbook in `configuration.yaml`
   (it still appears in the device's Activity panel).
@@ -871,7 +872,7 @@ Each test is short; note the time and what the panel showed.
 | Locks | pump off; Menu → LOCK → SL, Jets 1, 1 min on the main screen, hold Menu; repeat for SVL | Lock entity + f14 bit 1 / bit 2 flips |
 | Service counter Off | Menu → H2O (or FC) → Off, Jets 1, wait, set the value back, Jets 1 | `Off` vs `Change Now`, f2 bit 7 |
 | ClearRay counter / key | Menu → UV → Warmer/Cooler to a value (e.g. 250, then Off), Jets 1, 15 s on the main screen, set it back, Jets 1 (steps of 10: the old value is only restored to ±5 days) | f15 encoding, the new key from the confirming frame on |
-| Language | Menu → LANG → Warmer ×6, wait (no save); write down the language name shown after each press, and read Raw F13 / F15 / Screen Key from the history | the first press only displays the current language (f15 0); the next ones give the code of each language at this key |
+| Language | Menu → LANG → Warmer ×6, wait (no save); write down the language name shown after each press, and read Raw F13 / F15 / Screen Key from the history | the first press only displays the current language (f15 0); the next ones give the codes at this key, which start at the same value for every stored language (§9) |
 | Settings write | from HA change one value (e.g. Primary Filter Cycles 4 → 3 → 4); watch Raw F13 for the return to the main screen | the walk, the notice on failure, the re-read |
 | Power cut | spa breaker off 1 min, on, do not touch the panel for 5 min | boot messages, purge, clock reset, automatic sync, boot read |
 | Light from HA | select Red, then Off | light seek logic |

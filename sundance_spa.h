@@ -172,7 +172,6 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   void set_time_text_sensor(text_sensor::TextSensor *s) { this->time_text_sensor_ = s; }
   void set_heater_mode_text_sensor(text_sensor::TextSensor *s) { this->heater_mode_text_sensor_ = s; }
   void set_clearray_text_sensor(text_sensor::TextSensor *s) { this->clearray_text_sensor_ = s; }
-  void set_language_text_sensor(text_sensor::TextSensor *s) { this->language_text_sensor_ = s; }
   void set_lock_text_sensor(text_sensor::TextSensor *s) { this->lock_text_sensor_ = s; }
   void set_temp_format_text_sensor(text_sensor::TextSensor *s) { this->temp_format_text_sensor_ = s; }
   void set_date_text_sensor(text_sensor::TextSensor *s) { this->date_text_sensor_ = s; }
@@ -365,7 +364,6 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   text_sensor::TextSensor *time_text_sensor_{nullptr};
   text_sensor::TextSensor *heater_mode_text_sensor_{nullptr};
   text_sensor::TextSensor *clearray_text_sensor_{nullptr};
-  text_sensor::TextSensor *language_text_sensor_{nullptr};
   text_sensor::TextSensor *lock_text_sensor_{nullptr};
   text_sensor::TextSensor *temp_format_text_sensor_{nullptr};
   text_sensor::TextSensor *date_text_sensor_{nullptr};
@@ -407,7 +405,6 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   int menu_prev_screen_{-1};
   int menu_prev_value_{0};
   bool uv_display_pending_{false};
-  void publish_language_(int value, bool from_screen = true);
   int routine_mask_{0};
   int read_task_{0};
   // settings write
@@ -455,7 +452,6 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   uint32_t lock_event_ms_{0};
   uint8_t lock_event_f14_{0};
   ESPPreferenceObject lock_pref_;
-  ESPPreferenceObject lang_pref_;
   void on_panel_press_(uint8_t btn);
   void service_lock_event_();
   void release_locks_();

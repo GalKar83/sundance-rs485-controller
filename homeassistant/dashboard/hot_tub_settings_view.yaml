@@ -65,6 +65,17 @@ sections:
         grid_options:
           columns: full
           rows: 1
+      - type: markdown
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: select.sundance_spa_heater_mode_setting
+            state_not: Auto
+        content: >-
+          {% set m = states('select.sundance_spa_heater_mode_setting') %}<small>**{{ m }}** heats
+          only {{ '17:00-07:00 (next day)' if m == 'Eco' else '07:00-17:00' }} by the spa clock.
+          Filtering is not affected.</small>
       - type: heading
         heading: Primary Filter
         heading_style: subtitle
@@ -240,17 +251,6 @@ sections:
               - Access Lock
               - Settings Lock
               - Service Lock
-      - type: markdown
-        grid_options:
-          columns: full
-        visibility:
-          - condition: state
-            entity: select.sundance_spa_heater_mode_setting
-            state_not: Auto
-        content: >-
-          {% set m = states('select.sundance_spa_heater_mode_setting') %}<small>**{{ m }}** heats
-          only {{ '17:00-07:00 (next day)' if m == 'Eco' else '07:00-17:00' }} by the spa clock.
-          Filtering is not affected.</small>
       - type: heading
         heading: Service Counters
         heading_style: subtitle
@@ -475,19 +475,6 @@ sections:
           be serviced. It releases itself after 2 hours. Choose Off to release it earlier; the spa
           then runs a purge of about 2 minutes.'}.get(l, '') }} Controls this lock blocks are greyed
           out below and on the Hot Tub page.</small>
-      - type: custom:mushroom-template-card
-        entity: sensor.sundance_spa_language
-        primary: Language
-        secondary: '{{ states(''sensor.sundance_spa_language'') }}'
-        icon: mdi:translate
-        icon_color: blue
-        tap_action:
-          action: none
-        grid_options:
-          columns: 12
-          rows: 1
-        hold_action:
-          action: none
       - type: heading
         heading: Clock
         heading_style: subtitle

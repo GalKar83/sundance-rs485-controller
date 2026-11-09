@@ -501,7 +501,7 @@ A plan is deleted only with the trash icon, never by tapping its row.
 **Settings:** Heating (Heater Mode with an Eco/Day explanation card, Primary Filter start / cycles /
 duration — the cycles and duration are not greyed out in Eco or Day because they apply in every
 mode), the three service counters as dropdowns, temperature format, the **Lock** dropdown with an explanation of the
-selected lock, language (display only, with no write), a separate **Notifications** section (between Power Values and Diagnostics) with one *Quiet hours*
+selected lock, a separate **Notifications** section (between Power Values and Diagnostics) with one *Quiet hours*
 card that shows the start and end and whether the quiet hours are on (icon and colour change); when messages wait during the quiet
 hours a tap sends them, otherwise a tap opens the **Quiet Hours** page where the start and end are edited, the spa clock with *Sync* and *Read* buttons (hold to press), the six Power values, a full-width *Power measurement · last 24 hours* line under them (the measured
 power against the setting from the optional power measurement, same text as its weekly summary;
