@@ -625,6 +625,10 @@ sections:
         icon: mdi:scale-balance
         icon_color: grey
         multiline_secondary: true
+        visibility:
+          - condition: state
+            entity: input_text.spa_power_measure_circulation
+            state_not: unavailable
         tap_action:
           action: none
         hold_action:
