@@ -19,6 +19,12 @@ sections:
           <small>Fill in the fields below once. Type the full entity id or service name, for example
           <code>notify.mobile_app_pixel_9</code>. Find your phone's service under Developer tools →
           Actions (search "notify.mobile_app").</small>
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small><b>Prerequisites:</b> the dashboard needs the HACS frontend add-ons <b>Mushroom</b>,
+          <b>ApexCharts Card</b> and <b>card-mod</b>. Without them the cards do not display.</small>
       - type: heading
         heading: Phone notifications (required)
         icon: mdi:cellphone-message

@@ -470,6 +470,8 @@ Replace the phone entity ids in the templates (`sensor.person1_phone_bluetooth_c
 
 ## 5. Dashboard
 
+**Requirement: the dashboard does not work without these three frontend add-ons** (install them from [HACS](https://hacs.xyz) → Frontend, then reload the browser): [Mushroom](https://github.com/piitaya/lovelace-mushroom), [ApexCharts Card](https://github.com/RomRider/apexcharts-card) and [card-mod](https://github.com/thomasloven/lovelace-card-mod). Without them the cards show "Custom element doesn't exist". There is also a **Hot Tub Setup** page (`dashboard/hot_tub_setup_view.yaml`) for the package install, see [packages/README.md](packages/README.md).
+
 There are four pages: **Hot Tub**, **Settings** (`hot-tub-settings`), **Quiet Hours** (`hot-tub-quiet-hours`, opened from the
 Settings page) and **Scheduled Plans** (`hot-tub-plans`), all in one dashboard. Most rows are Mushroom template cards, one line each, with
 the numbers and units in smaller type (card-mod); several are shown in °C or °F depending on

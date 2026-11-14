@@ -2,6 +2,19 @@
 
 Instead of creating helpers, sensors, automations and scripts one by one, copy **one file** and add **one line**.
 
+## Requirements for the dashboard (install these first)
+
+The package itself needs nothing extra. **The dashboard pages do: without the three frontend add-ons below most cards show
+"Custom element doesn't exist" and the pages do not work.** Install them from [HACS](https://hacs.xyz) (HACS → Frontend), then reload the browser:
+
+| Add-on | Used for | Link |
+|---|---|---|
+| **Mushroom** | almost every row and button (about 80 cards) | [piitaya/lovelace-mushroom](https://github.com/piitaya/lovelace-mushroom) |
+| **ApexCharts Card** | the temperature and power graphs | [RomRider/apexcharts-card](https://github.com/RomRider/apexcharts-card) |
+| **card-mod** | card styling (borders, dimmed locked rows, small text) | [thomasloven/lovelace-card-mod](https://github.com/thomasloven/lovelace-card-mod) |
+
+Also needed for the phone messages: the **Home Assistant Companion app** on the phone (it provides the `notify.mobile_app_...` service).
+
 ## 1. Install the core
 
 1. Install the ESPHome part first (the spa entities must exist).
@@ -38,6 +51,6 @@ through the UI. Use **one way or the other, not both**, or the entities will be 
 
 ## Notes
 
-- The dashboard needs `mushroom`, `apexcharts-card` and `card-mod` from HACS (see the Home Assistant README).
+- The dashboard needs Mushroom, ApexCharts Card and card-mod (see Requirements above).
 - Entities created from a package cannot be renamed or edited in the UI helper screen; change the YAML instead.
 - Not tested on a fresh Home Assistant yet (the author's own system uses the per-file objects). Please report problems.
