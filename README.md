@@ -138,7 +138,11 @@ part (optional) is pasted into Home Assistant by hand.
    *Communication* stays off, check the wiring and §5.
 
 **Home Assistant side (optional).** Nothing in [`homeassistant/`](homeassistant/README.md) is needed
-for the component; it is the owner's complete setup. To use it, in this order:
+for the component; it is the owner's complete setup.
+
+**Requirements for the dashboard** (install from [HACS](https://hacs.xyz) → Frontend; without them the cards do not display): [Mushroom](https://github.com/piitaya/lovelace-mushroom), [ApexCharts Card](https://github.com/RomRider/apexcharts-card) and [card-mod](https://github.com/thomasloven/lovelace-card-mod). The notifications need the Home Assistant Companion app on the phone.
+
+**Short way:** one package file plus optional modules, see [`homeassistant/packages/README.md`](homeassistant/packages/README.md) (not yet tested on a fresh Home Assistant). **Step by step**, in this order:
 
 1. **Helpers** ([`helpers/`](homeassistant/helpers)): create the `input_*` helpers and counters
    (*Settings → Devices & services → Helpers*), then the template, utility-meter and integration
