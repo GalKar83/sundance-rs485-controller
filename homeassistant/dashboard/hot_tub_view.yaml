@@ -545,6 +545,38 @@ sections:
             yaxis_id: temp
             show:
               in_header: raw
+              in_chart: false
+          - entity: climate.sundance_spa
+            attribute: temperature
+            name: Target
+            unit: °C
+            color: '#2196f3'
+            curve: stepline
+            stroke_dash: 4
+            float_precision: 1
+            yaxis_id: temp
+            show:
+              in_header: raw
+              in_chart: false
+          - entity: climate.sundance_spa
+            name: Water line
+            unit: °C
+            color: '#ff9800'
+            curve: stepline
+            float_precision: 1
+            yaxis_id: temp
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids:
+              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
+              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
+              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
+              st[i].lc) * 1000, start.getTime()); const v = (st[i].a || {}).current_temperature;
+              const ok = typeof v === 'number'; const tn = (i + 1 < st.length) ? (st[i + 1].lu ||
+              st[i + 1].lc) * 1000 : end.getTime(); out.push([t, ok ? v : null]); if (ok)
+              out.push([Math.max(tn - 1, t), v]); } return out;
+            show:
+              in_header: false
           - entity: climate.sundance_spa
             name: Heating
             unit: °C
@@ -571,16 +603,25 @@ sections:
             show:
               in_header: false
           - entity: climate.sundance_spa
-            attribute: temperature
-            name: Target
+            name: Target line
             unit: °C
             color: '#2196f3'
             curve: stepline
             stroke_dash: 4
             float_precision: 1
             yaxis_id: temp
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids:
+              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
+              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
+              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
+              st[i].lc) * 1000, start.getTime()); const v = (st[i].a || {}).temperature; const ok =
+              typeof v === 'number'; const tn = (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc)
+              * 1000 : end.getTime(); out.push([t, ok ? v : null]); if (ok) out.push([Math.max(tn -
+              1, t), v]); } return out;
             show:
-              in_header: raw
+              in_header: false
         visibility:
           - condition: state
             entity: sensor.sundance_spa_temperature_format
@@ -625,14 +666,23 @@ sections:
               format: dd/MM HH:mm
         series:
           - entity: climate.sundance_spa
-            attribute: current_temperature
-            name: Water
+            name: Water line
             unit: °F
             color: '#ff9800'
             curve: stepline
             float_precision: 0
             yaxis_id: temp
-            transform: 'return x === null ? null : Math.round(x * 9 / 5 + 32);'
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids:
+              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
+              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
+              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
+              st[i].lc) * 1000, start.getTime()); const v0 = (st[i].a || {}).current_temperature;
+              const ok = typeof v0 === 'number'; const v = ok ? Math.round(v0 * 9 / 5 + 32) : null;
+              const tn = (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 :
+              end.getTime(); out.push([t, v]); if (ok) out.push([Math.max(tn - 1, t), v]); } return
+              out;
             show:
               in_header: false
           - entity: climate.sundance_spa
@@ -662,15 +712,23 @@ sections:
             show:
               in_header: false
           - entity: climate.sundance_spa
-            attribute: temperature
-            name: Target
+            name: Target line
             unit: °F
             color: '#2196f3'
             curve: stepline
             stroke_dash: 4
             float_precision: 0
             yaxis_id: temp
-            transform: 'return x === null ? null : Math.round(x * 9 / 5 + 32);'
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids:
+              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
+              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
+              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
+              st[i].lc) * 1000, start.getTime()); const v0 = (st[i].a || {}).temperature; const ok =
+              typeof v0 === 'number'; const v = ok ? Math.round(v0 * 9 / 5 + 32) : null; const tn =
+              (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 : end.getTime();
+              out.push([t, v]); if (ok) out.push([Math.max(tn - 1, t), v]); } return out;
             show:
               in_header: false
           - entity: sensor.spa_water_f
