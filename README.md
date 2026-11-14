@@ -17,7 +17,9 @@ Example configuration: [example-680.yaml](example-680.yaml).
 > assembly P/N 6600-158*, main board marked *Jacuzzi Products Co. PN 24168_C* (export 50 Hz model, 3-phase hookup,
 > 2-speed pump 1, pump 2, 2.7 kW heater, ClearRay UV, SD680 topside). The same board family
 > is also used in **Jacuzzi J100 / J200** spas: the sticker on the board reads *PWA J100/J200/SD680 50HZ V2.06 1/2P*
-> (1 or 2 pumps), board S/N 6600-2692007270002. So this work may apply to them as well (untested on those models).
+> (1 or 2 pumps), board S/N 6600-2692007270002. Parts retailers list the 60 Hz version of this board (6600-268, revision 2.06, needs the encrypted
+> topside panel) for **Sundance 680 series and Jacuzzi J-100 / J-200 spas from model year 2018 to about mid-2022** (one listing gives the end as 07/2022;
+> these are retailer listings, not an official fitment chart). So this work may apply to those models as well (untested on them).
 >
 > **Connection:** the RS-485 module is connected to header **J15** on the controller board, at the
 > top edge of the board next to J13 (MAIN PANEL, the SD680 topside).
