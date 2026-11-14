@@ -66,6 +66,7 @@ Contents
 14. [Known issues and limitations](#14-known-issues-and-limitations)
 15. [How to test / reproduce](#15-how-to-test--reproduce)
 16. [Development history](#16-development-history)
+17. [Licence](#licence)
 
 ---
 
@@ -903,3 +904,9 @@ What was added and verified on the test spa, in order:
 | 2 Nov | Pump 1 Running / Pump 2 Running; the six Power values as settings on the device; the Home Assistant side published in `homeassistant/` |
 | 3 Nov | **p29:** automatic clock sync from 30 s when a whole-minute move improves it; run time, energy, power counted in the ESP; no reboot on a lost API connection. **p30:** settings write from HA (heater mode, Primary Filter, service counters, °C/°F), diagnostic Panel Press buttons, Energy Last 24 Hours, Counters At Midnight. TEMP menu mapped (§9) |
 | 5–6 Nov | **p31 / p31b:** language kept in flash; Primary Filter cycles edit screen is code 14 under the key (the first guess, raw 0, failed); a successful write clears an earlier failure notice; language write and select removed after the ESP's presses were shown not to change the panel; provisional per-key language code model. Cycles 4 → 3 → 4 written from HA on p31b |
+
+## Licence
+
+The files written for this repository are under the [PolyForm Noncommercial License 1.0.0](LICENSE): free to use, change
+and build on for noncommercial purposes; **commercial use needs my written permission**. See [NOTICE.md](NOTICE.md) for
+which files are covered (the parts that come from the upstream 780 component are not, because upstream has no licence file).
