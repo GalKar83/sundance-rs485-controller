@@ -1,0 +1,89 @@
+title: Hot Tub Setup
+path: hot-tub-setup
+icon: mdi:wrench-cog
+subview: true
+back_path: /home-control/hot-tub-settings
+type: sections
+max_columns: 1
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Setup
+        heading_style: title
+        icon: mdi:wrench-cog
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>Fill in the fields below once. Type the full entity id or service name, for example
+          <code>notify.mobile_app_pixel_9</code>. Find your phone's service under Developer tools →
+          Actions (search "notify.mobile_app").</small>
+      - type: heading
+        heading: Phone notifications (required)
+        icon: mdi:cellphone-message
+      - type: entities
+        grid_options:
+          columns: full
+        entities:
+          - entity: input_text.spa_notify_service
+            name: Notify service of your phone
+      - type: heading
+        heading: Spa Bluetooth audio (optional)
+        icon: mdi:bluetooth-audio
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>Only if you installed <code>spa_audio.yaml</code>. Needs the Bluetooth MAC address of the
+          spa audio (<code>AA:BB:CC:DD:EE:FF</code>) and, for each phone, the Companion app sensors
+          <i>Bluetooth connection</i> and <i>Media session</i> and its notify service. Leave person 2 empty if
+          only one phone is used.</small>
+      - type: entities
+        grid_options:
+          columns: full
+        entities:
+          - entity: input_text.spa_audio_bluetooth_mac
+            name: Bluetooth MAC of the spa audio
+          - entity: input_text.spa_audio_p1_bluetooth_sensor
+            name: Person 1 - Bluetooth connection sensor
+          - entity: input_text.spa_audio_p1_media_sensor
+            name: Person 1 - Media session sensor
+          - entity: input_text.spa_audio_p1_notify_service
+            name: Person 1 - notify service
+          - entity: input_text.spa_audio_p2_bluetooth_sensor
+            name: Person 2 - Bluetooth connection sensor
+          - entity: input_text.spa_audio_p2_media_sensor
+            name: Person 2 - Media session sensor
+          - entity: input_text.spa_audio_p2_notify_service
+            name: Person 2 - notify service
+      - type: heading
+        heading: Power measurement (optional)
+        icon: mdi:flash
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>Only if you installed <code>spa_power_measurement.yaml</code> and have a whole-house power
+          sensor (in W). It compares the spa power estimate with the house load; it never changes a setting.</small>
+      - type: entities
+        grid_options:
+          columns: full
+        entities:
+          - entity: input_text.spa_house_load_sensor
+            name: Whole-house power sensor
+      - type: heading
+        heading: Panel used while away (optional)
+        icon: mdi:account-alert
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>Only if you installed <code>spa_panel_used_while_away.yaml</code>. Enter your person entity,
+          for example <code>person.john</code>.</small>
+      - type: entities
+        grid_options:
+          columns: full
+        entities:
+          - entity: input_text.spa_owner_person
+            name: Your person entity

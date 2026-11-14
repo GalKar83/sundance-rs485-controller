@@ -1,0 +1,76 @@
+# (optional) Phone alert when someone presses a button on the spa panel while you are away.
+# Needs: your person entity (e.g. person.john) in input_text.spa_owner_person on the Hot Tub Setup page.
+
+input_boolean:
+  spa_panel_alert_sent:
+    name: Spa Panel Alert Sent
+    icon: mdi:bell-check
+input_text:
+  spa_owner_person:
+    name: Spa Owner Person
+    icon: mdi:account
+    min: 0
+    max: 100
+    mode: text
+automation:
+  - id: sundance_spa_panel_used_while_away
+    alias: Spa - Panel used while the owner is away
+    description: >-
+      When a button is pressed on the spa topside panel (sensor.sundance_spa_panel_button, physical
+      presses only; anything done from HA does not appear there) while the owner (the person entity
+      in input_text.spa_owner_person) is not home, notify the owner's phone ONCE per absence:
+      input_boolean.spa_panel_alert_sent blocks further alerts until the owner is home again (then
+      it is cleared). NOTE: relies on the Panel Button entity - keep it when the diagnostic entities
+      are removed in v1. Revised 2026-10-26: one alert per absence (was one per 10 min). Revised
+      2026-10-29: presence now read from person.owner (GPS overruled to home by the home Wi-Fi via
+      the template tracker device_tracker.owner_presence) instead of the raw GPS tracker
+      device_tracker.your_phone.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_panel_button
+        not_to:
+          - Idle
+          - unknown
+          - unavailable
+        id: press
+      - trigger: template
+        value_template: >-
+          {{ states('input_text.spa_owner_person') != '' and
+          is_state(states('input_text.spa_owner_person'), 'home') }}
+        id: home
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: home
+            sequence:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.spa_panel_alert_sent
+            note: 'Back home: the next absence gets a new alert.'
+          - conditions:
+              - condition: trigger
+                id: press
+              - condition: template
+                value_template: >-
+                  {{ states('input_text.spa_owner_person') != '' and not
+                  is_state(states('input_text.spa_owner_person'), 'home') }}
+              - condition: state
+                entity_id: input_boolean.spa_panel_alert_sent
+                state: 'off'
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  title: Spa panel used
+                  message: >-
+                    Someone pressed '{{ trigger.to_state.state }}' on the spa panel at {{
+                    now().strftime('%H:%M') }} while you are away.
+                  data:
+                    tag: spa_panel_used
+                    priority: high
+                    ttl: 0
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.spa_panel_alert_sent
+    mode: queued
+    max: 5

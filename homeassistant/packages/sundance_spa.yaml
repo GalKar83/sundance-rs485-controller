@@ -1,0 +1,3182 @@
+# Sundance 680 spa - core Home Assistant package (helpers, sensors, automations, scripts).
+# Generated from the per-file YAML in this folder. Install: see packages/README.md.
+# After installing, set the one thing that is personal: input_text.spa_notify_service (the notify service of your phone,
+# e.g. notify.mobile_app_pixel_9) on the Hot Tub Setup page. Everything else works as is.
+
+input_boolean:
+  spa_session_merging:
+    name: Spa Session Merging
+    icon: mdi:merge
+    initial: false
+  spa_plan_sun:
+    name: Spa Plan Sun
+  spa_plan_mon:
+    name: Spa Plan Mon
+  spa_plan_tue:
+    name: Spa Plan Tue
+  spa_plan_wed:
+    name: Spa Plan Wed
+  spa_plan_thu:
+    name: Spa Plan Thu
+  spa_plan_fri:
+    name: Spa Plan Fri
+  spa_plan_sat:
+    name: Spa Plan Sat
+  spa_plan_1_on:
+    name: Spa Plan 1 On
+  spa_plan_2_on:
+    name: Spa Plan 2 On
+  spa_plan_3_on:
+    name: Spa Plan 3 On
+  spa_plan_4_on:
+    name: Spa Plan 4 On
+  spa_plan_5_on:
+    name: Spa Plan 5 On
+input_datetime:
+  last_maintenance:
+    name: Last Maintenance (Storage)
+    icon: mdi:flask-outline
+    has_date: true
+    has_time: true
+  last_replacement_filter_date:
+    name: Last Replacement Filter Date (Storage)
+    icon: mdi:air-filter
+    has_date: true
+    has_time: false
+  last_replacement_clearray_bulb_date:
+    name: Last Replacement ClearRay Bulb Date (Storage)
+    icon: mdi:lightbulb-on-outline
+    has_date: true
+    has_time: false
+  last_replacement_water_date:
+    name: Last Replacement Water Date (Storage)
+    icon: mdi:water-sync
+    has_date: true
+    has_time: false
+  last_soak:
+    name: Last Soak (Storage)
+    icon: mdi:hot-tub
+    has_date: true
+    has_time: true
+  last_rinse_filter:
+    name: Last Rinse Filter (Storage)
+    icon: mdi:air-filter
+    has_date: true
+    has_time: true
+  spa_in_use_since:
+    name: Spa In Use Since
+    has_date: true
+    has_time: true
+  spa_plan_when:
+    name: Spa Plan When
+    has_date: true
+    has_time: true
+  spa_last_power_cut:
+    name: Spa Last Power Cut
+    has_date: true
+    has_time: true
+  spa_plan_next_start:
+    name: Spa Plan Next Start
+    has_date: true
+    has_time: true
+  spa_plan_ready_check:
+    name: Spa Plan Ready Check
+    has_date: true
+    has_time: true
+  spa_last_bromine:
+    name: Spa Last Bromine
+    has_date: true
+    has_time: true
+  spa_previous_soak:
+    name: Spa Previous Soak
+    has_date: true
+    has_time: true
+  spa_last_service_lock_end:
+    name: Spa Last Service Lock End
+    icon: mdi:lock-open-check
+    has_date: true
+    has_time: true
+  spa_quiet_hours_start:
+    name: Spa Quiet Hours Start
+    icon: mdi:bell-sleep
+    has_date: false
+    has_time: true
+  spa_quiet_hours_end:
+    name: Spa Quiet Hours End
+    icon: mdi:bell-ring
+    has_date: false
+    has_time: true
+input_number:
+  spa_soaking_minutes_total:
+    name: Spa Real Use Minutes Total
+    icon: mdi:hot-tub
+    min: 0
+    max: 100000000
+    step: 0.1
+    unit_of_measurement: min
+    mode: box
+  spa_maintenance_minutes_total:
+    name: Spa Maintenance Minutes Total
+    icon: mdi:flask-outline
+    min: 0
+    max: 100000000
+    step: 0.1
+    unit_of_measurement: min
+    mode: box
+  spa_heat_rate:
+    name: Spa Heat Rate
+    min: 0.5
+    max: 6
+    step: 0.1
+    unit_of_measurement: °C/h
+    mode: box
+  spa_ready_by_margin:
+    name: Spa Ready By Margin
+    min: 0
+    max: 120
+    step: 5
+    unit_of_measurement: min
+    mode: slider
+input_select:
+  spa_plan_mode:
+    name: Spa Plan Mode
+    options:
+      - Ready by
+      - Start heating
+  spa_plan_repeat:
+    name: Spa Plan Repeat
+    options:
+      - Once
+      - Daily
+      - Chosen days
+  spa_plan_temperature:
+    name: Spa Plan Temperature
+    options:
+      - '18.0'
+      - '18.5'
+      - '19.0'
+      - '19.5'
+      - '20.0'
+      - '20.5'
+      - '21.0'
+      - '21.5'
+      - '22.0'
+      - '22.5'
+      - '23.0'
+      - '23.5'
+      - '24.0'
+      - '24.5'
+      - '25.0'
+      - '25.5'
+      - '26.0'
+      - '26.5'
+      - '27.0'
+      - '27.5'
+      - '28.0'
+      - '28.5'
+      - '29.0'
+      - '29.5'
+      - '30.0'
+      - '30.5'
+      - '31.0'
+      - '31.5'
+      - '32.0'
+      - '32.5'
+      - '33.0'
+      - '33.5'
+      - '34.0'
+      - '34.5'
+      - '35.0'
+      - '35.5'
+      - '36.0'
+      - '36.5'
+      - '37.0'
+      - '37.5'
+      - '38.0'
+      - '38.5'
+      - '39.0'
+      - '39.5'
+      - '40.0'
+  spa_set_pf_start:
+    name: Spa Set PF Start
+    options:
+      - '00:00'
+      - '01:00'
+      - '02:00'
+      - '03:00'
+      - '04:00'
+      - '05:00'
+      - '06:00'
+      - '07:00'
+      - '08:00'
+      - '09:00'
+      - '10:00'
+      - '11:00'
+      - '12:00'
+      - '13:00'
+      - '14:00'
+      - '15:00'
+      - '16:00'
+      - '17:00'
+      - '18:00'
+      - '19:00'
+      - '20:00'
+      - '21:00'
+      - '22:00'
+      - '23:00'
+  spa_set_filter_change:
+    name: Spa Set Filter Change
+    options:
+      - '-'
+  spa_set_clearray:
+    name: Spa Set ClearRay
+    options:
+      - '-'
+  spa_set_water_refresh:
+    name: Spa Set Water Refresh
+    options:
+      - '-'
+  spa_set_lock:
+    name: Spa Set Lock
+    icon: mdi:lock
+    options:
+      - 'Off'
+      - Access Lock
+      - Temperature Lock
+      - Settings Lock
+      - Service Lock
+input_text:
+  spa_decoder_seen:
+    name: Spa Decoder Seen
+    icon: mdi:magnify-scan
+    min: 0
+    max: 255
+    mode: text
+  spa_last_heating:
+    name: Spa Last Heating
+    max: 100
+    min: 0
+    mode: text
+  spa_heating_run_data:
+    name: Spa Heating Run Data
+    max: 60
+    min: 0
+    mode: text
+  spa_temp_last_drop:
+    name: Spa Temp Last Drop
+    max: 60
+    min: 0
+    mode: text
+  spa_night_alerts:
+    name: Spa Night Alerts
+    max: 255
+    min: 0
+    mode: text
+  spa_ready_by_state:
+    name: Spa Ready By State
+    min: 0
+    max: 100
+    mode: text
+  spa_plan_1:
+    name: Spa Plan 1
+    min: 0
+    max: 60
+    mode: text
+  spa_plan_2:
+    name: Spa Plan 2
+    min: 0
+    max: 60
+    mode: text
+  spa_plan_3:
+    name: Spa Plan 3
+    min: 0
+    max: 60
+    mode: text
+  spa_plan_4:
+    name: Spa Plan 4
+    min: 0
+    max: 60
+    mode: text
+  spa_plan_5:
+    name: Spa Plan 5
+    min: 0
+    max: 60
+    mode: text
+  spa_ready_notified:
+    name: Spa Ready Notified
+    min: 0
+    max: 20
+    mode: text
+  spa_plan_when_auto:
+    name: Spa Plan When Auto
+    min: 0
+    max: 20
+    mode: text
+  spa_plan_previous_heater_mode:
+    name: Spa Plan Previous Heater Mode
+    min: 0
+    max: 10
+    mode: text
+  spa_plan_previous_lock:
+    name: Spa Plan Previous Lock
+    icon: mdi:lock-clock
+    min: 0
+    max: 30
+    mode: text
+  spa_notify_service:
+    name: Spa Notify Service
+    icon: mdi:cellphone-message
+    min: 0
+    max: 100
+    mode: text
+counter:
+  spa_soaking_sessions_total:
+    name: Spa Real Use Sessions Total
+    icon: mdi:hot-tub
+    initial: 0
+    minimum: 0
+    step: 1
+    restore: true
+    maximum: null
+  spa_maintenance_sessions_total:
+    name: Spa Maintenance Sessions Total
+    icon: mdi:flask-outline
+    initial: 0
+    minimum: 0
+    step: 1
+    restore: true
+    maximum: null
+utility_meter:
+  in_use_time_month:
+    name: In Use Time Month
+    source: sensor.sundance_spa_pumps_total_time
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  heater_time_week:
+    name: Heater Time Week
+    source: sensor.sundance_spa_heater_total_time
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  heater_time_month:
+    name: Heater Time Month
+    source: sensor.sundance_spa_heater_total_time
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  heating_run_count_week:
+    name: Heating Run Count Week
+    source: sensor.sundance_spa_heater_total_count
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  heating_run_count_month:
+    name: Heating Run Count Month
+    source: sensor.sundance_spa_heater_total_count
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  spa_real_use_time_today:
+    name: Spa Real Use Time Today
+    source: sensor.sundance_spa_soaking_time_total
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  spa_real_use_time_week:
+    name: Spa Real Use Time Week
+    source: sensor.sundance_spa_soaking_time_total
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  spa_real_use_time_month:
+    name: Spa Real Use Time Month
+    source: sensor.sundance_spa_soaking_time_total
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  spa_real_use_count_today:
+    name: Spa Real Use Count Today
+    source: sensor.sundance_spa_soaking_count_total
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  spa_real_use_count_week:
+    name: Spa Real Use Count Week
+    source: sensor.sundance_spa_soaking_count_total
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  spa_real_use_count_month:
+    name: Spa Real Use Count Month
+    source: sensor.sundance_spa_soaking_count_total
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  spa_maintenance_count_today:
+    name: Spa Maintenance Count Today
+    source: sensor.sundance_spa_maintenance_count_total
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  spa_maintenance_count_week:
+    name: Spa Maintenance Count Week
+    source: sensor.sundance_spa_maintenance_count_total
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  spa_maintenance_count_month:
+    name: Spa Maintenance Count Month
+    source: sensor.sundance_spa_maintenance_count_total
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  sundance_spa_pump_run_time_week:
+    name: Sundance Spa Pump Run Time Week
+    source: sensor.sundance_spa_pumps_total_time
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  uv_time_week:
+    name: UV Time Week
+    source: sensor.sundance_spa_clearray_total_time
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  uv_time_month:
+    name: UV Time Month
+    source: sensor.sundance_spa_clearray_total_time
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  energy_today:
+    name: Energy Today
+    source: sensor.sundance_spa_energy_counter
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  energy_week:
+    name: Energy Week
+    source: sensor.sundance_spa_energy_counter
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  energy_month:
+    name: Energy Month
+    source: sensor.sundance_spa_energy_counter
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  energy_year:
+    name: Energy Year
+    source: sensor.sundance_spa_energy_counter
+    cycle: yearly
+    periodically_resetting: false
+    always_available: true
+  pump_1_time_week:
+    name: Pump 1 Time Week
+    source: sensor.sundance_spa_pump_1_total_time
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  pump_1_time_month:
+    name: Pump 1 Time Month
+    source: sensor.sundance_spa_pump_1_total_time
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  pump_2_time_week:
+    name: Pump 2 Time Week
+    source: sensor.sundance_spa_pump_2_total_time
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  pump_2_time_month:
+    name: Pump 2 Time Month
+    source: sensor.sundance_spa_pump_2_total_time
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  spa_energy_test:
+    name: Spa Energy Test
+    source: sensor.sundance_spa_energy_counter
+    cycle: none
+    periodically_resetting: false
+    always_available: true
+  pump_1_time_today:
+    name: Pump 1 Time Today
+    source: sensor.sundance_spa_pump_1_total_time
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  pumps_time_today:
+    name: Pumps Time Today
+    source: sensor.sundance_spa_pumps_total_time
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  pump_2_time_today:
+    name: Pump 2 Time Today
+    source: sensor.sundance_spa_pump_2_total_time
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  heater_time_today:
+    name: Heater Time Today
+    source: sensor.sundance_spa_heater_total_time
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  heater_count_today:
+    name: Heater Count Today
+    source: sensor.sundance_spa_heater_total_count
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  clearray_bulb_time_today:
+    name: ClearRay Bulb Time Today
+    source: sensor.sundance_spa_clearray_total_time
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+template:
+  - sensor:
+      - name: Spa Real Use Time Total
+        unique_id: sundance_spa_spa_real_use_time_total
+        state: '{{ states(''input_number.spa_soaking_minutes_total'') | float(0) }}'
+        unit_of_measurement: min
+        device_class: duration
+        state_class: total_increasing
+        availability: '{{ has_value(''input_number.spa_soaking_minutes_total'') }}'
+      - name: Spa Maintenance Time Total
+        unique_id: sundance_spa_spa_maintenance_time_total
+        state: '{{ states(''input_number.spa_maintenance_minutes_total'') | float(0) }}'
+        unit_of_measurement: min
+        device_class: duration
+        state_class: total_increasing
+      - name: Spa Real Use Count Total
+        unique_id: sundance_spa_spa_real_use_count_total
+        state: '{{ states(''counter.spa_soaking_sessions_total'') | int(0) }}'
+        state_class: total_increasing
+        availability: '{{ has_value(''counter.spa_soaking_sessions_total'') }}'
+      - name: Spa Maintenance Count Total
+        unique_id: sundance_spa_spa_maintenance_count_total
+        state: '{{ states(''counter.spa_maintenance_sessions_total'') | int(0) }}'
+        state_class: total_increasing
+        availability: '{{ has_value(''counter.spa_maintenance_sessions_total'') }}'
+      - name: Filter Last Replacement
+        unique_id: sundance_spa_filter_last_replacement
+        state: >-
+          {% set d = states('input_datetime.last_replacement_filter_date') %}{{
+          as_datetime(d).strftime('%d/%m/%Y') if d >= '2000' else none }}
+      - name: Bulb Last Replacement
+        unique_id: sundance_spa_bulb_last_replacement
+        state: >-
+          {% set d = states('input_datetime.last_replacement_clearray_bulb_date') %}{{
+          as_datetime(d).strftime('%d/%m/%Y') if d >= '2000' else none }}
+      - name: Water Last Replacement
+        unique_id: sundance_spa_water_last_replacement
+        state: >-
+          {% set d = states('input_datetime.last_replacement_water_date') %}{{
+          as_datetime(d).strftime('%d/%m/%Y') if d >= '2000' else none }}
+      - name: Last Spa Use
+        unique_id: sundance_spa_last_spa_use
+        state: >-
+          {% set d = states('input_datetime.last_soak') %}{{ as_datetime(d).strftime('%d/%m/%Y
+          %H:%M') if d >= '2000' else none }}
+      - name: Last Spa Maintenance
+        unique_id: sundance_spa_last_spa_maintenance
+        state: >-
+          {% set d = states('input_datetime.last_maintenance') %}{{
+          as_datetime(d).strftime('%d/%m/%Y %H:%M') if d >= '2000' else none }}
+      - name: Last Rinse Filter
+        unique_id: sundance_spa_last_rinse_filter
+        state: >-
+          {% set d = states('input_datetime.last_rinse_filter') %}{{
+          as_datetime(d).strftime('%d/%m/%Y %H:%M') if d >= '2000' else none }}
+      - name: Spa Power
+        unique_id: sundance_spa_spa_power
+        state: >-
+          {# Spa electrical power from the ESP states x the power values set on the spa device
+          (number.sundance_spa_power_*, kept on the ESP). Pump 1 = Pump 1 Running: at high (Jet 1
+          switch) = Jet Pump + ClearRay, at low = Circulation (includes the ClearRay bulb); Pump 2 =
+          Pump 2 Running x Jet Pump; heater; light; controller always. #}{% set p1 =
+          is_state('binary_sensor.sundance_spa_pump_1_running', 'on') %}{% set p1_high =
+          is_state('switch.sundance_spa_jet_1', 'on') %}{% set p2 =
+          is_state('binary_sensor.sundance_spa_pump_2_running', 'on') %}{% set heat =
+          is_state('binary_sensor.sundance_spa_heater', 'on') %}{% set light =
+          states('sensor.sundance_spa_light_status') not in ['Off', 'unknown', 'unavailable'] %}{%
+          set ctrl = states('number.sundance_spa_power_controller') | float(15) %}{% set uv =
+          states('number.sundance_spa_power_clearray') | float(20) %}{% set lt =
+          states('number.sundance_spa_power_light') | float(5) %}{% set circ =
+          states('number.sundance_spa_power_circulation') | float(370) %}{% set jet =
+          states('number.sundance_spa_power_jet_pump') | float(1630) %}{% set heater =
+          states('number.sundance_spa_power_heater') | float(2700) %}{{ (ctrl + ((jet + uv) if
+          p1_high else (circ if p1 else 0)) + (jet if p2 else 0) + (heater if heat else 0) + (lt if
+          light else 0)) | round(0) }}
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        availability: '{{ is_state(''binary_sensor.sundance_spa_status'', ''on'') }}'
+      - name: Spa Next Plan
+        unique_id: sundance_spa_spa_next_plan
+        state: >-
+          {%- set ns = namespace(ts=0, p=[]) -%}{%- for i in range(1, 6) -%}{%- set p =
+          states('input_text.spa_plan_' ~ i).split(';') -%}{%- if p | count == 5 and
+          is_state('input_boolean.spa_plan_' ~ i ~ '_on', 'on') and p[2] |
+          regex_match('^[0-9]{2}:[0-9]{2}$') -%}{%- set base = today_at(p[2]) -%}{%- for d in
+          range(0, 8) -%}{%- set dt = base + timedelta(days=d) -%}{%- set ok = (p[3] == 'daily') or
+          (p[3] == 'once' and (dt.date() | string) == p[4]) or (p[3] not in ['daily', 'once'] and
+          (dt.weekday() | string) in p[3]) -%}{%- if ok and dt > now() -%}{%- set ts =
+          as_timestamp(dt) | int -%}{%- if ns.ts == 0 or ts < ns.ts -%}{%- set ns.ts = ts -%}{%- set
+          ns.p = p -%}{%- endif -%}{%- endif -%}{%- endfor -%}{%- endif -%}{%- endfor -%}{%- if
+          ns.ts == 0 -%}none{%- else -%}{%- set p = ns.p -%}{%- set c = p[1] | float(0) -%}{%- set t
+          = ((c * 9 / 5 + 32) | round(0) | int ~ '°F') if
+          is_state('sensor.sundance_spa_temperature_format', '°F') else (('%g' % c) ~ '°C') -%}{%-
+          set dd = (as_local(as_datetime(ns.ts)).date() - now().date()).days -%}{%- set when =
+          'today' if dd == 0 else ('tomorrow' if dd == 1 else 'on ' ~ ns.ts | timestamp_custom('%a
+          %d/%m')) -%}{%- if p[0] == 'R' -%}Hot Tub will be ready by {{ p[2] }} {{ when }} with {{ t
+          }}{%- else -%}Hot Tub will start heating at {{ p[2] }} {{ when }} to {{ t }}{%- endif
+          -%}{%- endif -%}
+      - name: Spa Water F
+        unique_id: sundance_spa_spa_water_f
+        state: >-
+          {{ (state_attr('climate.sundance_spa', 'current_temperature') | float(0) * 9 / 5 + 32) |
+          round(0) | int }}
+      - name: Spa Target F
+        unique_id: sundance_spa_spa_target_f
+        state: >-
+          {{ (state_attr('climate.sundance_spa', 'temperature') | float(0) * 9 / 5 + 32) | round(0)
+          | int }}
+  - binary_sensor:
+      - name: Spa Unmapped Alert Bits
+        unique_id: sundance_spa_spa_unmapped_alert_bits
+        state: '{{ (states(''sensor.sundance_spa_raw_f10'') | float(0) | int | bitwise_and(47)) > 0 }}'
+        device_class: problem
+      - name: Spa Quiet Hours
+        unique_id: sundance_spa_spa_quiet_hours
+        state: >-
+          {%- set n = now().strftime('%H:%M:%S') -%}{%- set s =
+          states('input_datetime.spa_quiet_hours_start') -%}{%- set e =
+          states('input_datetime.spa_quiet_hours_end') -%}{%- if s in ['unknown', 'unavailable', '']
+          or e in ['unknown', 'unavailable', ''] -%}false{%- elif s > e -%}{{ n >= s or n < e }}{%-
+          else -%}{{ s <= n < e }}{%- endif -%}
+automation:
+  - id: sundance_spa_spa_after_a_service_lock_filter_rinsed
+    alias: 'Spa - After a Service Lock: filter rinsed?'
+    description: >-
+      When a Service Lock (sensor.sundance_spa_lock) ends after 5+ minutes - released with Off in
+      the Lock dropdown, or by the spa itself after its 2 hours - the end time is stored in
+      input_datetime.spa_last_service_lock_end (also in the quiet hours; 'Spa - Ask: Filter/ClearRay
+      Bulb/Water Replaced?' uses it for the Filter counter). Outside the spa quiet hours 23:00-06:30
+      by default, set on the Hot Tub Settings page it then asks the owner's phone 'Did you rinse
+      your filter?' (Rinsed / No); Rinsed sets input_datetime.last_rinse_filter to the time the lock
+      ended (the same as 'Spa - After an ESP outage: power cut or Wi-Fi drop' does after a power
+      cut). When the Filter Change counter is at 0 (sensor.sundance_spa_remaining_days_filter_change
+      = Change Now) the question also has a Replaced button, which sets
+      input_datetime.last_replacement_filter_date to the date the lock ended. Service Lock is used
+      instead of switching the spa off only for filter work (rinse or replace); a UV bulb or water
+      change still needs the power off, so input_datetime.spa_last_power_cut is NOT set here. No
+      answer within 12 h: nothing changes. Created 2026-11-08.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_lock
+        from: Service Lock
+        to: 'Off'
+    conditions:
+      - alias: Locked for at least 5 minutes
+        condition: template
+        value_template: >-
+          {{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >=
+          300 }}
+    actions:
+      - variables:
+          ended: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
+          mins: >-
+            {{ ((as_timestamp(trigger.to_state.last_changed) -
+            as_timestamp(trigger.from_state.last_changed)) / 60) | round(0) | int }}
+          tag: spa_svl_rinse_{{ as_timestamp(now()) | int }}
+          repl: '{{ is_state(''sensor.sundance_spa_remaining_days_filter_change'', ''Change Now'') }}'
+      - alias: Remember when the lock ended (the filter replaced question looks at it)
+        action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.spa_last_service_lock_end
+        data:
+          timestamp: '{{ ended }}'
+      - alias: Not in the spa quiet hours (the time is remembered above in any case)
+        condition: state
+        entity_id: binary_sensor.spa_quiet_hours
+        state: 'off'
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          title: Spa Service Lock ended
+          message: >-
+            The spa was in Service Lock for about {{ mins }} min and was released at {{ ended |
+            timestamp_custom('%H:%M') }}. Did you rinse your filter?{{ ' The Filter Change counter
+            is at 0 - was the filter replaced?' if repl else '' }}
+          data:
+            tag: '{{ tag }}'
+            actions: >-
+              {{ [{'action': 'YES_' ~ tag, 'title': 'Rinsed'}] + ([{'action': 'REPL_' ~ tag,
+              'title': 'Replaced'}] if repl else []) + [{'action': 'NO_' ~ tag, 'title': 'No'}] }}
+            sticky: true
+            persistent: true
+            clickAction: noAction
+            priority: high
+            ttl: 0
+      - wait_for_trigger:
+          - trigger: event
+            event_type: mobile_app_notification_action
+            event_data:
+              action: YES_{{ tag }}
+          - trigger: event
+            event_type: mobile_app_notification_action
+            event_data:
+              action: REPL_{{ tag }}
+          - trigger: event
+            event_type: mobile_app_notification_action
+            event_data:
+              action: NO_{{ tag }}
+        timeout:
+          hours: 12
+        continue_on_timeout: true
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''YES_'' ~ tag }}'
+            sequence:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_rinse_filter
+                data:
+                  timestamp: '{{ ended }}'
+                note: Time the lock ended, not the time of the answer
+          - conditions:
+              - condition: template
+                value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''REPL_'' ~ tag }}'
+            sequence:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_replacement_filter_date
+                data:
+                  date: '{{ ended | timestamp_custom(''%Y-%m-%d'') }}'
+                note: Date the lock ended, not the date of the answer
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          message: clear_notification
+          data:
+            tag: '{{ tag }}'
+    mode: parallel
+    max: 3
+  - id: sundance_spa_spa_after_esp_outage
+    alias: 'Spa - After an ESP outage: power cut or Wi-Fi drop'
+    description: >-
+      Runs when the spa ESP (binary_sensor.sundance_spa_status) comes back after 1+ min offline and
+      tells a real spa power cut from a Wi-Fi drop by the spa clock: every spa power cut resets the
+      spa date to 01/01/2014 (and the clock to 00:00), and the ESP cannot sync the clock before it
+      is back in HA (it needs HA's time) - the date arrives ~80 s after the reconnect, the sync
+      fixes it ~2 min later (measured 31 Oct 08:02). POWER CUT (date 01/01/2014):
+      input_datetime.spa_last_power_cut = the time the spa came back on (used by the counter-reset
+      question); if off 5+ min and the spa came back ON outside the quiet hours 23:00-06:30 by
+      default, set on the Hot Tub Settings page, ask the owner's phone 'Did you rinse your filter?';
+      Yes -> input_datetime.last_rinse_filter = the time the spa came back ON = now minus the spa
+      clock reading. Nothing is added to the energy (the spa used none). WI-FI DROP (date correct):
+      since ESP patch 29 the ESP counts energy and run times itself (Energy Counter, *Total Time),
+      so the utility meters get the real figures as soon as it is back, including heating or manual
+      use. Only the hourly bars need help: the jump would land in the hour it came back, so the part
+      the normal schedule explains (controller + circulation in the Primary Filter cycles + the
+      1-min cleanup, from number.sundance_spa_power_*) is moved back into the hourly statistics of
+      sensor.sundance_spa_energy_total in the hours it belongs to (recorder.import_statistics;
+      scaled down if the ESP counted less), the rest stays in the hour it came back; across a reset
+      the part before it is taken out of the new period's meter; logged to the logbook. No date
+      within 3 min: nothing changes, a notice is sent. Created 2026-10-28 (as 'Spa - Ask: Filter
+      rinsed after power off?'). Revised 2026-11-01/02: detection by the spa date, quiet hours,
+      schedule estimate added to statistics + meters. Revised 2026-11-03 (ESP patch 29): the ESP's
+      own counters are the truth; the estimate only distributes them over the hours. Revised
+      2026-11-08: a Service Lock of 5+ minutes asks the same rinse question in its own automation
+      (Spa - After a Service Lock: filter rinsed?); it does not touch
+      input_datetime.spa_last_power_cut, which stays a real power cut only. Revised 2026-11-08: when
+      the Filter Change counter is at 0 (Change Now) the question also has a Replaced button, which
+      sets input_datetime.last_replacement_filter_date to the date the spa came back on; otherwise
+      it is the rinse question only (Rinsed / No). Revised 2026-11-08: quiet hours from the two time
+      helpers.
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_status
+        from: 'off'
+        to: 'on'
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 60
+          }}
+        note: >-
+          Offline at least a minute. No native condition measures how long the previous state
+          lasted.
+    actions:
+      - variables:
+          t0: '{{ as_timestamp(trigger.from_state.last_changed) }}'
+          t1: '{{ as_timestamp(trigger.to_state.last_changed) }}'
+          off_min: '{{ ((t1 - t0) / 60) | round(0) | int }}'
+      - wait_template: '{{ states(''sensor.sundance_spa_clock_date'') | regex_match(''^\d{2}/\d{2}/\d{4}$'') }}'
+        timeout:
+          minutes: 3
+        continue_on_timeout: true
+        note: >-
+          The spa date arrives ~80 s after a power-up; well before the automatic clock sync corrects
+          it.
+      - if:
+          - condition: template
+            value_template: '{{ not wait.completed }}'
+        then:
+          - action: script.spa_notify
+            data:
+              title: Spa outage
+              message: >-
+                The spa ESP was offline {{ off_min }} min but its date never arrived - could not
+                tell a power cut from a Wi-Fi drop; nothing recorded.
+              tag: spa_outage
+          - stop: No spa date
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: sensor.sundance_spa_clock_date
+                state: 01/01/2014
+            sequence:
+              - variables:
+                  clock: '{{ states(''sensor.sundance_spa_clock_time'') }}'
+                  on_ts: >-
+                    {% set p = clock.split(':') %}{% if p | count == 2 and p[0] | is_number and p[1]
+                    | is_number %}{{ (as_timestamp(now()) - (p[0] | int * 60 + p[1] | int) * 60) |
+                    int }}{% else %}{{ t1 | int }}{% endif %}
+                  on_min: >-
+                    {{ (on_ts | timestamp_custom('%H', true)) | int * 60 + (on_ts |
+                    timestamp_custom('%M', true)) | int }}
+                  tag: spa_rinse_{{ as_timestamp(now()) | int }}
+                  repl: '{{ is_state(''sensor.sundance_spa_remaining_days_filter_change'', ''Change Now'') }}'
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.spa_last_power_cut
+                data:
+                  timestamp: '{{ on_ts }}'
+                note: >-
+                  Every real power cut: when the spa came back on. The counter-reset question only
+                  asks after one of these.
+              - condition: template
+                value_template: >-
+                  {%- set sh = states('input_datetime.spa_quiet_hours_start') -%}{%- set eh =
+                  states('input_datetime.spa_quiet_hours_end') -%}{%- set s = sh[0:2] | int(23) * 60
+                  + sh[3:5] | int(0) -%}{%- set e = eh[0:2] | int(6) * 60 + eh[3:5] | int(30) -%}{%-
+                  set quiet = (on_min >= s or on_min < e) if s > e else (s <= on_min < e) -%}{{
+                  off_min >= 5 and not quiet }}
+                note: >-
+                  Rinsing takes minutes; nobody rinses the filter in the spa quiet hours (set on the
+                  Hot Tub Settings page).
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  title: Spa was switched off
+                  message: >-
+                    The spa was off for about {{ off_min }} min and came back on at {{ on_ts |
+                    timestamp_custom('%H:%M') }}. Did you rinse your filter?{{ ' The Filter Change
+                    counter is at 0 - was the filter replaced?' if repl else '' }}
+                  data:
+                    tag: '{{ tag }}'
+                    actions: >-
+                      {{ [{'action': 'YES_' ~ tag, 'title': 'Rinsed'}] + ([{'action': 'REPL_' ~ tag,
+                      'title': 'Replaced'}] if repl else []) + [{'action': 'NO_' ~ tag, 'title':
+                      'No'}] }}
+                    sticky: true
+                    persistent: true
+                    clickAction: noAction
+                    priority: high
+                    ttl: 0
+              - wait_for_trigger:
+                  - trigger: event
+                    event_type: mobile_app_notification_action
+                    event_data:
+                      action: YES_{{ tag }}
+                  - trigger: event
+                    event_type: mobile_app_notification_action
+                    event_data:
+                      action: REPL_{{ tag }}
+                  - trigger: event
+                    event_type: mobile_app_notification_action
+                    event_data:
+                      action: NO_{{ tag }}
+                timeout:
+                  hours: 12
+                continue_on_timeout: true
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ wait.trigger is not none and wait.trigger.event.data.action == 'YES_' ~ tag
+                      }}
+                then:
+                  - action: input_datetime.set_datetime
+                    target:
+                      entity_id: input_datetime.last_rinse_filter
+                    data:
+                      timestamp: '{{ on_ts }}'
+                    note: Time the spa came back on, not the time of the answer
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ wait.trigger is not none and wait.trigger.event.data.action == 'REPL_' ~
+                      tag }}
+                then:
+                  - action: input_datetime.set_datetime
+                    target:
+                      entity_id: input_datetime.last_replacement_filter_date
+                    data:
+                      date: '{{ on_ts | int | timestamp_custom(''%Y-%m-%d'') }}'
+                    note: Date the spa came back on, not the date of the answer
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: '{{ tag }}'
+        default:
+          - variables:
+              corr: >-
+                {%- set S = (states('sensor.sundance_spa_primary_filter_start') ~
+                ':0').split(':')[0] | int(12) -%}{%- set N =
+                [states('sensor.sundance_spa_primary_filter_cycles') | int(4), 1] | max -%}{%- set D
+                = states('sensor.sundance_spa_primary_filter_duration') | float(2) -%}{%- set circ =
+                states('number.sundance_spa_power_circulation') | float(370) -%}{%- set jet =
+                states('number.sundance_spa_power_jet_pump') | float(1630) -%}{%- set ctrl =
+                states('number.sundance_spa_power_controller') | float(15) -%}{%- set off =
+                now().utcoffset().total_seconds() -%}{%- set ns = namespace(total=0, key=none,
+                cur=0, hours=[]) -%}{%- set n = (((t1 - t0) / 60) | round(0, 'ceil')) | int -%}{%-
+                for i in range([n, 1440] | min) -%}{%- set a = t0 + i * 60 -%}{%- set b = [a + 60,
+                t1] | min -%}{%- set m = (a + b) / 2 -%}{%- set h = ((m + off) % 86400) / 3600
+                -%}{%- set c = namespace(on=false) -%}{%- for k in range(N) -%}{%- if ((h - S - k *
+                24 / N) % 24) < D -%}{%- set c.on = true -%}{%- endif -%}{%- endfor -%}{%- set cl =
+                (h - S) % 24 >= 1 / 60 and (h - S) % 24 < 2 / 60 -%}{%- set e = (ctrl + (circ if
+                c.on else 0) + (jet if cl else 0)) * (b - a) / 3600000 -%}{%- set key = (m - m %
+                3600) | int -%}{%- if key != ns.key and ns.key is not none -%}{%- set ns.hours =
+                ns.hours + [[ns.key, ns.cur]] -%}{%- set ns.cur = 0 -%}{%- endif -%}{%- set ns.key =
+                key -%}{%- set ns.cur = ns.cur + e -%}{%- set ns.total = ns.total + e -%}{%- endfor
+                -%}{%- if ns.key is not none -%}{%- set ns.hours = ns.hours + [[ns.key, ns.cur]]
+                -%}{%- endif -%}{{ {'total': ns.total, 'hours': ns.hours} | tojson }}
+          - condition: template
+            value_template: '{{ corr.total > 0.0005 }}'
+          - wait_template: >-
+              {{ states('sensor.sundance_spa_energy_counter') | is_number and
+              as_timestamp(states.sensor.sundance_spa_energy_counter.last_updated) >= t1 - 1 }}
+            timeout:
+              minutes: 2
+            continue_on_timeout: false
+            note: >-
+              The ESP counted the real energy while HA could not see it; its Energy Counter arrives
+              right after the reconnect and the utility meters add the jump by themselves.
+          - delay:
+              seconds: 10
+            note: Let the utility meters process the new counter value first.
+          - action: recorder.get_statistics
+            data:
+              start_time: '{{ (t0 - 7200) | timestamp_local }}'
+              end_time: '{{ now().isoformat() }}'
+              statistic_ids:
+                - sensor.sundance_spa_energy_counter
+              period: 5minute
+              types:
+                - state
+            response_variable: cst
+            note: >-
+              The counter value just before the outage = the state of its last 5-minute row starting
+              before t0.
+          - variables:
+              x: >-
+                {%- set rows = cst.statistics['sensor.sundance_spa_energy_counter'] | default([]) |
+                selectattr('start', 'lt', (t0 | timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false)))
+                | list -%}{%- if rows and rows[-1].state is number -%}{{
+                [states('sensor.sundance_spa_energy_counter') | float(0) - rows[-1].state, 0] | max
+                }}{%- else -%}{{ corr.total }}{%- endif -%}
+              scale: '{{ ([x / corr.total, 1] | min) if corr.total > 0 else 0 }}'
+            note: >-
+              x = what the ESP really counted during the outage. The schedule estimate is scaled
+              down if it is larger (ESP lost counting), so no hour is ever left negative.
+          - action: recorder.get_statistics
+            data:
+              start_time: '{{ (corr.hours[0][0] - 86400) | timestamp_local }}'
+              end_time: '{{ now().isoformat() }}'
+              statistic_ids:
+                - sensor.sundance_spa_energy_total
+              period: hour
+              types:
+                - sum
+                - state
+            response_variable: st
+            note: >-
+              From a day before, so the last row before the outage is found even after several
+              outages in a row.
+          - variables:
+              fixed: >-
+                {%- set rows = st.statistics['sensor.sundance_spa_energy_total'] | default([])
+                -%}{%- set first = corr.hours[0][0] | int -%}{%- set nowts = as_timestamp(now()) |
+                int -%}{%- set last_done = (nowts - nowts % 3600 - 3600) | int -%}{%- set ns =
+                namespace(out=[], raw=none, state=none) -%}{%- for r in rows -%}{%- if
+                as_timestamp(r.start) < first -%}{%- set ns.raw = r.sum -%}{%- set ns.state =
+                r.state -%}{%- endif -%}{%- endfor -%}{%- if first <= last_done -%}{%- for h in
+                range(first, last_done + 1, 3600) -%}{%- set ex = rows | selectattr('start',
+                'search', (h | timestamp_custom('%Y-%m-%dT%H:00:00', false))) | list -%}{%- if ex
+                -%}{%- set ns.raw = ex[0].sum -%}{%- set ns.state = ex[0].state -%}{%- endif -%}{%-
+                if ns.raw is not none -%}{%- set add = scale * (corr.hours | selectattr(0, 'le', h)
+                | map(attribute=1) | sum) -%}{%- set ns.out = ns.out + [{'start': h |
+                timestamp_custom('%Y-%m-%dT%H:%M:%S+00:00', false), 'state': ns.state, 'sum': ns.raw
+                + add}] -%}{%- endif -%}{%- endfor -%}{%- endif -%}{{ ns.out | tojson }}
+            note: >-
+              Each completed hour from the outage on gets the (scaled) estimate up to that hour; a
+              missing row is created from the hour before. The hour the ESP came back in is still
+              open: it is compiled from the meter, which already holds the real total, so it ends up
+              with the rest (manual use, heating) automatically.
+          - if:
+              - condition: template
+                value_template: '{{ fixed | count > 0 }}'
+            then:
+              - action: recorder.import_statistics
+                data:
+                  statistic_id: sensor.sundance_spa_energy_total
+                  source: recorder
+                  unit_of_measurement: kWh
+                  has_mean: false
+                  has_sum: true
+                  stats: '{{ fixed }}'
+          - repeat:
+              for_each:
+                - sensor.sundance_spa_energy_today
+                - sensor.sundance_spa_energy_week
+                - sensor.sundance_spa_energy_month
+                - sensor.sundance_spa_energy_year
+              sequence:
+                - variables:
+                    reset_ts: '{{ as_timestamp(state_attr(repeat.item, ''last_reset''), 0) }}'
+                    before: >-
+                      {{ scale * (corr.hours | selectattr(0, 'lt', reset_ts) | map(attribute=1) |
+                      sum) }}
+                - if:
+                    - condition: template
+                      value_template: '{{ before > 0.0005 and states(repeat.item) | is_number }}'
+                  then:
+                    - action: utility_meter.calibrate
+                      target:
+                        entity_id: '{{ repeat.item }}'
+                      data:
+                        value: '{{ [states(repeat.item) | float - before, 0] | max | round(3) }}'
+            note: >-
+              An outage across a reset (midnight, week, month, year): the meter got the whole jump
+              in the new period; take out the part that belongs before the reset. The hourly
+              statistics above already put it in the right day.
+          - action: logbook.log
+            data:
+              name: Spa energy
+              entity_id: sensor.sundance_spa_energy_total
+              message: >-
+                Wi-Fi drop {{ t0 | timestamp_custom('%d/%m %H:%M') }}-{{ t1 |
+                timestamp_custom('%H:%M') }} ({{ off_min }} min): the ESP counted {{ '%.3f' % x }}
+                kWh; {{ '%.3f' % (scale * corr.total) }} kWh (normal schedule) moved to the hours it
+                belongs to, the rest stays in the hour it came back.
+    mode: queued
+    max: 3
+  - id: sundance_spa_spa_ask_filter_bulb_water_replaced
+    alias: 'Spa - Ask: Filter/ClearRay Bulb/Water Replaced?'
+    description: >-
+      When a spa service counter is reset on the panel (Remaining Days Filter Change / ClearRay Bulb
+      / Water Refresh: days jump up, or Off / Change Now -> days), ask the owner's phone whether the
+      item was actually replaced. Yes -> the matching Last Replacement ... Date is set to the reset
+      date. No or no answer within 12 h -> nothing changes (covers test resets). unknown/unavailable
+      (ESP reboot) are ignored. Counters are text since ESP patch 17 (2026-10-25): days, 'Change
+      Now' or 'Off'. Revised 2026-10-28: entities renamed (sensor.sundance_spa_remaining_days_*,
+      input_datetime.last_replacement_*_date). Revised 2026-11-01: no question in the spa quiet
+      hours 23:00-06:30 by default, set on the Hot Tub Settings page - it waits and asks when they
+      end. Revised 2026-11-03: asked only within 12 h after a real power cut
+      (input_datetime.spa_last_power_cut, set by the outage automation when the spa date was reset)
+      - counters are also edited from HA now, and a real replacement always follows switching the
+      spa off. Revised 2026-11-08: for the Filter counter only, a Service Lock that ended within the
+      last 12 h (input_datetime.spa_last_service_lock_end, set by Spa - After a Service Lock: filter
+      rinsed?) also allows the question; ClearRay bulb and Water still need a real power cut.
+      Revised 2026-11-08: the Filter question is skipped when
+      input_datetime.last_replacement_filter_date is already today (the Replaced button of the rinse
+      question set it). Revised 2026-11-08: quiet hours from binary_sensor.spa_quiet_hours (the two
+      time helpers).
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_remaining_days_filter_change
+        id: filter
+        note: Counter reset on the panel
+      - trigger: state
+        entity_id: sensor.sundance_spa_remaining_days_clearray_bulb
+        id: clearray_bulb
+      - trigger: state
+        entity_id: sensor.sundance_spa_remaining_days_water_refresh
+        id: water
+    conditions:
+      - condition: template
+        value_template: >-
+          {% set f = trigger.from_state.state %}{% set t = trigger.to_state.state %}{{ is_number(t)
+          and ((is_number(f) and t | float > f | float) or f in ['Off', 'Change Now']) }}
+        note: >-
+          A reset = the days go up (normal daily change is -1), or a number appears after Off /
+          Change Now. unknown/unavailable (ESP reboot) never count. No native condition compares old
+          vs new state.
+      - condition: template
+        value_template: >-
+          {%- set now_ts = as_timestamp(now()) -%}{%- set cut =
+          state_attr('input_datetime.spa_last_power_cut', 'timestamp') | float(0) -%}{%- set svl =
+          state_attr('input_datetime.spa_last_service_lock_end', 'timestamp') | float(0) -%}{{
+          now_ts - cut < 12 * 3600 or (trigger.id == 'filter' and now_ts - svl < 12 * 3600) }}
+        note: >-
+          Owner's rule: a filter, bulb or water change always starts with the spa switched off, so a
+          reset is only asked about within 12 h after a real power cut (spa date reset to
+          01/01/2014). Only the filter can also be done under a Service Lock, so for the Filter
+          counter a Service Lock that ended in the last 12 h
+          (input_datetime.spa_last_service_lock_end) counts too. Otherwise the value was just
+          edited, e.g. from HA.
+      - alias: Not again when the filter was already marked replaced today
+        condition: template
+        value_template: >-
+          {{ not (trigger.id == 'filter' and states('input_datetime.last_replacement_filter_date')
+          == (now().date() | string)) }}
+        note: >-
+          The Replaced button of the rinse question (after a power cut or a Service Lock) already
+          set today's date, so the counter reset does not ask again. Filter only.
+    actions:
+      - variables:
+          item: >-
+            {{ {'filter': 'Filter', 'clearray_bulb': 'ClearRay bulb', 'water': 'Water'}[trigger.id]
+            }}
+          target_entity: '{{ ''input_datetime.last_replacement_'' ~ trigger.id ~ ''_date'' }}'
+          reset_date: '{{ now().date() | string }}'
+          tag: spa_replace_{{ trigger.id }}_{{ as_timestamp(now()) | int }}
+      - wait_template: '{{ is_state(''binary_sensor.spa_quiet_hours'', ''off'') }}'
+        timeout:
+          hours: 8
+        continue_on_timeout: true
+        note: >-
+          Spa quiet hours (set on the Hot Tub Settings page): ask when they end. The recorded date
+          stays the reset date.
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          title: Spa counter reset
+          message: >-
+            {{ item }} counter was reset to {{ trigger.to_state.state | int }} days. Was the {{ item
+            | lower }} replaced?
+          data:
+            tag: '{{ tag }}'
+            actions:
+              - action: YES_{{ tag }}
+                title: 'Yes'
+              - action: NO_{{ tag }}
+                title: 'No'
+            sticky: true
+            persistent: true
+            clickAction: noAction
+            priority: high
+            ttl: 0
+      - wait_for_trigger:
+          - trigger: event
+            event_type: mobile_app_notification_action
+            event_data:
+              action: YES_{{ tag }}
+          - trigger: event
+            event_type: mobile_app_notification_action
+            event_data:
+              action: NO_{{ tag }}
+        timeout:
+          hours: 12
+        continue_on_timeout: true
+      - if:
+          - condition: template
+            value_template: '{{ wait.trigger is not none and wait.trigger.event.data.action == ''YES_'' ~ tag }}'
+        then:
+          - action: input_datetime.set_datetime
+            target:
+              entity_id: '{{ target_entity }}'
+            data:
+              date: '{{ reset_date }}'
+            note: Date of the reset, not of the answer
+        note: 'No or no answer: date unchanged.'
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          message: clear_notification
+          data:
+            tag: '{{ tag }}'
+    mode: parallel
+    max: 5
+  - id: sundance_spa_spa_ask_soaking_or_maintenance
+    alias: 'Spa - Ask: Soaking or Maintenance'
+    description: >-
+      When a spa session of 10+ minutes ends (Jet 2 on or Jet 1 high,
+      binary_sensor.sundance_spa_in_use_session), wait 5 min: any further run (any length) starting
+      within 5 min of the last end is added to the same session (up to 6 runs). Then ask the owner's
+      phone once (buttons Soaking / Maintenance / Soaking (edit time) - the last one lets the owner
+      type the minutes actually spent in the water, e.g. staying in after the jets stop) whether it
+      was soaking or maintenance (adding chemicals), with the total minutes: just the session if
+      there was no follow-up, otherwise from the start of the first run to the end of the last one,
+      gaps included (time spent in the spa with the pump off counts; the 5-min wait itself is never
+      added). Soaking -> Spa Soaking totals + Last Soak (end of the last run); Maintenance -> Spa
+      Maintenance totals + Last Maintenance. No answer within 12 h -> counted in neither (still in
+      Pumps Time). Runs under 10 min that are not follow-ups are not asked about.
+      input_boolean.spa_session_merging blocks a second question while follow-ups are collected
+      (forced off at HA start). Revised 2026-10-26: follow-up merge. Revised 2026-10-28: dates
+      renamed to input_datetime.last_soak / last_maintenance. Revised 2026-10-31: triggered by
+      binary_sensor.sundance_spa_in_use going off from any state (on -> unavailable -> off was
+      missed on 31/10 07:41), with the run start from input_datetime.spa_in_use_since (set by "Spa -
+      Track In Use Start", reset to 1970 once used); runs under 10 min are ignored as before.
+      Revised 2026-11-01: no question in the spa quiet hours 23:00-06:30 by default, set on the Hot
+      Tub Settings page - it waits and asks when they end. Revised 2026-11-06: a recorded soak first
+      copies the old input_datetime.last_soak to input_datetime.spa_previous_soak (shown as
+      'Previous Soak' on the Hot Tub page). Revised 2026-11-08: quiet hours from
+      binary_sensor.spa_quiet_hours (the two time helpers).
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        not_from: 'off'
+        to: 'off'
+        note: >-
+          Any change to off, also via unavailable (a WiFi blip at the moment the jets stop) - the
+          run start comes from input_datetime.spa_in_use_since.
+    conditions:
+      - condition: state
+        entity_id: input_boolean.spa_session_merging
+        state: 'off'
+        note: >-
+          A run that ends while an earlier session is still collecting follow-up runs is merged into
+          that one, not asked about separately.
+    actions:
+      - variables:
+          start_ts: '{{ state_attr(''input_datetime.spa_in_use_since'', ''timestamp'') | float(0) }}'
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.spa_in_use_since
+        data:
+          datetime: '1970-01-01 00:00:00'
+        note: Close the run, so a later reconnect (unavailable -> off with no run open) does not ask.
+      - condition: template
+        value_template: '{{ start_ts > 1000000000 and as_timestamp(now()) - start_ts >= 600 }}'
+        note: A run was open and lasted 10+ minutes.
+      - variables:
+          minutes: '{{ ((as_timestamp(now()) - start_ts) / 60) | round(1) }}'
+          tag: spa_session_{{ as_timestamp(now()) | int }}
+          ended: '{{ as_timestamp(now()) | int }}'
+          more: true
+          first_start: '{{ start_ts }}'
+          done: false
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.spa_session_merging
+      - repeat:
+          sequence:
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id: binary_sensor.sundance_spa_in_use
+                  to: 'on'
+              timeout:
+                minutes: 5
+              continue_on_timeout: true
+              note: Another run (any length) within 5 min of the end belongs to the same soak.
+            - if:
+                - condition: template
+                  value_template: '{{ wait.trigger is not none }}'
+              then:
+                - variables:
+                    run_start: '{{ as_timestamp(now()) }}'
+                - wait_for_trigger:
+                    - trigger: state
+                      entity_id: binary_sensor.sundance_spa_in_use
+                      to: 'off'
+                  timeout:
+                    hours: 3
+                  continue_on_timeout: true
+                - variables:
+                    minutes: '{{ ((as_timestamp(now()) - first_start | float(0)) / 60) | round(1) }}'
+                    ended: '{{ as_timestamp(now()) | int }}'
+                  note: >-
+                    From the start of the first run to the end of the last one, gaps included (owner
+                    stays in the spa between runs).
+              else:
+                - variables:
+                    more: false
+          until:
+            - condition: template
+              value_template: '{{ not more or repeat.index >= 6 }}'
+        note: Collect follow-up runs; at most 6.
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.spa_in_use_since
+        data:
+          datetime: '1970-01-01 00:00:00'
+        note: Follow-up runs are merged here; close the last one.
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.spa_session_merging
+      - variables:
+          prompt: '{{ minutes | round(0) | int }} min. Was it soaking or maintenance?'
+        note: After the follow-up runs are merged.
+      - wait_template: '{{ is_state(''binary_sensor.spa_quiet_hours'', ''off'') }}'
+        timeout:
+          hours: 8
+        continue_on_timeout: true
+        note: 'Spa quiet hours (set on the Hot Tub Settings page): ask when they end.'
+      - repeat:
+          sequence:
+            - action: '{{ states(''input_text.spa_notify_service'') }}'
+              data:
+                title: Spa session ended
+                message: '{{ prompt }}'
+                data:
+                  tag: '{{ tag }}'
+                  actions:
+                    - action: SOAK_{{ tag }}
+                      title: Soaking
+                    - action: MAINT_{{ tag }}
+                      title: Maintenance
+                    - action: SOAKEDIT_{{ tag }}
+                      title: Soaking (edit time)
+                      behavior: textInput
+                      textInputButtonTitle: Save
+                      textInputPlaceholder: Minutes in the water
+                  sticky: true
+                  persistent: true
+                  clickAction: noAction
+                  priority: high
+                  ttl: 0
+            - wait_for_trigger:
+                - trigger: event
+                  event_type: mobile_app_notification_action
+                  event_data:
+                    action: SOAK_{{ tag }}
+                - trigger: event
+                  event_type: mobile_app_notification_action
+                  event_data:
+                    action: MAINT_{{ tag }}
+                - trigger: event
+                  event_type: mobile_app_notification_action
+                  event_data:
+                    action: SOAKEDIT_{{ tag }}
+              timeout:
+                hours: 12
+              continue_on_timeout: true
+            - variables:
+                answer: >-
+                  {{ wait.trigger.event.data.action.split('_')[0] if wait.trigger is not none else
+                  'none' }}
+            - if:
+                - condition: template
+                  value_template: '{{ answer == ''SOAKEDIT'' }}'
+              then:
+                - variables:
+                    typed: '{{ wait.trigger.event.data.get(''reply_text'', '''') | string | trim }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ typed | regex_match(''^[0-9]{1,3}$'') and 1 <= typed | int <= 300 }}'
+                  then:
+                    - variables:
+                        minutes: '{{ typed | int }}'
+                        ended: '{{ (first_start | float(0) + (typed | int) * 60) | int }}'
+                        answer: SOAK
+                        done: true
+                  else:
+                    - variables:
+                        prompt: Please type the minutes as a whole number (e.g. 35).
+                        done: false
+              else:
+                - variables:
+                    done: true
+              note: >-
+                Soaking (edit time): digits only, 1-300 whole minutes; anything else re-asks with
+                the same notification tag. Last Soak = start + typed minutes.
+          until:
+            - condition: template
+              value_template: '{{ done or repeat.index >= 5 }}'
+        note: >-
+          Ask, and re-ask after an invalid typed time (max 5 rounds). No answer within 12 h ends the
+          loop with nothing recorded.
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: '{{ answer == ''SOAK'' }}'
+            sequence:
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ (state_attr('input_datetime.last_soak', 'timestamp') | float(0)) > 172800
+                      }}
+                then:
+                  - action: input_datetime.set_datetime
+                    target:
+                      entity_id: input_datetime.spa_previous_soak
+                    data:
+                      timestamp: '{{ state_attr(''input_datetime.last_soak'', ''timestamp'') | int(0) }}'
+                note: >-
+                  Keep the soak that was Last Soak until now, for 'Previous Soak' on the Hot Tub
+                  page.
+              - action: counter.increment
+                target:
+                  entity_id: counter.spa_soaking_sessions_total
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.spa_soaking_minutes_total
+                data:
+                  value: >-
+                    {{ (states('input_number.spa_soaking_minutes_total') | float(0) + minutes |
+                    float(0)) | round(1) }}
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_soak
+                data:
+                  timestamp: '{{ ended }}'
+                note: Session end time
+          - conditions:
+              - condition: template
+                value_template: '{{ answer == ''MAINT'' }}'
+            sequence:
+              - action: counter.increment
+                target:
+                  entity_id: counter.spa_maintenance_sessions_total
+              - action: input_number.set_value
+                target:
+                  entity_id: input_number.spa_maintenance_minutes_total
+                data:
+                  value: >-
+                    {{ (states('input_number.spa_maintenance_minutes_total') | float(0) + minutes |
+                    float(0)) | round(1) }}
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_maintenance
+                data:
+                  timestamp: '{{ ended }}'
+                note: Session end time
+        note: 'No answer within 12 h: nothing is counted.'
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          message: clear_notification
+          data:
+            tag: '{{ tag }}'
+        note: 'Persistent notification: remove it from the phone once answered or timed out.'
+    mode: parallel
+    max: 5
+  - id: sundance_spa_spa_bromine_reminder
+    alias: Spa - Bromine reminder
+    description: >-
+      Every morning at 08:00, if bromine was last added 4 or more calendar days ago
+      (input_datetime.spa_last_bromine, or never), asks the phone 'Added bromine?' with Yes / No.
+      Yes sets the date and time to now, so the next question comes 4 days later. No, or no answer:
+      asked again the next morning at 08:00. The answer is its own trigger, so it still works after
+      an HA restart. The date can also be set by hand from the Hot Tub page. Created 2026-11-05.
+    triggers:
+      - trigger: time
+        at: '08:00:00'
+        id: morning
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SPA_BROMINE_YES
+        id: 'yes'
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SPA_BROMINE_NO
+        id: 'no'
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: morning
+              - condition: template
+                value_template: >-
+                  {%- set t = state_attr('input_datetime.spa_last_bromine', 'timestamp') | float(0)
+                  -%}{{ (now().date() - as_local(as_datetime(t)).date()).days >= 4 }}
+                note: 4 or more calendar days since the last addition.
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  title: Spa bromine
+                  message: >-
+                    {%- set t = state_attr('input_datetime.spa_last_bromine', 'timestamp') |
+                    float(0) -%}{%- if t < 172800 -%}Time to add bromine. Added it?{%- else -%}Time
+                    to add bromine. Last added {{ t | timestamp_custom('%d/%m %H:%M') }} ({{
+                    (now().date() - as_local(as_datetime(t)).date()).days }} days ago). Added it?{%-
+                    endif -%}
+                  data:
+                    tag: spa_bromine
+                    actions:
+                      - action: SPA_BROMINE_YES
+                        title: 'Yes'
+                      - action: SPA_BROMINE_NO
+                        title: 'No'
+                    sticky: true
+                    persistent: true
+                    clickAction: noAction
+                    priority: high
+                    ttl: 0
+          - conditions:
+              - condition: trigger
+                id: 'yes'
+            sequence:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.spa_last_bromine
+                data:
+                  timestamp: '{{ as_timestamp(now()) | int }}'
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: spa_bromine
+          - conditions:
+              - condition: trigger
+                id: 'no'
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: spa_bromine
+    mode: queued
+  - id: sundance_spa_spa_decoder_notice
+    alias: Spa - Decoder notice
+    description: >-
+      Sends the spa ESP's Decoder Notice (sensor.sundance_spa_decoder_notice) to the owner's phone.
+      The ESP publishes 'OK' normally, or a short English message when something it could not handle
+      happened (clock sync or settings read failed, clock still off after a sync, unknown topside
+      screen, ClearRay on an unmapped screen, light or command not confirmed, no status from the
+      spa). It returns to 'OK' after an hour, so the same problem notifies at most about once an
+      hour. Created 2026-10-26 for v1 (entity appears after the v1 flash). Revised 2026-10-29:
+      not_from unknown/unavailable, so an HA-ESP reconnect that restores the same notice does not
+      notify again (29 Oct 15:01 re-sent code 71). Revised 2026-11-01: sent through
+      script.spa_notify (quiet hours 23:00-06:30 by default, set on the Hot Tub Settings page,
+      delivered together when they end).
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_decoder_notice
+        not_to:
+          - OK
+          - unknown
+          - unavailable
+        not_from:
+          - unknown
+          - unavailable
+    actions:
+      - action: script.spa_notify
+        data:
+          title: Spa decoder notice
+          message: '{{ trigger.to_state.state }} ({{ now().strftime(''%d/%m/%Y %H:%M'') }})'
+          tag: spa_decoder_notice
+        note: Held until 06:30 in the spa quiet hours (23:00-06:30).
+    mode: queued
+    max: 5
+  - id: sundance_spa_spa_deliver_night_alerts
+    alias: Spa - Deliver night alerts
+    description: >-
+      When the spa quiet hours end (06:30 by default; or on HA start outside the quiet hours, in
+      case HA was down then) sends the spa information notifications queued overnight by
+      script.spa_notify (input_text.spa_night_alerts) as one phone notification, then clears the
+      queue. Created 2026-11-01. Revised 2026-11-08: the quiet hours are the two time helpers set on
+      the Hot Tub Settings page (input_datetime.spa_quiet_hours_start / _end).
+    triggers:
+      - trigger: time
+        at: input_datetime.spa_quiet_hours_end
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: time
+        after: input_datetime.spa_quiet_hours_end
+        before: input_datetime.spa_quiet_hours_start
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: input_text.spa_night_alerts
+            state:
+              - ''
+              - unknown
+              - unavailable
+    actions:
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          title: 'Spa: overnight alerts'
+          message: '{{ states(''input_text.spa_night_alerts'') | replace(''; '', ''\n'') }}'
+          data:
+            tag: spa_night_alerts
+            ttl: 0
+            priority: high
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_night_alerts
+        data:
+          value: ''
+    mode: single
+  - id: sundance_spa_spa_filter_rinse_reminder
+    alias: Spa - Filter rinse reminder
+    description: >-
+      From 30 calendar days after the last filter rinse (input_datetime.last_rinse_filter), asks the
+      phone every morning at 08:00 until it is done. Done sets the date and time to now. A rinse
+      recorded by the power-off question ('Spa - Ask: Filter Rinsed After Power Off') or by hand
+      moves the date as well and clears the question. Not yet, or no answer: asked again the next
+      morning. Answers are their own triggers, so they still work after an HA restart. Created
+      2026-11-05.
+    triggers:
+      - trigger: time
+        at: '08:00:00'
+        id: morning
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SPA_RINSE_DONE
+        id: done
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SPA_RINSE_LATER
+        id: later
+      - trigger: state
+        entity_id: input_datetime.last_rinse_filter
+        not_to:
+          - unavailable
+          - unknown
+        id: recorded
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: morning
+              - condition: template
+                value_template: >-
+                  {%- set t = state_attr('input_datetime.last_rinse_filter', 'timestamp') | float(0)
+                  -%}{{ (now().date() - as_local(as_datetime(t)).date()).days >= 30 }}
+                note: 30 or more calendar days since the last rinse.
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  title: Spa filter rinse
+                  message: >-
+                    {%- set t = state_attr('input_datetime.last_rinse_filter', 'timestamp') |
+                    float(0) -%}Filter rinse is due. Last rinsed {{ t | timestamp_custom('%d/%m
+                    %H:%M') }} ({{ (now().date() - as_local(as_datetime(t)).date()).days }} days
+                    ago). Done?
+                  data:
+                    tag: spa_rinse
+                    actions:
+                      - action: SPA_RINSE_DONE
+                        title: Done
+                      - action: SPA_RINSE_LATER
+                        title: Not yet
+                    sticky: true
+                    persistent: true
+                    clickAction: noAction
+                    priority: high
+                    ttl: 0
+          - conditions:
+              - condition: trigger
+                id: done
+            sequence:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_rinse_filter
+                data:
+                  timestamp: '{{ as_timestamp(now()) | int }}'
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: spa_rinse
+          - conditions:
+              - condition: trigger
+                id:
+                  - later
+                  - recorded
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: spa_rinse
+    mode: queued
+  - id: sundance_spa_spa_heating_plans
+    alias: Spa - Heating plans
+    description: >-
+      Runs the heating plans from the Hot Tub Settings page (input_text.spa_plan_1..5 =
+      'mode;temp_c;HH:MM;days;date', written by script.spa_plan_add). Mode R = READY BY: the water
+      should be at the target at the plan time - heating starts at plan time - ((target - water) /
+      input_number.spa_heat_rate in °C/h + input_number.spa_ready_by_margin min). Mode S = START
+      HEATING at the plan time. days: 'once' (date in the 5th field; the plan stays listed until the
+      water reached its target and its plan time has come, whichever is later - i.e. with the 'Spa
+      ready' notice, or at the plan time when the water was ready earlier; one that never started is
+      removed 10 min after its time), 'daily', or weekday digits Mon=0..Sun=6 (stays until deleted).
+      Event driven (no polling): the next enabled plan is recalculated whenever a plan changes, the
+      water temperature changes (each panel step, 0.5 °C / 1 °F), the Heat Rate or margin changes,
+      HA starts or the ESP reconnects; its heating start is kept in
+      input_datetime.spa_plan_next_start and a time trigger starts it exactly then;
+      input_datetime.spa_plan_ready_check (the plan time, ready-by) triggers the not-ready check.
+      The setpoint before the heating is kept for 'Spa - Ready by: ask what next'. Stateless between
+      runs: input_text.spa_ready_by_state = 'plan_ts;previous setpoint;target;phase;ref_ts' (phase
+      heat / warned / asked / done; ref = when the water should be ready: the plan time for
+      ready-by, plan time + estimated heating for start). Ready-by only: at the plan time, if the
+      water is still more than 0.4° short, one notice. Heater Mode Eco (17:00-07:00 only) or Day
+      (07:00-17:00 only) could block heating: it is switched to Auto when a plan's heating starts,
+      the old mode kept in input_text.spa_plan_previous_heater_mode and restored by 'Spa - Ready by:
+      ask what next'. Created 2026-11-03 (first with a calendar, replaced the same day by the plan
+      list on the owner's request). A plan whose switch (input_boolean.spa_plan_N_on) is off is
+      skipped but kept; a switched-off one-off is still removed once its time has passed. Revised
+      2026-11-03: a one-off plan is no longer removed when its heating starts (owner: only once the
+      whole action has ended); the stale cleanup skips the running plan (state plan_ts). Revised
+      2026-11-03: the 'Spa heating' notice names the start temperature (water at the start of the
+      heating) - 'Heating from 34.5°C to 35.5°C ...'. Revised 2026-11-03: the 'Spa not ready yet'
+      notice gives the water temperature now and the expected minutes / time left to the target
+      (Heat Rate). Revised 2026-11-03: 'Spa - Heating plans: ready notice' tells the phone the
+      moment the water reaches the target; when it is already warm at the start,
+      input_text.spa_ready_notified is set here so that notice is skipped. Revised 2026-11-03: also
+      runs when a plan is added, changed or switched on (input_text.spa_plan_N /
+      input_boolean.spa_plan_N_on), so a plan whose heating should already have begun starts at once
+      instead of at the next 5-min run; mode queued so such a run is not dropped while another is
+      running. Revised 2026-11-03 (owner's design): 5-min polling replaced by the event triggers
+      above; the 12 h look-ahead dropped (start times are stored, not polled). Backup: OneDrive
+      HA-MCP/backups/automation-spa_heating_plans-20261103-1525-before-event-driven.json. Also runs
+      when input_text.spa_ready_by_state changes, so a finished one-off plan (phase done) leaves the
+      list at once; its own writes re-run it once with no effect. Revised 2026-11-03 (owner): a
+      one-off plan is removed not before its plan time and not before the water reached the target
+      (triggers: ready_check at the plan time, input_text.spa_ready_notified when the target is
+      reached). The Back/Keep/Set question follows independently (state). Revised 2026-11-08: when a
+      lock (Access, Temperature or Service Lock; Settings Lock only for the Eco/Day Heater Mode
+      switch) blocks the plan start, a phone notice says so; the ESP refuses the command at once
+      with a Decoder Notice. Revised 2026-11-08 (owner): a Temperature or Settings Lock is released
+      when the plan's heating starts (the lock is kept in input_text.spa_plan_previous_lock) and put
+      back by 'Spa - Ready by: ask what next'; an Access or Service Lock is never released
+      automatically - then the phone notice 'Spa heating plan blocked' is sent.
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: state
+        entity_id:
+          - input_text.spa_plan_1
+          - input_text.spa_plan_2
+          - input_text.spa_plan_3
+          - input_text.spa_plan_4
+          - input_text.spa_plan_5
+          - input_boolean.spa_plan_1_on
+          - input_boolean.spa_plan_2_on
+          - input_boolean.spa_plan_3_on
+          - input_boolean.spa_plan_4_on
+          - input_boolean.spa_plan_5_on
+        not_to:
+          - unavailable
+          - unknown
+        id: plan_changed
+      - trigger: time
+        at: input_datetime.spa_plan_next_start
+        id: start_time
+      - trigger: time
+        at: input_datetime.spa_plan_ready_check
+        id: ready_check
+      - trigger: state
+        entity_id: climate.sundance_spa
+        attribute: current_temperature
+        id: water
+      - trigger: state
+        entity_id:
+          - input_number.spa_heat_rate
+          - input_number.spa_ready_by_margin
+        id: params
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_status
+        to: 'on'
+        id: esp_back
+      - trigger: state
+        entity_id: input_text.spa_ready_by_state
+        id: state_changed
+      - trigger: state
+        entity_id: input_text.spa_ready_notified
+        id: ready_reached
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_status
+        state: 'on'
+        note: >-
+          Settings can only be sent while the ESP is connected; the esp_back trigger catches up
+          after a drop.
+    actions:
+      - variables:
+          panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+          st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+          cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+          setp: '{{ state_attr(''climate.sundance_spa'', ''temperature'') | float(0) }}'
+      - variables:
+          ftarget: >-
+            {%- set t = (st[2] | float(0)) if st | count > 2 else 0 -%}{{ ((t * 9 / 5 + 32) |
+            round(0) | int ~ '°F') if panel_f else ('%.1f°C' % t) }}
+      - if:
+          - condition: template
+            value_template: >-
+              {{ st | count == 5 and st[3] == 'heat' and st[4] == st[0] and as_timestamp(now()) >=
+              st[4] | int(0) and cur < (st[2] | float(0)) - 0.4 }}
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_ready_by_state
+            data:
+              value: '{{ st[0] }};{{ st[1] }};{{ st[2] }};warned;{{ st[4] }}'
+          - action: script.spa_notify
+            data:
+              title: Spa not ready yet
+              message: >-
+                {%- set fcur = ((cur * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else
+                ('%.1f°C' % cur) -%}{%- set left = (((st[2] | float(0)) - cur) /
+                ([states('input_number.spa_heat_rate') | float(2), 0.5] | max) * 60) | round(0) |
+                int -%}The spa should be {{ ftarget }} at {{ st[4] | int | timestamp_custom('%H:%M')
+                }} but the water is {{ fcur }} now. About {{ left }} more min to {{ ftarget }}
+                (ready about {{ (as_timestamp(now()) + left * 60) | timestamp_custom('%H:%M') }}) at
+                the learned Heat Rate of {%- set r = states('input_number.spa_heat_rate') | float(2)
+                %} {{ ((r * 1.8) | round(1) ~ '°F/h') if panel_f else (r | round(1) ~ '°C/h') }}.
+              tag: spa_ready_by
+        note: >-
+          Ready-by heating (ref = plan time) and the water is still short at that time: one notice
+          per plan.
+      - variables:
+          stale: >-
+            {%- set st = states('input_text.spa_ready_by_state').split(';') -%}{%- set active =
+            (st[0] | int(0)) if (st | count == 5 and st[3] in ['heat', 'warned', 'asked']) else 0
+            -%}{%- set nowts = as_timestamp(now()) | int -%}{%- set ns = namespace(s=[]) -%}{%- for
+            i in range(1, 6) -%}{%- set p = states('input_text.spa_plan_' ~ i).split(';') -%}{%- if
+            p | count == 5 and p[3] == 'once' and p[2] | regex_match('^[0-9]{2}:[0-9]{2}$') and p[4]
+            | regex_match('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') -%}{%- set ts =
+            as_timestamp(today_at(p[2]) + timedelta(days=(as_datetime(p[4]).date() -
+            now().date()).days)) | int -%}{%- set done_running = ts == active and
+            states('input_text.spa_ready_notified') == (ts | string) and ts <= nowts -%}{%- set
+            never_ran = ts != active and ts < nowts - 600 -%}{%- if done_running or never_ran -%}{%-
+            set ns.s = ns.s + ['input_text.spa_plan_' ~ i] -%}{%- endif -%}{%- endif -%}{%- endfor
+            -%}{{ ns.s }}
+      - if:
+          - condition: template
+            value_template: '{{ stale | count > 0 }}'
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: '{{ stale }}'
+            data:
+              value: ''
+        note: >-
+          One-off plans leave the list: a running one once the water reached its target AND its plan
+          time has come (whichever is later - with the 'Spa ready' notice, or at the plan time); one
+          that never started (e.g. ESP offline) 10 min after its time.
+      - variables:
+          pick: >-
+            {%- set ns = namespace(r=none) -%}{%- for i in range(1, 6) -%}{%- set p =
+            states('input_text.spa_plan_' ~ i).split(';') -%}{%- if p | count == 5 and
+            is_state('input_boolean.spa_plan_' ~ i ~ '_on', 'on') and p[2] |
+            regex_match('^[0-9]{2}:[0-9]{2}$') -%}{%- set base = today_at(p[2]) -%}{%- for d in
+            range(0, 8) -%}{%- set dt = base + timedelta(days=d) -%}{%- set ok = (p[3] == 'daily')
+            or (p[3] == 'once' and (dt.date() | string) == p[4]) or (p[3] not in ['daily', 'once']
+            and (dt.weekday() | string) in p[3]) -%}{%- if ok and as_timestamp(dt) >
+            as_timestamp(now()) - 600 -%}{%- set ts = as_timestamp(dt) | int -%}{%- if ns.r is none
+            or ts < ns.r.start -%}{%- set ns.r = {'start': ts, 'target': p[1] | float, 'mode':
+            ('start' if p[0] == 'S' else 'ready'), 'slot': i, 'once': p[3] == 'once'} -%}{%- endif
+            -%}{%- endif -%}{%- endfor -%}{%- endif -%}{%- endfor -%}{{ ns.r }}
+      - condition: template
+        value_template: '{{ pick is mapping }}'
+        note: There is an enabled plan in the next 8 days.
+      - variables:
+          st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+          same: '{{ st | count >= 4 and st[0] | int(0) == pick.start }}'
+          cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+          setp: '{{ state_attr(''climate.sundance_spa'', ''temperature'') | float(0) }}'
+          lead_min: >-
+            {{ (([pick.target - cur, 0] | max) / ([states('input_number.spa_heat_rate') | float(2),
+            0.5] | max) * 60 + states('input_number.spa_ready_by_margin') | float(20)) | round(0) }}
+          begin_ts: '{{ pick.start if pick.mode == ''start'' else pick.start - lead_min * 60 }}'
+          fmt_t: >-
+            {{ ((pick.target * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' %
+            pick.target) }}
+          heat_min: >-
+            {{ (([pick.target - cur, 0] | max) / ([states('input_number.spa_heat_rate') | float(2),
+            0.5] | max) * 60) | round(0) }}
+          ref: '{{ pick.start if pick.mode == ''ready'' else pick.start + heat_min * 60 }}'
+      - if:
+          - condition: template
+            value_template: '{{ not same }}'
+        then:
+          - if:
+              - condition: template
+                value_template: '{{ begin_ts | int > as_timestamp(now()) | int }}'
+            then:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.spa_plan_next_start
+                data:
+                  timestamp: '{{ begin_ts | int }}'
+          - if:
+              - condition: template
+                value_template: '{{ pick.mode == ''ready'' }}'
+            then:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.spa_plan_ready_check
+                data:
+                  timestamp: '{{ pick.start }}'
+        note: >-
+          Plan not started yet: keep its heating start (moves with every water reading, Heat Rate or
+          margin change) and, for ready-by, the plan time for the not-ready check. The time triggers
+          fire exactly then.
+      - if:
+          - condition: template
+            value_template: '{{ not same and as_timestamp(now()) >= begin_ts }}'
+        then:
+          - variables:
+              prev: '{{ st[1] if (st | count >= 4 and st[3] in [''heat'', ''warned'', ''asked'']) else setp }}'
+              old_mode: '{{ states(''sensor.sundance_spa_heater_mode'') }}'
+            note: An event that replaces one still open keeps the setpoint from before the first one.
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_ready_by_state
+            data:
+              value: '{{ pick.start }};{{ prev }};{{ pick.target }};heat;{{ ref }}'
+          - alias: Release a Temperature or Settings Lock for the plan
+            if:
+              - condition: state
+                entity_id: sensor.sundance_spa_lock
+                state:
+                  - Temperature Lock
+                  - Settings Lock
+            then:
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ states('input_text.spa_plan_previous_lock') in ['', 'unknown',
+                      'unavailable'] }}
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.spa_plan_previous_lock
+                    data:
+                      value: '{{ states(''sensor.sundance_spa_lock'') }}'
+                note: Keeps the first lock if the plan event is replaced by another one.
+              - action: select.select_option
+                target:
+                  entity_id: select.sundance_spa_lock_setting
+                data:
+                  option: 'Off'
+              - wait_template: '{{ is_state(''sensor.sundance_spa_lock'', ''Off'') }}'
+                timeout: '00:00:30'
+                continue_on_timeout: true
+            note: >-
+              Temperature and Settings Lock would block the set point or the Heater Mode switch.
+              'Spa - Ready by: ask what next' puts the lock back after the plan. Access and Service
+              Lock are never released automatically.
+          - if:
+              - condition: template
+                value_template: '{{ setp != pick.target }}'
+            then:
+              - action: climate.set_temperature
+                target:
+                  entity_id: climate.sundance_spa
+                data:
+                  temperature: '{{ pick.target }}'
+          - if:
+              - condition: template
+                value_template: '{{ cur >= pick.target }}'
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.spa_ready_notified
+                data:
+                  value: '{{ pick.start }}'
+            note: >-
+              Already warm: the start notice says so, so 'Spa - Heating plans: ready notice' does
+              not send another.
+          - if:
+              - condition: template
+                value_template: '{{ old_mode in [''Eco'', ''Day''] }}'
+            then:
+              - if:
+                  - condition: template
+                    value_template: '{{ states(''input_text.spa_plan_previous_heater_mode'') not in [''Eco'', ''Day''] }}'
+                then:
+                  - action: input_text.set_value
+                    target:
+                      entity_id: input_text.spa_plan_previous_heater_mode
+                    data:
+                      value: '{{ old_mode }}'
+              - action: select.select_option
+                target:
+                  entity_id: select.sundance_spa_heater_mode_setting
+                data:
+                  option: Auto
+            note: >-
+              Eco and Day can block the heater during the plan: Auto while it runs. 'Spa - Ready by:
+              ask what next' restores the mode after the question.
+          - action: script.spa_notify
+            data:
+              title: Spa heating
+              message: >-
+                {%- set fcur = ((cur * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else
+                ('%.1f°C' % cur) -%}{%- if cur >= pick.target -%}Water is {{ fcur }}, already at {{
+                fmt_t }}{{ '' if pick.mode == 'start' else ' for ' ~ (pick.start |
+                timestamp_custom('%H:%M')) }}.{%- elif pick.mode == 'start' -%}Heating from {{ fcur
+                }} to {{ fmt_t }}, starting now, ready about {{ ref | int |
+                timestamp_custom('%H:%M') }}.{%- else -%}Heating from {{ fcur }} to {{ fmt_t }} for
+                {{ pick.start | timestamp_custom('%H:%M') }} (about {{ heat_min | int }} min of
+                heating).{%- endif -%}{{ ' Heater Mode switched to Auto for this plan (was ' ~
+                old_mode ~ ').' if old_mode in ['Eco', 'Day'] else '' }}
+              tag: spa_ready_by
+          - alias: Tell the phone when a lock blocks the plan
+            if:
+              - condition: template
+                value_template: '{{ states(''sensor.sundance_spa_lock'') not in [''Off'', ''unknown'', ''unavailable''] }}'
+            then:
+              - action: script.spa_notify
+                data:
+                  title: Spa heating plan blocked
+                  message: >-
+                    The spa is in {{ states('sensor.sundance_spa_lock') }}, so the heating plan may
+                    not have started. Release the lock in Hot Tub Settings.
+                  tag: spa_ready_by
+    mode: queued
+  - id: sundance_spa_spa_heating_plans_ready_notice
+    alias: 'Spa - Heating plans: ready notice'
+    description: >-
+      Phone notice the moment the water reaches the target of a running heating plan
+      (input_text.spa_ready_by_state phase heat or warned), once per plan:
+      input_text.spa_ready_notified keeps the plan_ts already notified ('Spa - Heating plans' also
+      sets it when the water was already warm at the start, so no second notice). Ready-by plans say
+      how long before / after the plan time; start plans say when heating started and how long it
+      took. Created 2026-11-03 on the owner's request (notice right away, not at the plan time).
+    triggers:
+      - trigger: state
+        entity_id: climate.sundance_spa
+        attribute: current_temperature
+    conditions:
+      - condition: template
+        value_template: >-
+          {%- set st = states('input_text.spa_ready_by_state').split(';') -%}{{ st | count == 5 and
+          st[3] in ['heat', 'warned'] and (state_attr('climate.sundance_spa', 'current_temperature')
+          | float(0)) >= (st[2] | float(99)) and states('input_text.spa_ready_notified') != st[0] }}
+        note: A running plan, the water at its target, not yet notified for this plan.
+    actions:
+      - variables:
+          st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+          cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+          panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_ready_notified
+        data:
+          value: '{{ st[0] }}'
+      - action: script.spa_notify
+        data:
+          title: Spa ready
+          tag: spa_ready_by
+          message: >-
+            {%- set fcur = ((cur * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' %
+            cur) -%}{%- set plan = st[0] | int -%}{%- set nowts = as_timestamp(now()) | int -%}{%-
+            if st[4] == st[0] -%}{%- set d = ((plan - nowts) / 60) | round(0) | int -%}Water is {{
+            fcur }} at {{ now().strftime('%H:%M') }}, {{ (d ~ ' min before ' if d > 0 else ((-d) ~ '
+            min after ' if d < 0 else 'right on ')) ~ (plan | timestamp_custom('%H:%M')) }}.{%- else
+            -%}Water is {{ fcur }} at {{ now().strftime('%H:%M') }} (heating started {{ plan |
+            timestamp_custom('%H:%M') }}, took {{ ((nowts - plan) / 60) | round(0) | int }} min).{%-
+            endif -%}
+    mode: single
+  - id: sundance_spa_spa_lock_dropdown_follow_the_spa
+    alias: 'Spa - Lock dropdown: follow the spa'
+    description: >-
+      Keeps input_select.spa_set_lock (the Lock dropdown on the Hot Tub Settings page) showing the
+      lock the spa reports in sensor.sundance_spa_lock (Off, Access Lock, Temperature Lock, Settings
+      Lock, Service Lock). 'Spa - Lock dropdown: send a change' sends a pick to the spa. Created
+      2026-11-08.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_lock
+        not_to:
+          - unknown
+          - unavailable
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        hours: /1
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ states('sensor.sundance_spa_lock') in state_attr('input_select.spa_set_lock',
+          'options') }}
+      - condition: template
+        value_template: '{{ states(''input_select.spa_set_lock'') != states(''sensor.sundance_spa_lock'') }}'
+    actions:
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.spa_set_lock
+        data:
+          option: '{{ states(''sensor.sundance_spa_lock'') }}'
+    mode: queued
+    max: 5
+  - id: sundance_spa_spa_lock_dropdown_send_a_change
+    alias: 'Spa - Lock dropdown: send a change'
+    description: >-
+      When a person picks a lock in the Lock dropdown (input_select.spa_set_lock) that differs from
+      the spa's (sensor.sundance_spa_lock), sends it through select.sundance_spa_lock_setting; the
+      ESP releases the current lock and walks the topside menu to set the new one (about 20-60 s).
+      Every lock, Service Lock included, is sent at once, with no confirmation (decided 2026-11-08:
+      the owner can always release it from HA with Off, and it releases itself after 2 hours; the
+      explanation under the dropdown says what each lock does). If the spa does not report the new
+      lock within 120 s the dropdown returns to the spa's lock. Only a pick made by a person
+      (context user_id set) is sent. Created 2026-11-08.
+    triggers:
+      - trigger: state
+        entity_id: input_select.spa_set_lock
+        not_to:
+          - unknown
+          - unavailable
+    conditions:
+      - alias: Only a pick made by a person on the dashboard
+        condition: template
+        value_template: '{{ trigger.to_state.context.user_id is not none }}'
+      - alias: Only a real change
+        condition: template
+        value_template: '{{ trigger.to_state.state != states(''sensor.sundance_spa_lock'') }}'
+    actions:
+      - variables:
+          pick: '{{ trigger.to_state.state }}'
+      - alias: Send the pick to the spa
+        action: select.select_option
+        target:
+          entity_id: select.sundance_spa_lock_setting
+        data:
+          option: '{{ pick }}'
+      - alias: Wait for the spa to report the new lock
+        wait_template: '{{ states(''sensor.sundance_spa_lock'') == pick }}'
+        timeout: '00:02:00'
+        continue_on_timeout: true
+      - alias: If it did not take, show the spa's real lock again
+        if:
+          - condition: template
+            value_template: '{{ states(''input_select.spa_set_lock'') != states(''sensor.sundance_spa_lock'') }}'
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.spa_set_lock
+            data:
+              option: '{{ states(''sensor.sundance_spa_lock'') }}'
+    mode: restart
+  - id: sundance_spa_spa_maintenance_reminder
+    alias: Spa - Maintenance reminder
+    description: >-
+      From the 8th day without maintenance (8 or more calendar days since
+      input_datetime.last_maintenance, i.e. 7 full days without), asks the phone every morning at
+      08:00 until it is done. Done sets the date and time to now; a maintenance session recorded by
+      'Spa - Ask: Soaking or Maintenance' moves the date as well and clears the question. Not yet,
+      or no answer: asked again the next morning. Done also adds one to the maintenance count
+      (counter.spa_maintenance_sessions_total); maintenance time counts only real pump sessions.
+      Answers are their own triggers, so they still work after an HA restart. Created 2026-11-05.
+    triggers:
+      - trigger: time
+        at: '08:00:00'
+        id: morning
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SPA_MAINTENANCE_DONE
+        id: done
+      - trigger: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: SPA_MAINTENANCE_LATER
+        id: later
+      - trigger: state
+        entity_id: input_datetime.last_maintenance
+        not_to:
+          - unavailable
+          - unknown
+        id: recorded
+    actions:
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: morning
+              - condition: template
+                value_template: >-
+                  {%- set t = state_attr('input_datetime.last_maintenance', 'timestamp') | float(0)
+                  -%}{{ (now().date() - as_local(as_datetime(t)).date()).days >= 8 }}
+                note: 8 or more calendar days since the last maintenance.
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  title: Spa maintenance
+                  message: >-
+                    {%- set t = state_attr('input_datetime.last_maintenance', 'timestamp') |
+                    float(0) -%}Maintenance is due. Last done {{ t | timestamp_custom('%d/%m %H:%M')
+                    }} ({{ (now().date() - as_local(as_datetime(t)).date()).days }} days ago). Done?
+                  data:
+                    tag: spa_maintenance
+                    actions:
+                      - action: SPA_MAINTENANCE_DONE
+                        title: Done
+                      - action: SPA_MAINTENANCE_LATER
+                        title: Not yet
+                    sticky: true
+                    persistent: true
+                    clickAction: noAction
+                    priority: high
+                    ttl: 0
+          - conditions:
+              - condition: trigger
+                id: done
+            sequence:
+              - action: counter.increment
+                target:
+                  entity_id: counter.spa_maintenance_sessions_total
+                note: >-
+                  Counts in the Today / Week / Month / Total maintenance counters; maintenance time
+                  stays with real pump sessions.
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.last_maintenance
+                data:
+                  timestamp: '{{ as_timestamp(now()) | int }}'
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: spa_maintenance
+          - conditions:
+              - condition: trigger
+                id:
+                  - later
+                  - recorded
+            sequence:
+              - action: '{{ states(''input_text.spa_notify_service'') }}'
+                data:
+                  message: clear_notification
+                  data:
+                    tag: spa_maintenance
+    mode: queued
+  - id: sundance_spa_spa_plan_form_when_stays_in_the_future
+    alias: 'Spa - Plan form: When stays in the future'
+    description: >-
+      Earliest possible time for the 'When' of the Add a plan form (input_datetime.spa_plan_when,
+      Scheduled Plans page), one-off plans only (input_select.spa_plan_repeat = Once). Start
+      heating: the current minute. Ready by: now + (form temperature - water) /
+      input_number.spa_heat_rate, rounded up to a minute; the safety margin is not added; no gap
+      means the current minute. An untouched form follows this time up and down with the clock, the
+      water, the temperature, the mode and the Heat Rate: input_text.spa_plan_when_auto keeps the
+      last value written here, so a value that differs from it and is later than the earliest time
+      was chosen by the owner and is left alone until it is overtaken. An earlier value is replaced.
+      Repeating plans use only the time of day, so nothing is changed for them. Plans already added
+      are not touched. Created 2026-11-05 on the owner's request (first the next day at the same
+      time, then the current time, then this).
+    triggers:
+      - trigger: time_pattern
+        minutes: '*'
+        id: tick
+      - trigger: state
+        entity_id:
+          - input_datetime.spa_plan_when
+          - input_select.spa_plan_repeat
+          - input_select.spa_plan_mode
+          - input_select.spa_plan_temperature
+          - input_number.spa_heat_rate
+        not_to:
+          - unavailable
+          - unknown
+        id: edited
+      - trigger: homeassistant
+        event: start
+        id: start
+    conditions:
+      - condition: state
+        entity_id: input_select.spa_plan_repeat
+        state: Once
+    actions:
+      - variables:
+          earliest: >-
+            {%- set nowts = as_timestamp(now()) | int -%}{%- set o =
+            states('input_select.spa_plan_temperature') | float(0) -%}{%- set target = ((o - 32) * 5
+            / 9) if o >= 50 else o -%}{%- set w = state_attr('climate.sundance_spa',
+            'current_temperature') -%}{%- set gap = (target - (w | float)) if (w is number and
+            is_state('input_select.spa_plan_mode', 'Ready by')) else 0 -%}{%- if gap > 0 -%}{{
+            (((nowts + gap / ([states('input_number.spa_heat_rate') | float(2), 0.5] | max) * 3600)
+            / 60) | round(0, 'ceil') * 60) | int }}{%- else -%}{{ nowts - now().second }}{%- endif
+            -%}
+          current: '{{ state_attr(''input_datetime.spa_plan_when'', ''timestamp'') | float(0) | int }}'
+          auto: '{{ states(''input_text.spa_plan_when_auto'') | int(0) }}'
+      - condition: template
+        value_template: '{{ current != earliest and (current < earliest or current == auto) }}'
+        note: >-
+          Earlier than possible, or still the value written here. A later value chosen by the owner
+          stays.
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_plan_when_auto
+        data:
+          value: '{{ earliest }}'
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.spa_plan_when
+        data:
+          timestamp: '{{ earliest }}'
+    mode: single
+    max_exceeded: silent
+  - id: sundance_spa_spa_plan_temperature_follows_the_panel_unit
+    alias: Spa - Plan temperature follows the panel unit
+    description: >-
+      The heating-plan form's temperature dropdown (input_select.spa_plan_temperature) offers the
+      panel's unit: 18.0-40.0 °C in half degrees, or 65-104 °F in whole degrees. When the panel unit
+      changes (sensor.sundance_spa_temperature_format) the options are swapped and the chosen value
+      is converted (°F = °C x 9/5 + 32 rounded; °C back to the nearest half degree). Also checked at
+      HA start. Created 2026-11-03.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_temperature_format
+        to:
+          - °C
+          - °F
+      - trigger: homeassistant
+        event: start
+    actions:
+      - variables:
+          panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+          cur: '{{ states(''input_select.spa_plan_temperature'') | float(38) }}'
+          list_is_f: >-
+            {{ '.' not in (state_attr('input_select.spa_plan_temperature', 'options') | first |
+            string) }}
+      - condition: template
+        value_template: '{{ panel_f != list_is_f }}'
+        note: Options already in the panel's unit.
+      - variables:
+          c: '{{ ((((cur - 32) * 10 / 9) | round(0)) / 2) if list_is_f else cur }}'
+          opts: >-
+            {%- if panel_f -%}{{ range(65, 105) | map('string') | list }}{%- else -%}{%- set ns =
+            namespace(o=[]) -%}{%- for i in range(36, 81) -%}{%- set ns.o = ns.o + ['%.1f' % (i /
+            2)] -%}{%- endfor -%}{{ ns.o }}{%- endif -%}
+          pick: >-
+            {{ (([[c * 9 / 5 + 32, 65] | max, 104] | min) | round(0) | int | string) if panel_f else
+            ('%.1f' % ([[c, 18] | max, 40] | min)) }}
+      - action: input_select.set_options
+        target:
+          entity_id: input_select.spa_plan_temperature
+        data:
+          options: '{{ opts }}'
+      - action: input_select.select_option
+        target:
+          entity_id: input_select.spa_plan_temperature
+        data:
+          option: '{{ pick }}'
+    mode: queued
+    max: 3
+  - id: sundance_spa_spa_raw_decoding_values_changed
+    alias: Spa - Raw decoding values changed (diagnostic)
+    description: >-
+      Diagnostic, works on the raw decoding entities: notify the owner once per NEW unknown value
+      seen on the spa bus — f10 bits 0-3/5 (likely alerts), f4 != 6, a new message type, an unknown
+      heater mode. Each key is remembered in input_text.spa_decoder_seen so it is reported only
+      once; clear that text to re-arm. The ESP's own Decoder Notice (automation 'Spa - Decoder
+      notice') covers decoding problems; this one stays while the raw entities exist (owner's choice
+      2026-10-26: keep them locally). Renamed 2026-10-28 (was 'Spa - Decoder notice (new unknown
+      values)'). Revised 2026-11-01: sent through script.spa_notify (quiet hours 23:00-06:30 by
+      default, set on the Hot Tub Settings page).
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.sundance_spa_raw_f10
+          - sensor.sundance_spa_raw_f4
+          - sensor.sundance_spa_bus_message_types
+          - sensor.sundance_spa_heater_mode
+        not_from:
+          - unavailable
+          - unknown
+        not_to:
+          - unavailable
+          - unknown
+    actions:
+      - variables:
+          seen: '{{ states(''input_text.spa_decoder_seen'').split('','') | reject(''eq'', '''') | list }}'
+          new_keys: >-
+            {% set f10 = states('sensor.sundance_spa_raw_f10') | int(0) %}{% set f4 =
+            states('sensor.sundance_spa_raw_f4') | int(6) %}{% set types =
+            states('sensor.sundance_spa_bus_message_types').split(' ') %}{% set hm =
+            states('sensor.sundance_spa_heater_mode') %}{% set ns = namespace(k=[]) %}{% for b in
+            [0,1,2,3,5] %}{% if f10 // (2 ** b) % 2 == 1 %}{% set ns.k = ns.k + ['f10b' ~ b] %}{%
+            endif %}{% endfor %}{% if f4 != 6 %}{% set ns.k = ns.k + ['f4=' ~ f4] %}{% endif %}{%
+            for t in types %}{% if t not in
+            ['00','01','02','03','04','06','C4','CA','CC','unknown','unavailable',''] %}{% set ns.k
+            = ns.k + ['msg' ~ t] %}{% endif %}{% endfor %}{% if hm.startswith('Unknown') and hm !=
+            'Unknown (16)' %}{% set ns.k = ns.k + ['heat' ~ hm[9:-1]] %}{% endif %}{{ ns.k |
+            reject('in', seen) | list }}
+      - condition: template
+        value_template: '{{ new_keys | length > 0 }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_decoder_seen
+        data:
+          value: '{{ ((seen + new_keys) | join('',''))[-255:] }}'
+      - action: script.spa_notify
+        data:
+          title: 'Spa decoder: new value'
+          message: >-
+            {{ new_keys | join(', ') }} at {{ now().strftime('%H:%M') }}. Check the panel display
+            and tell Claude what it shows.
+          tag: spa_decoder_new_value
+        note: Held until the spa quiet hours end (set on the Hot Tub Settings page).
+    mode: queued
+    max: 10
+  - id: sundance_spa_spa_ready_by_ask_what_next
+    alias: 'Spa - Ready by: ask what next'
+    description: >-
+      After a calendar heating ('Spa - Heating schedule (calendar)', input_text.spa_ready_by_state)
+      asks the phone what to do with the temperature: back to the setpoint from before the heating,
+      keep it, or type a new one (in the unit the panel shows, °C 18-40 in 0.5 steps or °F 65-104).
+      Asked when a soak is recorded (input_datetime.last_soak from 1 h before the water should be
+      ready), or 2 h after it should have been ready if nobody soaked (ready = the event start for
+      ready-by, start + estimated heating time for a 'start' event). Never in the spa quiet hours
+      23:00-06:30 by default, set on the Hot Tub Settings page: then when they end. No answer within
+      12 h: nothing changes. Created 2026-11-03. Revised 2026-11-03: answer/typed/new_c pre-defined
+      before the repeat - set only inside it they stayed local, so Back and Set would not have
+      applied. A one-off plan stays listed until this ends (state 'done'); the 5-min cleanup of 'Spa
+      - Heating plans' then removes it. Revised 2026-11-05: after the answer or the 12 h timeout, a
+      Heater Mode that the plan switched to Auto goes back to Eco / Day. Revised 2026-11-08: quiet
+      hours from binary_sensor.spa_quiet_hours (the two time helpers). Revised 2026-11-08: after the
+      question a Temperature or Settings Lock that the plan released
+      (input_text.spa_plan_previous_lock) is put back.
+    triggers:
+      - trigger: state
+        entity_id: input_datetime.last_soak
+        id: soak
+      - trigger: time_pattern
+        minutes: /5
+        id: timer
+    conditions:
+      - condition: template
+        value_template: >-
+          {%- set st = states('input_text.spa_ready_by_state').split(';') -%}{%- set ref = (st[4] if
+          st | count > 4 else st[0]) | int(0) if st | count >= 4 else 0 -%}{%- if st | count < 4 or
+          st[3] not in ['heat', 'warned'] -%}false{%- elif trigger.id == 'soak' -%}{{
+          (state_attr('input_datetime.last_soak', 'timestamp') | float(0)) >= ref - 3600 }}{%- else
+          -%}{{ as_timestamp(now()) >= ref + 7200 }}{%- endif -%}
+        note: >-
+          Only for an open calendar heating; a soak recorded from 1 h before the water should be
+          ready, or 2 h after it should have been ready.
+    actions:
+      - variables:
+          st: '{{ states(''input_text.spa_ready_by_state'').split('';'') }}'
+          prev: '{{ st[1] | float(35) }}'
+          target: '{{ st[2] | float(35) }}'
+          panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+          tag: spa_ready_next_{{ st[0] }}
+          ref: '{{ (st[4] if st | count > 4 else st[0]) | int(0) }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_ready_by_state
+        data:
+          value: '{{ st[0] }};{{ st[1] }};{{ st[2] }};asked;{{ ref }}'
+        note: Mark first, so the 5-min trigger cannot ask twice.
+      - variables:
+          fprev: '{{ ((prev * 9 / 5 + 32) | round(0) | int ~ ''°F'') if panel_f else (''%.1f°C'' % prev) }}'
+          ftarget: >-
+            {{ ((target * 9 / 5 + 32) | round(0) | int ~ '°F') if panel_f else ('%.1f°C' % target)
+            }}
+          prompt: >-
+            {{ 'Soak recorded.' if trigger.id == 'soak' else 'Heated for ' ~ (ref | int |
+            timestamp_custom('%H:%M')) ~ ', no soak recorded.' }} Back to {{ fprev }}, keep {{
+            ftarget }}, or set a new temperature?
+          done: false
+          answer: none
+          typed: ''
+          new_c: none
+        note: >-
+          answer / typed / new_c are defined here so the values set inside the repeat reach the
+          choose after it (a variables action inside a sequence only changes variables that already
+          exist outside it).
+      - wait_template: '{{ is_state(''binary_sensor.spa_quiet_hours'', ''off'') }}'
+        timeout:
+          hours: 8
+        continue_on_timeout: true
+        note: 'Spa quiet hours (set on the Hot Tub Settings page): ask when they end.'
+      - repeat:
+          sequence:
+            - action: '{{ states(''input_text.spa_notify_service'') }}'
+              data:
+                title: Spa temperature
+                message: '{{ prompt }}'
+                data:
+                  tag: '{{ tag }}'
+                  actions:
+                    - action: BACK_{{ tag }}
+                      title: Back to {{ fprev }}
+                    - action: KEEP_{{ tag }}
+                      title: Keep {{ ftarget }}
+                    - action: SET_{{ tag }}
+                      title: Set
+                      behavior: textInput
+                      textInputButtonTitle: Set
+                      textInputPlaceholder: '{{ ''e.g. 98'' if panel_f else ''e.g. 36.5'' }}'
+                  sticky: true
+                  persistent: true
+                  clickAction: noAction
+                  priority: high
+                  ttl: 0
+            - wait_for_trigger:
+                - trigger: event
+                  event_type: mobile_app_notification_action
+                  event_data:
+                    action: BACK_{{ tag }}
+                - trigger: event
+                  event_type: mobile_app_notification_action
+                  event_data:
+                    action: KEEP_{{ tag }}
+                - trigger: event
+                  event_type: mobile_app_notification_action
+                  event_data:
+                    action: SET_{{ tag }}
+              timeout:
+                hours: 12
+              continue_on_timeout: true
+            - variables:
+                answer: >-
+                  {{ wait.trigger.event.data.action.split('_')[0] if wait.trigger is not none else
+                  'none' }}
+                typed: >-
+                  {{ (wait.trigger.event.data.get('reply_text', '') | string | trim | replace(',',
+                  '.')) if wait.trigger is not none else '' }}
+            - variables:
+                new_c: >-
+                  {%- if answer != 'SET' or not (typed | regex_match('^[0-9]{2,3}(\.[0-9])?$'))
+                  -%}none{%- else -%}{%- set v = typed | float -%}{%- if panel_f -%}{{ (((v - 32) *
+                  10 / 9) | round(0) / 2) if (65 <= v <= 104 and v == v | round(0)) else 'none'
+                  }}{%- else -%}{{ v if (18 <= v <= 40 and (v * 2) == (v * 2) | round(0)) else
+                  'none' }}{%- endif -%}{%- endif -%}
+            - if:
+                - condition: template
+                  value_template: '{{ answer == ''SET'' and new_c == ''none'' }}'
+              then:
+                - variables:
+                    prompt: >-
+                      {{ 'Please type a whole °F value 65-104 (e.g. 98).' if panel_f else 'Please
+                      type 18-40 in steps of 0.5 (e.g. 36.5).' }}
+              else:
+                - variables:
+                    done: true
+          until:
+            - condition: template
+              value_template: '{{ done or repeat.index >= 5 }}'
+        note: Re-ask after an invalid typed value (max 5 rounds); no answer within 12 h ends it.
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: '{{ answer == ''BACK'' }}'
+            sequence:
+              - action: climate.set_temperature
+                target:
+                  entity_id: climate.sundance_spa
+                data:
+                  temperature: '{{ prev }}'
+          - conditions:
+              - condition: template
+                value_template: '{{ answer == ''SET'' and new_c != ''none'' }}'
+            sequence:
+              - action: climate.set_temperature
+                target:
+                  entity_id: climate.sundance_spa
+                data:
+                  temperature: '{{ new_c | float }}'
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_ready_by_state
+        data:
+          value: '{{ st[0] }};{{ st[1] }};{{ st[2] }};done;{{ ref }}'
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          message: clear_notification
+          data:
+            tag: '{{ tag }}'
+      - if:
+          - condition: template
+            value_template: '{{ states(''input_text.spa_plan_previous_heater_mode'') in [''Eco'', ''Day''] }}'
+        then:
+          - if:
+              - condition: state
+                entity_id: sensor.sundance_spa_heater_mode
+                state: Auto
+            then:
+              - action: select.select_option
+                target:
+                  entity_id: select.sundance_spa_heater_mode_setting
+                data:
+                  option: '{{ states(''input_text.spa_plan_previous_heater_mode'') }}'
+            note: Not if someone already chose another mode meanwhile.
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_plan_previous_heater_mode
+            data:
+              value: ''
+        note: Heater Mode back to Eco / Day after the plan ('Spa - Heating plans' switched it to Auto).
+      - alias: Put a Temperature or Settings Lock back that the plan released
+        if:
+          - condition: template
+            value_template: >-
+              {{ states('input_text.spa_plan_previous_lock') in ['Temperature Lock', 'Settings
+              Lock'] }}
+        then:
+          - if:
+              - condition: state
+                entity_id: sensor.sundance_spa_lock
+                state: 'Off'
+            then:
+              - action: select.select_option
+                target:
+                  entity_id: select.sundance_spa_lock_setting
+                data:
+                  option: '{{ states(''input_text.spa_plan_previous_lock'') }}'
+            note: Not if someone already set another lock meanwhile.
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_plan_previous_lock
+            data:
+              value: ''
+        note: '''Spa - Heating plans'' released the lock when the heating started.'
+    mode: single
+  - id: sundance_spa_spa_record_last_heating
+    alias: Spa - Record Last Heating
+    description: >-
+      Writes 'lowest → highest °C · minutes · start' of each heating run
+      (binary_sensor.sundance_spa_heating_run) to input_text.spa_last_heating and the logbook.
+      Stateless (no long waits, so an automation reload or HA restart mid-run loses nothing): the
+      open run is kept in input_text.spa_heating_run_data as 'start_ts;min;max' (empty = no run).
+      Start: min = the current water temperature, or the last drop recorded within 30 s before the
+      run (input_text.spa_temp_last_drop 'ts;temp') if lower - the 34.0 reading that starts a heat
+      call often lasts only 1-3 s, before the 2 s-confirmed heating_run turns on. While a run is
+      open every temperature reading widens min/max; max = the temperature reached (end readings
+      flicker by 0.5). End: any change of heating_run to off (also via unavailable) closes an open
+      run. Created 2026-10-30. Revised 2026-10-31: rebuilt stateless (the first version waited for
+      the end and was cancelled by an automation reload at 08:50), min over the run + pre-run drop
+      instead of the single reading at start, max instead of the reading at the end. Revised
+      2026-11-03: also updates input_number.spa_heat_rate (30% weight per run of 20+ min rising 1°+)
+      for the calendar Ready-by heating.
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heating_run
+        from: 'off'
+        to: 'on'
+        id: start
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heating_run
+        not_from: 'off'
+        to: 'off'
+        id: end
+      - trigger: state
+        entity_id: climate.sundance_spa
+        attribute: current_temperature
+        id: temp
+    actions:
+      - variables:
+          run: '{{ states(''input_text.spa_heating_run_data'') }}'
+          is_open: '{{ run.split('';'') | count == 3 }}'
+      - choose:
+          - conditions:
+              - condition: trigger
+                id: start
+            sequence:
+              - variables:
+                  cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
+                  since: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
+                  drop: '{{ states(''input_text.spa_temp_last_drop'').split('';'') }}'
+                  low: >-
+                    {% if drop | count == 2 and since - drop[0] | float(0) <= 30 %}{{ [cur, drop[1]
+                    | float(99)] | min }}{% else %}{{ cur }}{% endif %}
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.spa_heating_run_data
+                data:
+                  value: '{{ since }};{{ low }};{{ cur }}'
+          - conditions:
+              - condition: trigger
+                id: temp
+              - condition: template
+                value_template: '{{ trigger.to_state.attributes.current_temperature is number }}'
+            sequence:
+              - variables:
+                  t: '{{ trigger.to_state.attributes.current_temperature | float }}'
+              - if:
+                  - condition: template
+                    value_template: '{{ is_open }}'
+                then:
+                  - variables:
+                      p: '{{ run.split('';'') }}'
+                      mn: '{{ [p[1] | float, t] | min }}'
+                      mx: '{{ [p[2] | float, t] | max }}'
+                  - if:
+                      - condition: template
+                        value_template: '{{ mn != p[1] | float or mx != p[2] | float }}'
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: input_text.spa_heating_run_data
+                        data:
+                          value: '{{ p[0] }};{{ mn }};{{ mx }}'
+                else:
+                  - if:
+                      - condition: template
+                        value_template: >-
+                          {{ trigger.from_state.attributes.current_temperature is number and t <
+                          trigger.from_state.attributes.current_temperature }}
+                    then:
+                      - action: input_text.set_value
+                        target:
+                          entity_id: input_text.spa_temp_last_drop
+                        data:
+                          value: '{{ as_timestamp(trigger.to_state.last_updated) | int }};{{ t }}'
+          - conditions:
+              - condition: trigger
+                id: end
+              - condition: template
+                value_template: '{{ is_open }}'
+            sequence:
+              - variables:
+                  p: '{{ run.split('';'') }}'
+                  summary: >-
+                    {{ '%.1f' % (p[1] | float) }} → {{ '%.1f' % (p[2] | float) }} °C · {{
+                    ((as_timestamp(now()) - p[0] | float) / 60) | round(0) | int }} min · {{ (p[0] |
+                    int) | timestamp_custom('%d/%m %H:%M') }}
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.spa_last_heating
+                data:
+                  value: '{{ summary }}'
+              - action: input_text.set_value
+                target:
+                  entity_id: input_text.spa_heating_run_data
+                data:
+                  value: ''
+              - action: logbook.log
+                data:
+                  name: Spa heating
+                  message: '{{ summary }}'
+                  entity_id: climate.sundance_spa
+              - variables:
+                  mins: '{{ (as_timestamp(now()) - p[0] | float) / 60 }}'
+                  rise: '{{ p[2] | float - p[1] | float }}'
+              - if:
+                  - condition: template
+                    value_template: '{{ mins >= 20 and rise >= 1 }}'
+                then:
+                  - action: input_number.set_value
+                    target:
+                      entity_id: input_number.spa_heat_rate
+                    data:
+                      value: >-
+                        {{ ([[(states('input_number.spa_heat_rate') | float(2)) * 0.7 + (rise / mins
+                        * 60) * 0.3, 0.5] | max, 6] | min) | round(1) }}
+                note: >-
+                  Learns the heating rate (°C/h) for Spa - Ready by: 30% of each run of 20+ min that
+                  rose 1° or more (shorter runs are too noisy at 0.5° resolution).
+    mode: queued
+    max: 20
+  - id: sundance_spa_spa_service_counter_reached_0
+    alias: Spa - Service counter reached 0
+    description: >-
+      Tells the owner's phone when a spa service counter reaches 0
+      (sensor.sundance_spa_remaining_days_filter_change / _clearray_bulb / _water_refresh = 'Change
+      Now'): change the filter, the ClearRay bulb or the water. Sent through script.spa_notify, so
+      in the spa quiet hours (23:00-06:30 by default, set on the Hot Tub Settings page) it is held
+      and delivered when they end (the counters reach 0 at midnight). The same condition shows a red
+      banner at the top of the Hot Tub page until the counter is reset. Not sent again after an ESP
+      reconnect (not_from unavailable/unknown). Created 2026-11-08.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_remaining_days_filter_change
+        to: Change Now
+        not_from:
+          - unavailable
+          - unknown
+        id: filter
+      - trigger: state
+        entity_id: sensor.sundance_spa_remaining_days_clearray_bulb
+        to: Change Now
+        not_from:
+          - unavailable
+          - unknown
+        id: clearray
+      - trigger: state
+        entity_id: sensor.sundance_spa_remaining_days_water_refresh
+        to: Change Now
+        not_from:
+          - unavailable
+          - unknown
+        id: water
+    actions:
+      - action: script.spa_notify
+        data:
+          title: Spa alert
+          message: >-
+            {{ {'filter': 'The Filter Change counter reached 0 - change the filter.', 'clearray':
+            'The ClearRay Bulb counter reached 0 - change the ClearRay bulb.', 'water': 'The Water
+            Refresh counter reached 0 - change the water.'}[trigger.id] }}
+          tag: spa_counter_{{ trigger.id }}
+    mode: queued
+    max: 5
+  - id: sundance_spa_spa_settings_dropdowns_follow_the_spa
+    alias: 'Spa - Settings dropdowns: follow the spa'
+    description: >-
+      Keeps the dropdowns on the Hot Tub Settings page (input_select.spa_set_pf_start /
+      _filter_change / _clearray / _water_refresh) showing the value read from the spa, with only
+      the values the spa allows: Primary Filter start 00:00-23:00; Filter Change Off, 10-180 (steps
+      of 10); ClearRay Off, 10-360 and 365; Water Refresh Off, 30-180 (steps of 30). A current value
+      off that grid (e.g. 141 days, or Change Now) is put at the top of its list. 'Spa - Settings
+      dropdowns: send a change' writes a pick to the spa. Created 2026-11-03.
+    triggers:
+      - trigger: state
+        entity_id:
+          - sensor.sundance_spa_remaining_days_filter_change
+          - sensor.sundance_spa_remaining_days_clearray_bulb
+          - sensor.sundance_spa_remaining_days_water_refresh
+          - sensor.sundance_spa_primary_filter_start
+        not_to:
+          - unknown
+          - unavailable
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        hours: /1
+    actions:
+      - repeat:
+          for_each:
+            - sel: input_select.spa_set_filter_change
+              src: sensor.sundance_spa_remaining_days_filter_change
+              grid: Off,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180
+            - sel: input_select.spa_set_clearray
+              src: sensor.sundance_spa_remaining_days_clearray_bulb
+              grid: >-
+                Off,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,210,220,230,240,250,260,270,280,290,300,310,320,330,340,350,360,365
+            - sel: input_select.spa_set_water_refresh
+              src: sensor.sundance_spa_remaining_days_water_refresh
+              grid: Off,30,60,90,120,150,180
+            - sel: input_select.spa_set_pf_start
+              src: sensor.sundance_spa_primary_filter_start
+              grid: >-
+                00:00,01:00,02:00,03:00,04:00,05:00,06:00,07:00,08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00,22:00,23:00
+          sequence:
+            - variables:
+                cur: '{{ states(repeat.item.src) ~ '''' }}'
+                opts: >-
+                  {%- set c = states(repeat.item.src) | string -%}{%- set g =
+                  repeat.item.grid.split(',') -%}{{ g if c in g else [c] + g }}
+              note: >-
+                Compared as text: a variable holding 170 renders as a number (bug of 2026-11-03: 170
+                was added twice and set_options failed).
+            - if:
+                - condition: template
+                  value_template: '{{ states(repeat.item.src) not in [''unknown'', ''unavailable'', ''''] }}'
+              then:
+                - if:
+                    - condition: template
+                      value_template: '{{ state_attr(repeat.item.sel, ''options'') != opts }}'
+                  then:
+                    - action: input_select.set_options
+                      target:
+                        entity_id: '{{ repeat.item.sel }}'
+                      data:
+                        options: '{{ opts }}'
+                - if:
+                    - condition: template
+                      value_template: '{{ states(repeat.item.sel) != (states(repeat.item.src) | string) }}'
+                  then:
+                    - action: input_select.select_option
+                      target:
+                        entity_id: '{{ repeat.item.sel }}'
+                      data:
+                        option: '{{ states(repeat.item.src) | string }}'
+    mode: queued
+    max: 5
+  - id: sundance_spa_spa_settings_dropdowns_send_a_change
+    alias: 'Spa - Settings dropdowns: send a change'
+    description: >-
+      When a dropdown on the Hot Tub Settings page is set to a value different from the spa's, sends
+      it to the spa through the ESP's setting controls
+      (number.sundance_spa_primary_filter_start_hour / _filter_change_days / _clearray_days /
+      _water_refresh_days; Off = 0). The ESP walks the topside menu; the dropdown then follows the
+      value read back ('Spa - Settings dropdowns: follow the spa'), so a failed change returns to
+      the old value. Created 2026-11-03. Revised 2026-11-08: only a change made by a person (context
+      user_id set) is sent. The follow-the-spa automation also changes these dropdowns, copying the
+      live values the ESP publishes while it walks the menu (e.g. 165, 170, 180, Off, 10), and that
+      fed back into a second write: Filter Change 165 -> 10 was saved, then the stale intermediate
+      Off was written.
+    triggers:
+      - trigger: state
+        entity_id: input_select.spa_set_pf_start
+        id: pf
+        not_to:
+          - unknown
+          - unavailable
+      - trigger: state
+        entity_id: input_select.spa_set_filter_change
+        id: fc
+        not_to:
+          - unknown
+          - unavailable
+      - trigger: state
+        entity_id: input_select.spa_set_clearray
+        id: uv
+        not_to:
+          - unknown
+          - unavailable
+      - trigger: state
+        entity_id: input_select.spa_set_water_refresh
+        id: h2o
+        not_to:
+          - unknown
+          - unavailable
+    actions:
+      - alias: Only a pick made by a person on the dashboard
+        condition: template
+        value_template: '{{ trigger.to_state.context.user_id is not none }}'
+      - variables:
+          src: >-
+            {{ {'pf': 'sensor.sundance_spa_primary_filter_start', 'fc':
+            'sensor.sundance_spa_remaining_days_filter_change', 'uv':
+            'sensor.sundance_spa_remaining_days_clearray_bulb', 'h2o':
+            'sensor.sundance_spa_remaining_days_water_refresh'}[trigger.id] }}
+          dst: >-
+            {{ {'pf': 'number.sundance_spa_primary_filter_start_hour', 'fc':
+            'number.sundance_spa_filter_change_days', 'uv': 'number.sundance_spa_clearray_days',
+            'h2o': 'number.sundance_spa_water_refresh_days'}[trigger.id] }}
+      - condition: template
+        value_template: >-
+          {%- set pick = trigger.to_state.state | string -%}{{ pick != (states(src) | string) and
+          pick != '-' and (pick == 'Off' or pick | regex_match('^[0-9]{1,3}$') or pick |
+          regex_match('^[0-9]{2}:00$')) }}
+        note: >-
+          Only a real change to a grid value. Compared as text: a variable holding 141 renders as a
+          number and never equals the state string (bug of 2026-11-03 that sent the current values).
+      - action: number.set_value
+        target:
+          entity_id: '{{ dst }}'
+        data:
+          value: >-
+            {%- set pick = trigger.to_state.state | string -%}{{ 0 if pick == 'Off' else (pick[:2] |
+            int if trigger.id == 'pf' else pick | int) }}
+    mode: queued
+    max: 10
+  - id: sundance_spa_spa_track_in_use_start
+    alias: Spa - Track In Use Start
+    description: >-
+      Stores the time a spa run starts (binary_sensor.sundance_spa_in_use off -> on: Jet 2 on or Jet
+      1 high) in input_datetime.spa_in_use_since. 'Spa - Ask: Soaking or Maintenance' reads it when
+      the run ends and resets it to 1970-01-01 (= no open run). A reconnect mid-run (unavailable ->
+      on) keeps the original start. Created 2026-10-31.
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        from: 'off'
+        to: 'on'
+    actions:
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.spa_in_use_since
+        data:
+          timestamp: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
+    mode: single
+script:
+  spa_deliver_night_alerts_now:
+    alias: Spa - Deliver held alerts now
+    description: >-
+      Sends the spa notifications held by the quiet hours (input_text.spa_night_alerts) to the
+      owner's phone right away, as one notification, and clears the queue. Run by tapping the Quiet
+      hours card on the Hot Tub Settings page, also during the quiet hours. Does nothing when
+      nothing is waiting. Created 2026-11-08.
+    mode: single
+    sequence:
+      - condition: template
+        value_template: '{{ states(''input_text.spa_night_alerts'') not in ['''', ''unknown'', ''unavailable''] }}'
+      - action: '{{ states(''input_text.spa_notify_service'') }}'
+        data:
+          title: 'Spa: held alerts'
+          message: '{{ states(''input_text.spa_night_alerts'') | replace(''; '', ''\n'') }}'
+          data:
+            tag: spa_night_alerts
+            ttl: 0
+            priority: high
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_night_alerts
+        data:
+          value: ''
+  spa_notify:
+    alias: Spa - Notify (quiet hours aware)
+    description: >-
+      Sends a spa information notification to the owner's phone, except in the spa quiet hours
+      23:00-06:30 by default, set on the Hot Tub Settings page (input_datetime.spa_quiet_hours_start
+      / _end): then the message is appended to input_text.spa_night_alerts ('HH:MM title: message;
+      ...', 255 chars max, oldest dropped) and 'Spa - Deliver night alerts' sends them all as one
+      notification when the quiet hours end. Used by the decoder notices; questions with Yes/No
+      buttons wait for 06:30 inside their own automation instead. Created 2026-11-01. Revised
+      2026-11-08: the quiet hours are read from the two time helpers, not fixed.
+    mode: queued
+    max: 10
+    fields:
+      title:
+        description: Notification title
+        required: true
+        selector:
+          text: {}
+      message:
+        description: Notification text
+        required: true
+        selector:
+          text: {}
+      tag:
+        description: Optional notification tag
+        required: false
+        selector:
+          text: {}
+    sequence:
+      - if:
+          - condition: time
+            after: input_datetime.spa_quiet_hours_start
+            before: input_datetime.spa_quiet_hours_end
+            note: Spa quiet hours, set on the Hot Tub Settings page (the window may cross midnight).
+        then:
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_night_alerts
+            data:
+              value: >-
+                {% set old = states('input_text.spa_night_alerts') %}{% set item =
+                now().strftime('%H:%M') ~ ' ' ~ title ~ ': ' ~ message %}{% set all = (old ~ '; ' ~
+                item) if old not in ['', 'unknown', 'unavailable'] else item %}{{ all[-255:] }}
+        else:
+          - action: '{{ states(''input_text.spa_notify_service'') }}'
+            data:
+              title: '{{ title }}'
+              message: '{{ message }}'
+              data:
+                tag: '{{ tag | default(''spa_info'', true) }}'
+                ttl: 0
+                priority: high
+  spa_plan_add:
+    alias: Spa - Add heating plan
+    description: >-
+      Adds the plan from the form on the Hot Tub Settings page (input_select.spa_plan_mode /
+      spa_plan_repeat, input_select.spa_plan_temperature - in the panel unit; values of 50 and up
+      are °F and stored as the nearest half °C, input_datetime.spa_plan_when,
+      input_boolean.spa_plan_sun..sat) to the first free slot input_text.spa_plan_1..5 as
+      'mode;temp_c;HH:MM;days;date' (mode R = ready by, S = start heating; days 'once', 'daily' or
+      weekday digits Mon=0..Sun=6; date YYYY-MM-DD for once). Refused with a notice in HA when: no
+      free slot, a one-off time already passed, or chosen days without a day. Created 2026-11-03. A
+      new plan is switched on (input_boolean.spa_plan_N_on).
+    mode: single
+    sequence:
+      - variables:
+          panel_f: '{{ is_state(''sensor.sundance_spa_temperature_format'', ''°F'') }}'
+          temp_c: >-
+            {%- set v = states('input_select.spa_plan_temperature') | float(38) -%}{%- if v >= 50
+            -%}{{ ((v - 32) * 10 / 9) | round(0) / 2 }}{%- else -%}{{ v }}{%- endif -%}
+          when_ts: '{{ state_attr(''input_datetime.spa_plan_when'', ''timestamp'') | float(0) }}'
+          hhmm: '{{ when_ts | timestamp_custom(''%H:%M'') }}'
+          rep: '{{ states(''input_select.spa_plan_repeat'') }}'
+          days: >-
+            {%- set ns = namespace(d='') -%}{%- for name, wd in
+            [('mon',0),('tue',1),('wed',2),('thu',3),('fri',4),('sat',5),('sun',6)] -%}{%- if
+            is_state('input_boolean.spa_plan_' ~ name, 'on') -%}{%- set ns.d = ns.d ~ wd -%}{%-
+            endif -%}{%- endfor -%}{{ 'once' if rep == 'Once' else ('daily' if rep == 'Daily' else
+            ns.d) }}
+          slot: >-
+            {%- set ns = namespace(s=0) -%}{%- for i in range(1, 6) -%}{%- if ns.s == 0 and
+            states('input_text.spa_plan_' ~ i) in ['', 'unknown', 'unavailable'] -%}{%- set ns.s = i
+            -%}{%- endif -%}{%- endfor -%}{{ ns.s }}
+          problem: >-
+            {%- if slot | int == 0 -%}All 5 plan slots are in use - delete one first.{%- elif rep ==
+            'Once' and when_ts <= as_timestamp(now()) -%}That date and time has already passed.{%-
+            elif rep == 'Chosen days' and days == '' -%}Choose at least one day.{%- endif -%}
+      - if:
+          - condition: template
+            value_template: '{{ problem != '''' }}'
+        then:
+          - action: persistent_notification.create
+            data:
+              title: Spa heating plan not added
+              message: '{{ problem }}'
+              notification_id: spa_plan_add
+          - stop: Invalid plan
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_plan_{{ slot }}
+        data:
+          value: >-
+            {{ 'S' if is_state('input_select.spa_plan_mode', 'Start heating') else 'R' }};{{ temp_c
+            }};{{ hhmm }};{{ days }};{{ when_ts | timestamp_custom('%Y-%m-%d') if rep == 'Once' else
+            '-' }}
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.spa_plan_{{ slot }}_on
+      - action: persistent_notification.dismiss
+        data:
+          notification_id: spa_plan_add
+  spa_plan_delete:
+    alias: Spa - Delete heating plan
+    description: >-
+      Clears one heating plan slot (input_text.spa_plan_1..5) and its on/off switch. Called from the
+      trash button of a plan row on the Hot Tub Settings page. Created 2026-11-03.
+    mode: queued
+    fields:
+      slot:
+        description: Slot number 1-5
+        required: true
+        selector:
+          number:
+            min: 1
+            max: 5
+    sequence:
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.spa_plan_{{ slot | int }}
+        data:
+          value: ''
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.spa_plan_{{ slot | int }}_on
+  spa_target_step:
+    alias: Spa - Target temperature step
+    description: >-
+      One step of the spa's target temperature in the unit the panel shows: 0.5 °C, or 1 °F
+      (converted to the nearest 0.5 °C the spa accepts). Limits 18-40 °C / 65-104 °F. Called by the
+      - and + buttons on the Hot Tub page. Created 2026-11-05.
+    fields:
+      direction:
+        description: 1 = warmer, -1 = cooler
+        required: true
+        selector:
+          number:
+            min: -1
+            max: 1
+            step: 2
+            mode: box
+    mode: queued
+    max: 10
+    sequence:
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.sundance_spa
+        data:
+          temperature: >-
+            {%- set t = state_attr('climate.sundance_spa', 'temperature') | float(35) -%}{%- set d =
+            direction | int(0) -%}{%- if is_state('sensor.sundance_spa_temperature_format', '°F')
+            -%}{%- set f = (t * 9 / 5 + 32) | round(0) + d -%}{%- set f = [[f, 65] | max, 104] | min
+            -%}{{ ((f - 32) * 10 / 9) | round(0) / 2 }}{%- else -%}{{ [[t + d * 0.5, 18] | max, 40]
+            | min }}{%- endif -%}
+      - delay:
+          milliseconds: 700

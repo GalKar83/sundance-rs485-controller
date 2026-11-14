@@ -1,0 +1,135 @@
+# (optional) Spa Bluetooth audio: shows which phone is connected to the spa speaker and controls play/pause/next.
+# Needs: the Bluetooth MAC address of the spa audio, and per phone the Companion app sensors "Bluetooth connection"
+# and "Media session" plus the phone notify service. Fill them on the Hot Tub Setup page. Skip this file if you have no audio.
+
+input_text:
+  spa_audio_bluetooth_mac:
+    name: Spa Audio Bluetooth MAC
+    min: 0
+    max: 17
+    mode: text
+  spa_audio_p1_bluetooth_sensor:
+    name: Spa Audio Person 1 Bluetooth Sensor
+    min: 0
+    max: 100
+    mode: text
+  spa_audio_p1_media_sensor:
+    name: Spa Audio Person 1 Media Session Sensor
+    min: 0
+    max: 100
+    mode: text
+  spa_audio_p1_notify_service:
+    name: Spa Audio Person 1 Notify Service
+    min: 0
+    max: 100
+    mode: text
+  spa_audio_p2_bluetooth_sensor:
+    name: Spa Audio Person 2 Bluetooth Sensor
+    min: 0
+    max: 100
+    mode: text
+  spa_audio_p2_media_sensor:
+    name: Spa Audio Person 2 Media Session Sensor
+    min: 0
+    max: 100
+    mode: text
+  spa_audio_p2_notify_service:
+    name: Spa Audio Person 2 Notify Service
+    min: 0
+    max: 100
+    mode: text
+script:
+  spa_audio_control:
+    alias: Spa - Audio control
+    description: >-
+      Controls the phone that is connected to the spa's Bluetooth audio (sensor.spa_audio):
+      play/pause toggle, next or previous, through the Companion app's media command (notify
+      command_media; needs Notification access for the app, the same as the Media session sensor).
+      The target app is the one the phone's Media session sensor reports as playing, otherwise its
+      first session. After the command the app is told to send its sensors at once
+      (command_update_sensors), so the Spa Audio row updates sooner. Called by the buttons under the
+      Spa Audio row on the Hot Tub page.
+    mode: queued
+    max: 5
+    fields:
+      command:
+        description: toggle, next or previous
+        required: true
+        selector:
+          select:
+            options:
+              - toggle
+              - next
+              - previous
+    sequence:
+      - variables:
+          who: '{{ states(''sensor.spa_audio'') }}'
+          media: >-
+            {{ states('input_text.spa_audio_p1_media_sensor') if states('sensor.spa_audio') ==
+            'Person 1' else states('input_text.spa_audio_p2_media_sensor') }}
+          svc: >-
+            {{ states('input_text.spa_audio_p1_notify_service') if states('sensor.spa_audio') ==
+            'Person 1' else states('input_text.spa_audio_p2_notify_service') }}
+      - condition: template
+        value_template: '{{ who in [''Person 1'', ''Person 2''] }}'
+      - variables:
+          pkg: >-
+            {%- set m = states[media] -%}{%- set ns = namespace(pkg='', playing=false) -%}{%- if m
+            is not none -%}{%- for k in m.attributes.keys() | list if
+            k.startswith('playback_state_') -%}{%- set p = k[15:] -%}{%- if ns.pkg == '' or
+            (m.attributes[k] == 'Playing' and not ns.playing) -%}{%- set ns.pkg = p -%}{%- set
+            ns.playing = m.attributes[k] == 'Playing' -%}{%- endif -%}{%- endfor -%}{%- endif -%}{{
+            ns.pkg }}
+          is_playing: '{{ is_state(media, ''Playing'') }}'
+      - condition: template
+        value_template: '{{ pkg != '''' }}'
+      - action: '{{ svc }}'
+        data:
+          message: command_media
+          data:
+            media_command: '{{ (''pause'' if is_playing else ''play'') if command == ''toggle'' else command }}'
+            media_package_name: '{{ pkg }}'
+      - delay:
+          milliseconds: 800
+      - action: '{{ svc }}'
+        data:
+          message: command_update_sensors
+template:
+  - binary_sensor:
+      - name: Spa Audio Person 1 Connected
+        unique_id: sundance_spa_spa_audio_person_1_connected
+        state: >-
+          {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
+          ((state_attr(states('input_text.spa_audio_p1_bluetooth_sensor'),
+          'connected_paired_devices') or []) | select('search', mac, ignorecase=true) | list |
+          count) > 0 }}
+      - name: Spa Audio Person 2 Connected
+        unique_id: sundance_spa_spa_audio_person_2_connected
+        state: >-
+          {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
+          ((state_attr(states('input_text.spa_audio_p2_bluetooth_sensor'),
+          'connected_paired_devices') or []) | select('search', mac, ignorecase=true) | list |
+          count) > 0 }}
+  - sensor:
+      - name: Spa Audio
+        unique_id: sundance_spa_spa_audio
+        state: >-
+          {%- set g = is_state('binary_sensor.spa_audio_person1_connected', 'on') -%}{%- set e =
+          is_state('binary_sensor.spa_audio_person2_connected', 'on') -%}{%- if g and e -%}{{
+          'Person 2' if states.binary_sensor.spa_audio_person2_connected.last_changed >
+          states.binary_sensor.spa_audio_person1_connected.last_changed else 'Person 1' }}{%- elif g
+          -%}Person 1{%- elif e -%}Person 2{%- else -%}Not connected{%- endif -%}
+      - name: Spa Audio Now Playing
+        unique_id: sundance_spa_spa_audio_now_playing
+        state: >-
+          {%- set who = states('sensor.spa_audio') -%}{%- set mid = {'Person 1':
+          states('input_text.spa_audio_p1_media_sensor'), 'Person 2':
+          states('input_text.spa_audio_p2_media_sensor')}.get(who) -%}{%- set m = states[mid] if mid
+          else none -%}{%- set ns = namespace(pkg='', playing=false) -%}{%- if m is not none -%}{%-
+          for k in m.attributes.keys() | list if k.startswith('playback_state_') -%}{%- set p =
+          k[15:] -%}{%- if ns.pkg == '' or (m.attributes[k] == 'Playing' and not ns.playing) -%}{%-
+          set ns.pkg = p -%}{%- set ns.playing = m.attributes[k] == 'Playing' -%}{%- endif -%}{%-
+          endfor -%}{%- endif -%}{%- if m is none or ns.pkg == '' -%}—{%- else -%}{%- set t =
+          m.attributes['title_' ~ ns.pkg] | default('', true) -%}{%- set a = m.attributes['artist_'
+          ~ ns.pkg] | default('', true) -%}{{ ('' if ns.playing else 'Paused: ') ~ t ~ ((' – ' ~ a)
+          if a else '') }}{%- endif -%}

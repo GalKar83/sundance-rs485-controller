@@ -1,0 +1,429 @@
+# (optional) Compare the spa power estimate with your whole-house power sensor (measurement only, changes nothing).
+# Needs: a whole-house power sensor (W). Enter its entity id in input_text.spa_house_load_sensor on the Hot Tub Setup page.
+# Skip this file if you have no whole-house power sensor.
+
+input_text:
+  spa_power_measure_circulation:
+    name: Spa Power Measure Circulation
+    min: 0
+    max: 255
+    mode: text
+  spa_power_measure_jet_pump:
+    name: Spa Power Measure Jet Pump
+    min: 0
+    max: 255
+    mode: text
+  spa_house_load_sensor:
+    name: Spa House Load Sensor
+    icon: mdi:home-lightning-bolt
+    min: 0
+    max: 100
+    mode: text
+template:
+  - sensor:
+      - name: Spa House Load
+        unique_id: sundance_spa_house_load
+        unit_of_measurement: W
+        device_class: power
+        state_class: measurement
+        state: '{{ states(states(''input_text.spa_house_load_sensor'')) | float(0) }}'
+        availability: '{{ has_value(states(''input_text.spa_house_load_sensor'')) }}'
+sensor:
+  - platform: integration
+    name: House Load Energy (Spa Calibration)
+    unique_id: sundance_spa_house_load_energy
+    source: sensor.spa_house_load
+    method: left
+    unit_prefix: k
+    unit_time: h
+    round: 4
+    max_sub_interval:
+      minutes: 1
+  - platform: statistics
+    name: House Load Mean 10 Min (Spa Calibration)
+    unique_id: sundance_spa_house_load_mean_10
+    entity_id: sensor.spa_house_load
+    state_characteristic: average_step
+    max_age:
+      minutes: 10
+    keep_last_sample: true
+    precision: 0
+automation:
+  - id: sundance_spa_spa_power_measurement_circulation
+    alias: 'Spa - Power measurement: circulation (nightly)'
+    description: >-
+      Calibrates number.sundance_spa_power_circulation (Pump 1 low + ClearRay, used by
+      sensor.sundance_spa_power). The filter cycle runs 00:00-02:00 and the house load hardly
+      changes at night (owner, 2026-10-29), so: average house load 00:05-01:55 (circulation) minus
+      the average of 02:05-03:55 (spa idle) = circulation power. Averages come from
+      sensor.house_load_energy_spa_calibration (Riemann sum of sensor.load_power). The night is
+      skipped if the heater or a jet ran, the pump did not run the whole cycle, or the quiet base
+      was unstable (02:05-03:00 vs 03:00-03:55 differ by 150 W or more). A plausible result (200-700
+      W) moves the value 25% of the way (rolling average); each night is written to the logbook.
+      Created 2026-10-29. Revised 2026-11-02 (owner): MEASUREMENT ONLY - no longer changes
+      number.sundance_spa_power_circulation (set to 370 W); each night logs the measured value and
+      its difference from the setting, reviewed periodically. Revised 2026-11-02: setting read from
+      number.sundance_spa_power_circulation (on the ESP). Revised 2026-11-06: each result (measured
+      W and difference, or a skipped night) is also appended to
+      input_text.spa_power_measure_circulation for the weekly summary; the setting is still never
+      changed. Revised 2026-11-07: the helper list ignores a non-numeric start value (unknown), so
+      only real results count towards the last 10. Revised 2026-11-08 (owner): a short ESP
+      disconnect no longer voids the night (the checks use the states, not last_changed); a real
+      disturbance (heater or jets on, pump off during the circulation window, pump on during the
+      quiet window) is caught by triggers in the waits.
+    triggers:
+      - trigger: time
+        at: '00:05:00'
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        state: 'on'
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_heater
+        state: 'off'
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        state: 'off'
+    actions:
+      - variables:
+          start_ts: '{{ as_timestamp(now()) }}'
+          e0: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+      - wait_for_trigger:
+          - trigger: time
+            at: '01:55:00'
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_heater
+            to: 'on'
+            id: disturbed
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_in_use
+            to: 'on'
+            id: disturbed
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_pumps_running
+            to: 'off'
+            id: disturbed
+        timeout:
+          hours: 2
+        continue_on_timeout: false
+      - condition: template
+        value_template: '{{ wait.trigger is not none and wait.trigger.id != ''disturbed'' }}'
+        note: 'The heater, a jet or the pump changed during this window: the night does not count.'
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        state: 'on'
+        note: >-
+          State only: a short ESP disconnect (unavailable) no longer voids the night; real
+          disturbances are caught by the triggers of the waits.
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_heater
+        state: 'off'
+        note: >-
+          State only: a short ESP disconnect (unavailable) no longer voids the night; real
+          disturbances are caught by the triggers of the waits.
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        state: 'off'
+        note: >-
+          State only: a short ESP disconnect (unavailable) no longer voids the night; real
+          disturbances are caught by the triggers of the waits.
+      - variables:
+          e1: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+      - wait_for_trigger:
+          - trigger: time
+            at: '02:05:00'
+        timeout:
+          minutes: 20
+        continue_on_timeout: false
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        state: 'off'
+      - variables:
+          e2: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+          quiet_ts: '{{ as_timestamp(now()) }}'
+      - wait_for_trigger:
+          - trigger: time
+            at: '03:00:00'
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_heater
+            to: 'on'
+            id: disturbed
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_in_use
+            to: 'on'
+            id: disturbed
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_pumps_running
+            to: 'on'
+            id: disturbed
+        timeout:
+          hours: 1
+        continue_on_timeout: false
+      - condition: template
+        value_template: '{{ wait.trigger is not none and wait.trigger.id != ''disturbed'' }}'
+        note: 'The heater, a jet or the pump changed during this window: the night does not count.'
+      - variables:
+          e3: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+      - wait_for_trigger:
+          - trigger: time
+            at: '03:55:00'
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_heater
+            to: 'on'
+            id: disturbed
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_in_use
+            to: 'on'
+            id: disturbed
+          - trigger: state
+            entity_id: binary_sensor.sundance_spa_pumps_running
+            to: 'on'
+            id: disturbed
+        timeout:
+          hours: 1
+        continue_on_timeout: false
+      - condition: template
+        value_template: '{{ wait.trigger is not none and wait.trigger.id != ''disturbed'' }}'
+        note: 'The heater, a jet or the pump changed during this window: the night does not count.'
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        state: 'off'
+        note: >-
+          State only: a short ESP disconnect (unavailable) no longer voids the night; real
+          disturbances are caught by the triggers of the waits.
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_heater
+        state: 'off'
+        note: >-
+          State only: a short ESP disconnect (unavailable) no longer voids the night; real
+          disturbances are caught by the triggers of the waits.
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        state: 'off'
+        note: >-
+          State only: a short ESP disconnect (unavailable) no longer voids the night; real
+          disturbances are caught by the triggers of the waits.
+      - variables:
+          e4: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+      - condition: template
+        value_template: >-
+          {{ is_number(e0) and is_number(e1) and is_number(e2) and is_number(e3) and is_number(e4)
+          }}
+      - variables:
+          circ_w: '{{ ((e1 | float - e0 | float) * 1000 / (110 / 60)) | round(0) }}'
+          q1: '{{ ((e3 | float - e2 | float) * 1000 / (55 / 60)) | round(0) }}'
+          q2: '{{ ((e4 | float - e3 | float) * 1000 / (55 / 60)) | round(0) }}'
+          old: '{{ states(''number.sundance_spa_power_circulation'') | float(370) }}'
+      - variables:
+          base: '{{ ((q1 | float + q2 | float) / 2) | round(0) }}'
+          measured: '{{ (circ_w | float - (q1 | float + q2 | float) / 2) | round(0) }}'
+      - if:
+          - condition: template
+            value_template: '{{ (q1 | float - q2 | float) | abs < 150 and 200 <= measured | float <= 700 }}'
+        then:
+          - action: logbook.log
+            data:
+              name: Spa power measurement
+              entity_id: number.sundance_spa_power_circulation
+              message: >-
+                circulation measured {{ measured }} W (house {{ circ_w }} W, base {{ base }} W);
+                setting {{ old | round(0) }} W, difference {{ ((measured | float - old) / old * 100)
+                | round(1) }}%
+            note: >-
+              Measurement only since 2026-11-02 - the setting is changed by hand (owner) when the
+              measurements show a consistent gap.
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_power_measure_circulation
+            data:
+              value: >-
+                {% set items = states('input_text.spa_power_measure_circulation').split(';') |
+                select('match', '[0-9]') | list %}{% set e = ((as_timestamp(now()) / 60) | int |
+                string) ~ ',' ~ (measured | float | round(0) | int | string) ~ ',' ~ (((measured |
+                float - old) / old * 100) | round(1) | string) %}{{ (items + [e])[-10:] | join(';')
+                }}
+        else:
+          - action: logbook.log
+            data:
+              name: Spa power measurement
+              entity_id: number.sundance_spa_power_circulation
+              message: >-
+                night skipped: base {{ q1 }}/{{ q2 }} W, circulation {{ circ_w }} W, measured {{
+                measured }} W
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_power_measure_circulation
+            data:
+              value: >-
+                {% set items = states('input_text.spa_power_measure_circulation').split(';') |
+                select('match', '[0-9]') | list %}{% set e = ((as_timestamp(now()) / 60) | int |
+                string) ~ ',x' %}{{ (items + [e])[-10:] | join(';') }}
+    mode: single
+  - id: sundance_spa_spa_power_measurement_jet_pump
+    alias: 'Spa - Power measurement: jet pump (after a soak)'
+    description: >-
+      Calibrates number.sundance_spa_power_jet_pump (one pump at high speed; both pumps are the same
+      model, Pump 2 has no low speed - owner 2026-10-29). When the pumps start after 10+ min idle
+      with only jets on high (Primary Filter 'Running', no heater), house load during the jets
+      (sensor.house_load_energy_spa_calibration) minus the average of the 10 min before and the 10
+      min after (sensor.house_load_mean_10_min_spa_calibration) = jet power; minus 20 W ClearRay
+      when Jet 1 is on, divided by the number of jets. Skipped if the run lasted under 5 min, the
+      jets changed, the heater came on, or the house load before and after differs by 200 W or more.
+      A plausible result (1000-2500 W) moves the value 30% of the way; each soak is written to the
+      logbook. Created 2026-10-29 (first value 1630 W from the 29 Oct 08:06 soak). Revised
+      2026-11-02 (owner): MEASUREMENT ONLY - no longer changes number.sundance_spa_power_jet_pump
+      (1630 W); each soak logs the measured value and its difference from the setting, reviewed
+      periodically. Revised 2026-11-02: setting and ClearRay value read from
+      number.sundance_spa_power_* (on the ESP). Revised 2026-11-06: each result (measured W and
+      difference, or a skipped soak) is also appended to input_text.spa_power_measure_jet_pump for
+      the weekly summary; the setting is still never changed. Revised 2026-11-07: the helper list
+      ignores a non-numeric start value (unknown), so only real results count towards the last 10.
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        from: 'off'
+        to: 'on'
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >=
+          600 }}
+        note: Idle for 10 min before, so the 10-min mean is a clean base.
+      - condition: state
+        entity_id: binary_sensor.sundance_spa_heater
+        state: 'off'
+    actions:
+      - variables:
+          before: '{{ states(''sensor.house_load_mean_10_min_spa_calibration'') }}'
+      - delay:
+          seconds: 30
+      - variables:
+          j1: '{{ is_state(''switch.sundance_spa_jet_1'', ''on'') }}'
+          j2: '{{ is_state(''switch.sundance_spa_jet_2'', ''on'') }}'
+          e_s: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+          t_s: '{{ as_timestamp(now()) }}'
+      - condition: template
+        value_template: >-
+          {{ (j1 or j2) and is_state('sensor.sundance_spa_primary_filter', 'Running') and
+          is_number(before) and is_number(e_s) }}
+      - wait_for_trigger:
+          - trigger: state
+            entity_id:
+              - switch.sundance_spa_jet_1
+              - switch.sundance_spa_jet_2
+              - binary_sensor.sundance_spa_heater
+        timeout:
+          hours: 1
+        continue_on_timeout: true
+      - variables:
+          e_e: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+          t_e: '{{ as_timestamp(now()) }}'
+      - condition: template
+        value_template: '{{ t_e - t_s >= 300 and is_number(e_e) }}'
+      - variables:
+          during: '{{ ((e_e | float - e_s | float) * 1000 * 3600 / (t_e - t_s)) | round(0) }}'
+      - wait_template: '{{ is_state(''binary_sensor.sundance_spa_pumps_running'', ''off'') }}'
+        timeout:
+          minutes: 30
+        continue_on_timeout: false
+      - delay:
+          minutes: 10
+      - condition: template
+        value_template: >-
+          {{ is_state('binary_sensor.sundance_spa_pumps_running', 'off') and (now() -
+          states.binary_sensor.sundance_spa_pumps_running.last_changed).total_seconds() >= 595 and
+          is_state('binary_sensor.sundance_spa_heater', 'off') }}
+      - variables:
+          after: '{{ states(''sensor.house_load_mean_10_min_spa_calibration'') }}'
+          old: '{{ states(''number.sundance_spa_power_jet_pump'') | float(1630) }}'
+          'n': '{{ (1 if j1 else 0) + (1 if j2 else 0) }}'
+      - variables:
+          base: '{{ ((before | float + after | float) / 2) | round(0) }}'
+          measured: >-
+            {{ ((during | float - (before | float + after | float) / 2 -
+            (states('number.sundance_spa_power_clearray') | float(20) if j1 else 0)) / n) | round(0)
+            }}
+      - if:
+          - condition: template
+            value_template: >-
+              {{ (before | float - after | float) | abs < 200 and 1000 <= measured | float <= 2500
+              }}
+        then:
+          - action: logbook.log
+            data:
+              name: Spa power measurement
+              entity_id: number.sundance_spa_power_jet_pump
+              message: >-
+                jet pump measured {{ measured }} W ({{ n }} jet(s), house {{ during }} W, base {{
+                base }} W); setting {{ old | round(0) }} W, difference {{ ((measured | float - old)
+                / old * 100) | round(1) }}%
+            note: >-
+              Measurement only since 2026-11-02 - the setting is changed by hand (owner) when the
+              measurements show a consistent gap.
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_power_measure_jet_pump
+            data:
+              value: >-
+                {% set items = states('input_text.spa_power_measure_jet_pump').split(';') |
+                select('match', '[0-9]') | list %}{% set e = ((as_timestamp(now()) / 60) | int |
+                string) ~ ',' ~ (measured | float | round(0) | int | string) ~ ',' ~ (((measured |
+                float - old) / old * 100) | round(1) | string) %}{{ (items + [e])[-10:] | join(';')
+                }}
+        else:
+          - action: logbook.log
+            data:
+              name: Spa power measurement
+              entity_id: number.sundance_spa_power_jet_pump
+              message: >-
+                soak skipped: before {{ before }} W, after {{ after }} W, during {{ during }} W,
+                measured {{ measured }} W
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_power_measure_jet_pump
+            data:
+              value: >-
+                {% set items = states('input_text.spa_power_measure_jet_pump').split(';') |
+                select('match', '[0-9]') | list %}{% set e = ((as_timestamp(now()) / 60) | int |
+                string) ~ ',x' %}{{ (items + [e])[-10:] | join(';') }}
+    mode: single
+  - id: sundance_spa_spa_power_measurement_weekly_summary
+    alias: 'Spa - Power measurement: weekly summary'
+    description: >-
+      Every Saturday at 08:00 sends the phone a summary of the last 7 days of the two power
+      measurements ('Spa - Power measurement: circulation (nightly)' and '... jet pump (after a
+      soak)'): how many valid measurements, the average measured power against the setting on the
+      ESP, the average difference in %, and how many were skipped. The measurements are read from
+      input_text.spa_power_measure_circulation / _jet_pump (up to the last 10 results each,
+      'minutes_since_epoch,measured_W,difference_%' or 'minutes,x' for a skipped one). Information
+      only: the Power settings are never changed by any automation. Optional - needs a whole-house
+      power sensor for the two measurement automations. Created 2026-11-06.
+    triggers:
+      - trigger: time
+        at: '08:00:00'
+    conditions:
+      - condition: time
+        weekday:
+          - sat
+    actions:
+      - action: script.spa_notify
+        data:
+          title: Spa power measurement, last 7 days
+          tag: spa_power_weekly
+          message: >-
+            {% macro summ(raw, label, unit_word, setting) -%}{%- set cutoff = (as_timestamp(now()) -
+            604800) / 60 -%}{%- set ns = namespace(n=0, skip=0, m=0, p=0) -%}{%- for it in
+            raw.split(';') if it -%}{%- set f = it.split(',') -%}{%- if f[0] | float(0) >= cutoff
+            -%}{%- if f | count >= 3 -%}{%- set ns.n = ns.n + 1 -%}{%- set ns.m = ns.m + f[1] |
+            float(0) -%}{%- set ns.p = ns.p + f[2] | float(0) -%}{%- else -%}{%- set ns.skip =
+            ns.skip + 1 -%}{%- endif -%}{%- endif -%}{%- endfor -%}{%- if ns.n > 0 -%}{{ label }}:
+            {{ ns.n }} {{ unit_word }}{{ '' if ns.n == 1 else 's' }} measured, average {{ (ns.m /
+            ns.n) | round(0) | int }} W vs setting {{ setting | round(0) | int }} W ({{ '%+.1f' %
+            (ns.p / ns.n) }}%){{ ', ' ~ ns.skip ~ ' skipped' if ns.skip > 0 else '' }}.{%- else
+            -%}{{ label }}: no valid measurement{{ ' (' ~ ns.skip ~ ' skipped)' if ns.skip > 0 else
+            '' }}.{%- endif -%}{%- endmacro -%}{{
+            summ(states('input_text.spa_power_measure_circulation'), 'Circulation', 'night',
+            states('number.sundance_spa_power_circulation') | float(370)) }} {{
+            summ(states('input_text.spa_power_measure_jet_pump'), 'Jet pump', 'soak',
+            states('number.sundance_spa_power_jet_pump') | float(1630)) }} Settings unchanged.
+    mode: single
