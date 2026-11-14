@@ -1,5 +1,13 @@
 # Sundance 680 series — ESPHome RS-485 component
 
+**Control and monitor a Sundance 680 series (Peyton) hot tub from Home Assistant**, with an ESP32 running ESPHome
+connected to the spa's RS-485 port. Temperature and set point, heater and heater mode, both jets, circulation, light,
+clock, Primary Filter, service counters (filter, ClearRay bulb, water), the panel locks and run time / energy are Home
+Assistant entities, and most settings can be changed from Home Assistant. An optional Home Assistant package adds
+heating plans ("ready by 19:00"), reminders, notifications and a dashboard (screenshots in [§4](#4-home-assistant-entities)).
+The protocol decoding is shared with [pete-jorgensen/SundanceHotTub2MQTT](https://github.com/pete-jorgensen/SundanceHotTub2MQTT)
+(its `DECODING.md` has a 680 column).
+
 ESPHome component and decoding notes for **Sundance 680 series** spas (Balboa-based controller),
 based on the Sundance 780 component by [Iraithium](https://github.com/Iraithium/sundance-rs485-controller)
 — all credit for the original work goes to him. For the 780, see the original repository.
@@ -23,7 +31,7 @@ controller), what was decoded on the RS-485 bus, how sure we are about each part
 unknown. It is meant for anyone who wants to continue the work, reproduce it on another 680, or
 spot mistakes.
 
-> Status (2026-11-06): running daily on one spa. Temperature, set point, heater, both jets,
+> Status (2026-11-12): running daily on one spa. Temperature, set point, heater, both jets,
 > circulation, lights, heater mode, clock/date (read + automatic sync to within a minute, incl. DST
 > changes), service counters (with Off / Change Now), Primary Filter settings and states (incl.
 > Cleanup and Purge), all four lock modes, temperature unit, run timers,
