@@ -21,6 +21,11 @@ Example configuration: [example-680.yaml](example-680.yaml).
 > topside panel) for **Sundance 680 series and Jacuzzi J-100 / J-200 spas from model year 2018 to about mid-2022** (one listing gives the end as 07/2022;
 > these are retailer listings, not an official fitment chart). So this work may apply to those models as well (untested on them).
 >
+> **Disclaimer — use at your own risk.** This is an unofficial, community project. It is not made, approved or supported by Sundance Spas or Jacuzzi.
+> It connects to the spa's controller (the box has mains voltage inside — switch the spa off at the breaker before opening it) and can change its
+> settings, including the heater, pumps and locks. It was developed on one spa and may behave differently on yours. The author accepts no responsibility or
+> liability for any damage to a spa, to other equipment or to people, loss of warranty, or any other loss, however caused. Do not rely on it for safety functions.
+>
 > **Connection:** the RS-485 module is connected to header **J15** on the controller board, at the
 > top edge of the board next to J13 (MAIN PANEL, the SD680 topside).
 
