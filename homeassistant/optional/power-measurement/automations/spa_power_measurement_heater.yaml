@@ -1,0 +1,169 @@
+alias: 'Spa - Power measurement: heater (per run)'
+description: >-
+  Measures the heater power (number.sundance_spa_power_heater, spec 2700 W) against the setting.
+  When the pumps start after 10+ min idle (the normal start of a heating cycle: pump low about a
+  minute before the heater), the 10-minute house-load mean before is the base. From the moment the
+  heater comes on until it goes off the house load is integrated
+  (sensor.house_load_energy_spa_calibration); heater = that average minus the average of the base
+  before and the base 10 min after the pumps stopped, minus the circulation setting
+  (number.sundance_spa_power_circulation, the pump runs the whole time). Plausible result 2000-3500
+  W, runs of 5+ min, the base before and after within 200 W of each other. Skipped (and recorded
+  with the reason) when the heater did not come on within 3 min of the pump start (an ordinary
+  filter cycle - NOT recorded), or a jet / use / a pump stop disturbed the run, or the run was under
+  5 min, or the base moved. MEASUREMENT ONLY - never changes the setting; results go to the logbook
+  and input_text.spa_power_measure_heater (last 10) through script.spa_power_measure_record, and
+  into the weekly summary. Created 2026-11-11 (owner): the heater running used to be treated only as
+  a disturbance; the night of 11 Nov 03:28-04:02 was a clean 34-minute run that nobody measured.
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.sundance_spa_pumps_running
+    from: 'off'
+    to: 'on'
+conditions:
+  - condition: template
+    value_template: '{{ (trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() >= 600 }}'
+    note: Idle for 10 min before, so the 10-min mean is a clean base.
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_heater
+    state: 'off'
+  - condition: state
+    entity_id: binary_sensor.sundance_spa_in_use
+    state: 'off'
+actions:
+  - variables:
+      before: '{{ states(''sensor.house_load_mean_10_min_spa_calibration'') }}'
+      old: '{{ states(''number.sundance_spa_power_heater'') | float(2700) }}'
+      circ: '{{ states(''number.sundance_spa_power_circulation'') | float(370) }}'
+  - wait_for_trigger:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heater
+        to: 'on'
+        id: heater
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        to: 'on'
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        to: 'off'
+        id: disturbed
+    timeout:
+      minutes: 3
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: '{{ wait.trigger is none or wait.trigger.id != ''heater'' }}'
+    then:
+      - if:
+          - condition: template
+            value_template: '{{ wait.trigger is not none }}'
+        then:
+          - action: script.spa_power_measure_record
+            data:
+              kind: heater
+              measured: ''
+              old: '{{ old }}'
+              message: 'heater run skipped: the pump stopped or the spa was used before the heater came on'
+      - stop: not a heating run
+    note: No heater within 3 min = an ordinary filter cycle, nothing to record.
+  - variables:
+      e_s: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+      t_s: '{{ as_timestamp(now()) }}'
+  - wait_for_trigger:
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_heater
+        to: 'off'
+        id: heater_off
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_in_use
+        to: 'on'
+        id: disturbed
+      - trigger: state
+        entity_id: binary_sensor.sundance_spa_pumps_running
+        to: 'off'
+        id: disturbed
+    timeout:
+      hours: 2
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: '{{ wait.trigger is none or wait.trigger.id != ''heater_off'' }}'
+    then:
+      - action: script.spa_power_measure_record
+        data:
+          kind: heater
+          measured: ''
+          old: '{{ old }}'
+          message: >-
+            heater run skipped: a jet, use of the spa or a pump stop during the run (or no end
+            within 2 h)
+      - stop: heater run disturbed
+  - variables:
+      e_e: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
+      t_e: '{{ as_timestamp(now()) }}'
+  - if:
+      - condition: template
+        value_template: '{{ t_e | float - t_s | float < 300 or not (is_number(e_s) and is_number(e_e)) }}'
+    then:
+      - action: script.spa_power_measure_record
+        data:
+          kind: heater
+          measured: ''
+          old: '{{ old }}'
+          message: 'heater run skipped: run under 5 min or the house load energy sensor was not available'
+      - stop: run too short
+  - variables:
+      during: '{{ ((e_e | float - e_s | float) * 1000 * 3600 / (t_e | float - t_s | float)) | round(0) }}'
+  - wait_template: '{{ is_state(''binary_sensor.sundance_spa_pumps_running'', ''off'') }}'
+    timeout:
+      minutes: 10
+    continue_on_timeout: false
+  - delay:
+      minutes: 10
+  - if:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: binary_sensor.sundance_spa_pumps_running
+            state: 'off'
+    then:
+      - action: script.spa_power_measure_record
+        data:
+          kind: heater
+          measured: ''
+          old: '{{ old }}'
+          message: 'heater run skipped: the pump started again during the 10 min after the run'
+      - stop: pump restarted
+  - variables:
+      after: '{{ states(''sensor.house_load_mean_10_min_spa_calibration'') }}'
+  - variables:
+      base: '{{ ((before | float(0) + after | float(0)) / 2) | round(0) }}'
+      measured: >-
+        {{ (during | float - ((before | float(0) + after | float(0)) / 2) - circ | float) | round(0)
+        }}
+  - if:
+      - condition: template
+        value_template: >-
+          {{ is_number(before) and is_number(after) and (before | float - after | float) | abs < 200
+          and 2000 <= measured | float <= 3500 }}
+    then:
+      - action: script.spa_power_measure_record
+        data:
+          kind: heater
+          measured: '{{ measured }}'
+          old: '{{ old }}'
+          message: >-
+            heater measured {{ measured }} W (house {{ during }} W for {{ ((t_e | float - t_s |
+            float) / 60) | round(0) | int }} min, base {{ base }} W, circulation {{ circ | round(0)
+            | int }} W); setting {{ old | round(0) }} W, difference {{ ((measured | float - old) /
+            old * 100) | round(1) }}%
+    else:
+      - action: script.spa_power_measure_record
+        data:
+          kind: heater
+          measured: ''
+          old: '{{ old }}'
+          message: >-
+            heater run skipped: before {{ before }} W, after {{ after }} W, during {{ during }} W,
+            measured {{ measured }} W
+mode: single

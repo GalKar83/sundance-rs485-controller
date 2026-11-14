@@ -2,6 +2,21 @@
 # Needs: the Bluetooth MAC address of the spa audio, and per phone the Companion app sensors "Bluetooth connection"
 # and "Media session" plus the phone notify service. Fill them on the Hot Tub Setup page. Skip this file if you have no audio.
 
+input_number:
+  spa_power_bluewave_standby:
+    name: Spa Power Bluewave Standby
+    min: 0
+    max: 30
+    step: 0.5
+    unit_of_measurement: W
+    mode: slider
+  spa_power_bluewave_playing:
+    name: Spa Power Bluewave Playing
+    min: 0
+    max: 150
+    step: 1
+    unit_of_measurement: W
+    mode: slider
 input_text:
   spa_audio_bluetooth_mac:
     name: Spa Audio Bluetooth MAC
@@ -96,20 +111,30 @@ script:
           message: command_update_sensors
 template:
   - binary_sensor:
-      - name: Spa Audio Person 1 Connected
-        unique_id: sundance_spa_spa_audio_person_1_connected
+      - name: Spa Audio Person1 Connected
+        unique_id: sundance_spa_spa_audio_person1_connected
         state: >-
           {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
           ((state_attr(states('input_text.spa_audio_p1_bluetooth_sensor'),
           'connected_paired_devices') or []) | select('search', mac, ignorecase=true) | list |
           count) > 0 }}
-      - name: Spa Audio Person 2 Connected
-        unique_id: sundance_spa_spa_audio_person_2_connected
+        default_entity_id: binary_sensor.spa_audio_person1_connected
+      - name: Spa Audio Person2 Connected
+        unique_id: sundance_spa_spa_audio_person2_connected
         state: >-
           {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
           ((state_attr(states('input_text.spa_audio_p2_bluetooth_sensor'),
           'connected_paired_devices') or []) | select('search', mac, ignorecase=true) | list |
           count) > 0 }}
+        default_entity_id: binary_sensor.spa_audio_person2_connected
+      - name: Spa Audio Playing
+        unique_id: sundance_spa_spa_audio_playing
+        state: >-
+          {% set n = states('sensor.spa_audio_now_playing') %}{{
+          (is_state('binary_sensor.spa_audio_person1_connected','on') or
+          is_state('binary_sensor.spa_audio_person2_connected','on')) and n not in
+          ['—','unknown','unavailable'] and not n.startswith('Paused') }}
+        default_entity_id: binary_sensor.spa_audio_playing
   - sensor:
       - name: Spa Audio
         unique_id: sundance_spa_spa_audio
@@ -119,6 +144,7 @@ template:
           'Person 2' if states.binary_sensor.spa_audio_person2_connected.last_changed >
           states.binary_sensor.spa_audio_person1_connected.last_changed else 'Person 1' }}{%- elif g
           -%}Person 1{%- elif e -%}Person 2{%- else -%}Not connected{%- endif -%}
+        default_entity_id: sensor.spa_audio
       - name: Spa Audio Now Playing
         unique_id: sundance_spa_spa_audio_now_playing
         state: >-
@@ -133,3 +159,4 @@ template:
           m.attributes['title_' ~ ns.pkg] | default('', true) -%}{%- set a = m.attributes['artist_'
           ~ ns.pkg] | default('', true) -%}{{ ('' if ns.playing else 'Paused: ') ~ t ~ ((' – ' ~ a)
           if a else '') }}{%- endif -%}
+        default_entity_id: sensor.spa_audio_now_playing

@@ -301,9 +301,11 @@
       {# Spa electrical power from the ESP states x the power values set on the spa device
       (number.sundance_spa_power_*, kept on the ESP). Pump 1 = Pump 1 Running: at high (Jet 1
       switch) = Jet Pump + ClearRay, at low = Circulation (includes the ClearRay bulb); Pump 2 =
-      Pump 2 Running x Jet Pump; heater; light; controller always. #}{% set p1 =
-      is_state('binary_sensor.sundance_spa_pump_1_running', 'on') %}{% set p1_high =
-      is_state('switch.sundance_spa_jet_1', 'on') %}{% set p2 =
+      Pump 2 Running x Jet Pump; heater; light; controller always (the ESP is part of it). Plus
+      Bluewave (Bluetooth audio, always powered with the spa, standby or playing) =
+      sensor.sundance_spa_spa_extras_power (values in input_number.spa_power_bluewave_standby /
+      _playing). #}{% set p1 = is_state('binary_sensor.sundance_spa_pump_1_running', 'on') %}{% set
+      p1_high = is_state('switch.sundance_spa_jet_1', 'on') %}{% set p2 =
       is_state('binary_sensor.sundance_spa_pump_2_running', 'on') %}{% set heat =
       is_state('binary_sensor.sundance_spa_heater', 'on') %}{% set light =
       states('sensor.sundance_spa_light_status') not in ['Off', 'unknown', 'unavailable'] %}{% set
@@ -312,9 +314,10 @@
       states('number.sundance_spa_power_light') | float(5) %}{% set circ =
       states('number.sundance_spa_power_circulation') | float(370) %}{% set jet =
       states('number.sundance_spa_power_jet_pump') | float(1630) %}{% set heater =
-      states('number.sundance_spa_power_heater') | float(2700) %}{{ (ctrl + ((jet + uv) if p1_high
-      else (circ if p1 else 0)) + (jet if p2 else 0) + (heater if heat else 0) + (lt if light else
-      0)) | round(0) }}
+      states('number.sundance_spa_power_heater') | float(2700) %}{% set extras =
+      states('sensor.sundance_spa_spa_extras_power') | float(0) %}{{ (ctrl + extras + ((jet + uv) if
+      p1_high else (circ if p1 else 0)) + (jet if p2 else 0) + (heater if heat else 0) + (lt if
+      light else 0)) | round(1) }}
     state_class: measurement
     template_type: sensor
     unit_of_measurement: W
@@ -328,7 +331,7 @@
     net_consumption: false
     offset: 0
     periodically_resetting: false
-    source: sensor.sundance_spa_energy_counter
+    source: sensor.sundance_spa_spa_energy_counter_incl_extras
     tariffs: []
 - domain: utility_meter
   title: Energy Week
@@ -340,7 +343,7 @@
     net_consumption: false
     offset: 6
     periodically_resetting: false
-    source: sensor.sundance_spa_energy_counter
+    source: sensor.sundance_spa_spa_energy_counter_incl_extras
     tariffs: []
 - domain: utility_meter
   title: Energy Month
@@ -352,7 +355,7 @@
     net_consumption: false
     offset: 0
     periodically_resetting: false
-    source: sensor.sundance_spa_energy_counter
+    source: sensor.sundance_spa_spa_energy_counter_incl_extras
     tariffs: []
 - domain: utility_meter
   title: Energy Year
@@ -364,7 +367,7 @@
     net_consumption: false
     offset: 0
     periodically_resetting: false
-    source: sensor.sundance_spa_energy_counter
+    source: sensor.sundance_spa_spa_energy_counter_incl_extras
     tariffs: []
 - domain: utility_meter
   title: Pump 1 Time Week
@@ -424,7 +427,7 @@
     net_consumption: false
     offset: 0
     periodically_resetting: false
-    source: sensor.sundance_spa_energy_counter
+    source: sensor.sundance_spa_spa_energy_counter_incl_extras
     tariffs: []
 - domain: utility_meter
   title: Pump 1 Time Today
@@ -536,18 +539,18 @@
       int }}
     template_type: sensor
 - domain: template
-  title: Spa Audio Person 1 Connected
+  title: Spa Audio Person1 Connected
   options:
-    name: Spa Audio Person 1 Connected
+    name: Spa Audio Person1 Connected
     state: >-
       {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
       ((state_attr('sensor.person1_phone_bluetooth_connection', 'connected_paired_devices') or []) |
       select('search', mac, ignorecase=true) | list | count) > 0 }}
     template_type: binary_sensor
 - domain: template
-  title: Spa Audio Person 2 Connected
+  title: Spa Audio Person2 Connected
   options:
-    name: Spa Audio Person 2 Connected
+    name: Spa Audio Person2 Connected
     state: >-
       {%- set mac = states('input_text.spa_audio_bluetooth_mac') -%}{{ mac | length == 17 and
       ((state_attr('sensor.person2_phone_bluetooth_connection', 'connected_paired_devices') or []) |
@@ -583,15 +586,74 @@
 - domain: template
   title: Spa Unmapped Alert Bits
   options:
-    name: Spa Unmapped Alert Bits
     device_class: problem
-    state: >-
-      {{ (states('sensor.sundance_spa_raw_f10') | float(0) | int | bitwise_and(47)) > 0 }}
+    name: Spa Unmapped Alert Bits
+    state: '{{ (states(''sensor.sundance_spa_raw_f10'') | float(0) | int | bitwise_and(47)) > 0 }}'
     template_type: binary_sensor
 - domain: template
   title: Spa Quiet Hours
   options:
     name: Spa Quiet Hours
     state: >-
-      {%- set n = now().strftime('%H:%M:%S') -%}{%- set s = states('input_datetime.spa_quiet_hours_start') -%}{%- set e = states('input_datetime.spa_quiet_hours_end') -%}{%- if s in ['unknown', 'unavailable', ''] or e in ['unknown', 'unavailable', ''] -%}false{%- elif s > e -%}{{ n >= s or n < e }}{%- else -%}{{ s <= n < e }}{%- endif -%}
+      {%- set n = now().strftime('%H:%M:%S') -%}{%- set s =
+      states('input_datetime.spa_quiet_hours_start') -%}{%- set e =
+      states('input_datetime.spa_quiet_hours_end') -%}{%- if s in ['unknown', 'unavailable', ''] or
+      e in ['unknown', 'unavailable', ''] -%}false{%- elif s > e -%}{{ n >= s or n < e }}{%- else
+      -%}{{ s <= n < e }}{%- endif -%}
+    template_type: binary_sensor
+- domain: template
+  title: Spa Extras Power
+  options:
+    device_class: power
+    name: Spa Extras Power
+    state: >-
+      {# Bluewave (Bluetooth audio): always powered together with the spa (the ESP is part of the
+      Controller value). Playing while a phone plays through it, otherwise Standby. 0 when the
+      spa/ESP is not reporting. #}{% if is_state('binary_sensor.sundance_spa_status', 'on') %}{{
+      (states('input_number.spa_power_bluewave_playing') | float(0) if
+      is_state('binary_sensor.spa_audio_playing', 'on') else
+      states('input_number.spa_power_bluewave_standby') | float(0)) | round(1) }}{% else %}0{% endif
+      %}
+    state_class: measurement
+    template_type: sensor
+    unit_of_measurement: W
+- domain: integration
+  title: Spa Extras Energy
+  options:
+    max_sub_interval:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    method: left
+    name: Spa Extras Energy
+    round: 5
+    source: sensor.sundance_spa_spa_extras_power
+    unit_prefix: k
+    unit_time: h
+- domain: template
+  title: Spa Energy Counter Incl Extras
+  options:
+    additional_options:
+      availability: >-
+        {{ states('sensor.sundance_spa_energy_counter') | is_number and
+        states('sensor.sundance_spa_spa_extras_energy') | is_number }}
+    device_class: energy
+    name: Spa Energy Counter Incl Extras
+    state: >-
+      {# ESP Energy Counter (pumps, heater, lights, controller - integrated on the ESP) + Spa Extras
+      Energy (ESP + Bluewave, integrated here). The Energy Today/Week/Month/Year and Spa Energy Test
+      meters run on this sensor. #}{{ (states('sensor.sundance_spa_energy_counter') | float +
+      states('sensor.sundance_spa_spa_extras_energy') | float) | round(5) }}
+    state_class: total_increasing
+    template_type: sensor
+    unit_of_measurement: kWh
+- domain: template
+  title: Spa Audio Playing
+  options:
+    name: Spa Audio Playing
+    state: >-
+      {% set n = states('sensor.spa_audio_now_playing') %}{{
+      (is_state('binary_sensor.spa_audio_person1_connected','on') or
+      is_state('binary_sensor.spa_audio_person2_connected','on')) and n not in
+      ['—','unknown','unavailable'] and not n.startswith('Paused') }}
     template_type: binary_sensor

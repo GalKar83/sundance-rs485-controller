@@ -1,0 +1,38 @@
+alias: 'Spa - Power measurement: record'
+description: >-
+  Shared by the three power-measurement automations (circulation nightly, jet pump after a soak,
+  heater run). Writes one line to the logbook and appends one result to
+  input_text.spa_power_measure_<kind> (last 10 kept): 'minutes_since_epoch,measured_W,difference_%'
+  for a valid measurement, 'minutes,x' for a skipped one. Created 2026-11-11 so every skipped
+  night/soak/run is recorded with its reason instead of dropping silently. Never changes a power
+  setting.
+mode: queued
+fields:
+  kind:
+    description: circulation, jet_pump or heater
+    example: heater
+  measured:
+    description: Measured W, or empty for a skipped measurement
+    example: '2650'
+  old:
+    description: The current setting in W
+    example: '2700'
+  message:
+    description: Text for the logbook
+    example: heater measured 2650 W
+sequence:
+  - action: logbook.log
+    data:
+      name: Spa power measurement
+      entity_id: number.sundance_spa_power_{{ kind }}
+      message: '{{ message }}'
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.spa_power_measure_{{ kind }}
+    data:
+      value: >-
+        {% set items = states('input_text.spa_power_measure_' ~ kind).split(';') | select('match',
+        '[0-9]') | list %}{% set ts = ((as_timestamp(now()) / 60) | int) %}{% if measured | string |
+        is_number %}{% set e = (ts | string) ~ ',' ~ (measured | float | round(0) | int | string) ~
+        ',' ~ (((measured | float - old | float) / old | float * 100) | round(1) | string) %}{% else
+        %}{% set e = (ts | string) ~ ',x' %}{% endif %}{{ (items + [e])[-10:] | join(';') }}

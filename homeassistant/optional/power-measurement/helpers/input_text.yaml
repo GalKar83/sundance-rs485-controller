@@ -9,3 +9,8 @@ spa_power_measure_jet_pump:
   min: 0
   max: 255
   mode: text
+spa_power_measure_heater:
+  name: Spa Power Measure Heater
+  min: 0
+  max: 255
+  mode: text

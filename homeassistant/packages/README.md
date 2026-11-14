@@ -39,8 +39,8 @@ They are in [`../optional-packages`](../optional-packages) (outside `packages`, 
 
 | File | What it gives | What you must enter |
 |---|---|---|
-| `spa_audio.yaml` | which phone is connected to the spa speaker, play / pause / next from the Hot Tub page | the Bluetooth MAC address of the spa audio; per phone the Companion app *Bluetooth connection* and *Media session* sensors and its notify service |
-| `spa_power_measurement.yaml` | compares the spa power estimate with your whole-house load (measurement only, changes nothing) | the entity id of your whole-house power sensor (W) |
+| `spa_audio.yaml` | which phone is connected to the spa speaker, play / pause / next from the Hot Tub page; the Bluewave standby / playing power (added to the spa's power and energy) and its two sliders on the Settings page | the Bluetooth MAC address of the spa audio (and, on the Settings page, the Bluewave standby and playing watts); per phone the Companion app *Bluetooth connection* and *Media session* sensors and its notify service |
+| `spa_power_measurement.yaml` | compares the spa power estimate (circulation, jet pump, heater) with your whole-house load (measurement only, changes nothing) | the entity id of your whole-house power sensor (W) |
 | `spa_panel_used_while_away.yaml` | a phone alert when someone presses a panel button while you are away | your `person.` entity |
 
 ## What the package contains

@@ -605,6 +605,36 @@ sections:
         color: grey
         grid_options:
           columns: 6
+      - type: markdown
+        grid_options:
+          columns: full
+        content: >-
+          <small>Bluewave (the Bluetooth audio, always powered with the spa) is kept in Home
+          Assistant and added on top of the spa's own values.</small>
+        visibility:
+          - condition: state
+            entity: input_number.spa_power_bluewave_standby
+            state_not: unavailable
+      - type: tile
+        entity: input_number.spa_power_bluewave_standby
+        name: Bluewave Standby
+        color: grey
+        grid_options:
+          columns: 6
+        visibility:
+          - condition: state
+            entity: input_number.spa_power_bluewave_standby
+            state_not: unavailable
+      - type: tile
+        entity: input_number.spa_power_bluewave_playing
+        name: Bluewave Playing
+        color: grey
+        grid_options:
+          columns: 6
+        visibility:
+          - condition: state
+            entity: input_number.spa_power_bluewave_standby
+            state_not: unavailable
       - type: custom:mushroom-template-card
         primary: Power measurement · last 24 hours
         secondary: >-
@@ -621,20 +651,22 @@ sections:
           endif -%}{%- endmacro -%}{{ summ(states('input_text.spa_power_measure_circulation'),
           'Circulation', 'night', states('number.sundance_spa_power_circulation') | float(370)) }}
           {{ summ(states('input_text.spa_power_measure_jet_pump'), 'Jet pump', 'soak',
-          states('number.sundance_spa_power_jet_pump') | float(1630)) }}
+          states('number.sundance_spa_power_jet_pump') | float(1630)) }} {{
+          summ(states('input_text.spa_power_measure_heater'), 'Heater', 'run',
+          states('number.sundance_spa_power_heater') | float(2700)) }}
         icon: mdi:scale-balance
         icon_color: grey
         multiline_secondary: true
-        visibility:
-          - condition: state
-            entity: input_text.spa_power_measure_circulation
-            state_not: unavailable
         tap_action:
           action: none
         hold_action:
           action: none
         grid_options:
           columns: full
+        visibility:
+          - condition: state
+            entity: input_text.spa_power_measure_circulation
+            state_not: unavailable
   - type: grid
     cards:
       - type: heading

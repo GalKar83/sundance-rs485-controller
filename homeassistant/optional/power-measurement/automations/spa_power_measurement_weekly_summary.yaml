@@ -1,13 +1,14 @@
 alias: 'Spa - Power measurement: weekly summary'
 description: >-
-  Every Saturday at 08:00 sends the phone a summary of the last 7 days of the two power measurements
-  ('Spa - Power measurement: circulation (nightly)' and '... jet pump (after a soak)'): how many
-  valid measurements, the average measured power against the setting on the ESP, the average
-  difference in %, and how many were skipped. The measurements are read from
-  input_text.spa_power_measure_circulation / _jet_pump (up to the last 10 results each,
-  'minutes_since_epoch,measured_W,difference_%' or 'minutes,x' for a skipped one). Information only:
-  the Power settings are never changed by any automation. Optional - needs a whole-house power
-  sensor for the two measurement automations. Created 2026-11-06.
+  Every Saturday at 08:00 sends the phone a summary of the last 7 days of the three power
+  measurements ('Spa - Power measurement: circulation (nightly)', '... jet pump (after a soak)' and
+  '... heater (per run)'): how many valid measurements, the average measured power against the
+  setting on the ESP, the average difference in %, and how many were skipped. The measurements are
+  read from input_text.spa_power_measure_circulation / _jet_pump / _heater (up to the last 10
+  results each, 'minutes_since_epoch,measured_W,difference_%' or 'minutes,x' for a skipped one).
+  Information only: the Power settings are never changed by any automation. Optional - needs a
+  whole-house power sensor for the two measurement automations. Created 2026-11-06. Revised
+  2026-11-11 (owner): heater runs added.
 triggers:
   - trigger: time
     at: '08:00:00'
@@ -34,5 +35,7 @@ actions:
         summ(states('input_text.spa_power_measure_circulation'), 'Circulation', 'night',
         states('number.sundance_spa_power_circulation') | float(370)) }} {{
         summ(states('input_text.spa_power_measure_jet_pump'), 'Jet pump', 'soak',
-        states('number.sundance_spa_power_jet_pump') | float(1630)) }} Settings unchanged.
+        states('number.sundance_spa_power_jet_pump') | float(1630)) }} {{
+        summ(states('input_text.spa_power_measure_heater'), 'Heater', 'run',
+        states('number.sundance_spa_power_heater') | float(2700)) }} Settings unchanged.
 mode: single
