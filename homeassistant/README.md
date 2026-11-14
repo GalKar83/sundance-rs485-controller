@@ -5,6 +5,8 @@ scripts and the dashboard pages. It is the owner's complete working setup, expor
 Assistant's own files with the personal names replaced. Nothing in it is needed for the component
 to work; take what you want.
 
+> **Note:** the spa device has many diagnostic / raw-value entities. They are there on purpose while the project is in development, so that a bug report can include their output; see [the main README §12](../README.md#12-diagnostics-entities). You may hide or disable them.
+
 - [`automations/`](automations) — one YAML file per automation (23; the optional power-measurement ones are in
   [`optional/`](optional/power-measurement)). Paste it into a new
   automation with *Edit in YAML*.

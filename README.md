@@ -801,6 +801,8 @@ changed by hand only if the measurements show a consistent gap. See [`homeassist
 
 ## 12. Diagnostics entities
 
+**Many of the entities are there for debugging.** The project is still in development, so the diagnostic and raw-value entities (the `Raw …` sensors, Panel Button, Bus Message Types, the Diagnostics switch and similar) are left in on purpose: if you find a bug, the maintainer may ask you to send the output of some of them. You can hide or disable them in Home Assistant if you do not need them (the `Raw Frame C4` / `Raw Frame CA` sensors write a state every 10 s, so disable those unless asked). They are expected to be trimmed later.
+
 Temporary, `entity_category: diagnostic`, numeric where possible so they stay out of the logbook:
 
 | Entity | Purpose |

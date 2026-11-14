@@ -43,6 +43,8 @@ They are in [`../optional-packages`](../optional-packages) (outside `packages`, 
 | `spa_power_measurement.yaml` | compares the spa power estimate (circulation, jet pump, heater) with your whole-house load (measurement only, changes nothing) | the entity id of your whole-house power sensor (W) |
 | `spa_panel_used_while_away.yaml` | a phone alert when someone presses a panel button while you are away | your `person.` entity |
 
+> **Many entities are for debugging.** The ESPHome device exposes many diagnostic / raw-value entities because the project is still in development; they are kept so that you can be asked for their output when a bug is found. You can hide or disable them (details: [main README §12](../../README.md#12-diagnostics-entities)).
+
 ## What the package contains
 
 Helpers (`input_*`, `counter`), the 32 `utility_meter` sensors, the template sensors (power, filter / bulb / water dates, plan, quiet hours, ...),
