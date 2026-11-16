@@ -484,8 +484,9 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f6 | heater mode | 32 Auto, 34 Eco, 36 Day (16 for <1 s at power-up) | ✅ |
 | f12 | Water Refresh days remaining | plain, decrements at midnight; 0 = Off **or** due (told apart by f2 bit 7) | ✅ |
 | f3 | Filter Change days remaining | `f3 ^ 250`; raw 250 (= 0) both when the reminder is **Off** and when it is due (see below) | ✅ |
-| f4 | ? | always 6 so far | ❓ |
+| f4 | ? | always 6 so far, also while CHANGE FILTER and CHANGE CLEARRAY BULB were showing (2026-11-16), so it is not the alert code | ❓ |
 | f13 | topside screen code | **XOR-masked**, see §9 | ✅ |
+| last byte (33rd) of the payload | **alert / error code** | `first ^ last` of the payload = `38 ^ code` (see Frame under §5): 0 none, 1 CHANGE FILTER, 3 CHANGE CLEARRAY BULB (2 CHANGE WATER and the fault codes by analogy with Jacuzzi, not seen) | 🟡 (1 and 3 confirmed) |
 | f14 | second water temperature (°F) + flags | see [f14](#f14) below | ✅ |
 | f15 | value shown in the current menu screen | plain, screen-specific encoding (§9) | ✅ |
 
@@ -553,7 +554,9 @@ survives an ESP restart. (Earlier notes about an f14 "baseline change" were V dr
 **Filter Change 0 = Off or due?** Both send f3 = 250. The component reports `Change Now` when the
 counter reached 0 by counting down from 1, `Off` when someone saves Off in the FC menu (value 128 on
 the FC value screen), and otherwise — e.g. right after a boot — reads the FC menu once (Warmer shows
-the value, 128 = Off) during the boot / nightly routine.
+the value, 128 = Off) during the boot / nightly routine. **The alert byte tells them apart too** (2026-11-16): with
+Filter Change at 0 and due the alert code is 1, with the reminder saved as Off it stays 0 (checked: Off, alert
+`None`). The component does not use this yet.
 
 ## 7. Topside button codes (0xCC)
 
@@ -855,7 +858,7 @@ Temporary, `entity_category: diagnostic`, numeric where possible so they stay ou
 |---|---|
 | Raw F1, F2, F4, F7, F9, F10, F11, F13, F14, F15 | raw decoded status bytes in HA history (correlate with events without a live log) |
 | Raw Frame Tail | the last payload byte (the per-frame mask) of the status and lights frames, with the screen key and each byte XOR the key; at most one update per 5 s |
-| Raw Frame C4, Raw Frame CA | the full payload of a status / lights frame in hex, including the mask byte, at most once per 10 s. They write a state every 10 s, so disable them in Home Assistant unless you are capturing frames |
+| Raw Frame C4, Raw Frame CA | the full payload of a status / lights frame in hex, including the mask byte (the last byte of the C4 payload also carries the alert code: `first ^ last` = `38 ^ code`, §5), at most once per 10 s. They write a state every 10 s, so disable them in Home Assistant unless you are capturing frames |
 | Screen Key | the learned k |
 | Panel Button | last topside button (name, `Idle` from boot), held 1 s so short presses survive API state batching |
 | Raw Lights | decoded lights frame |
@@ -881,7 +884,7 @@ issue with timestamps and what the panel showed.
    while the ClearRay counter is at 0. Still open: CHANGE WATER (expected 2), and COOL, ICE, SN, FL, T-OH,
    H-OH, which have not occurred. Which codes do they use? (The Jacuzzi table has 11/12 flow switch, 13–18
    temperature sensor, 22/23/28/29 water too hot, 26 water 20 °F below the set point, 27 freeze.)
-4. **f4** (always 6), **f11 bit 7**, remaining lights-frame bytes.
+4. **f4** (always 6, also during the filter and ClearRay alerts), **f11 bit 7**, remaining lights-frame bytes.
 5. **f1 bit 5 vs bit 6** — command vs. confirmation?
 6. **Light behaviour for presses 3.4–5.2 s apart.**
 7. *(Answered 2026-11-07.)* The f7 date formula: `(day << 3) XOR month`, checked on an even day in July (see §6).
@@ -891,7 +894,8 @@ issue with timestamps and what the panel showed.
     is the same for every stored language, the cycle order depends on the stored language, and a quick change
     can leave no frame. (a) Is the stored language anywhere on the bus, e.g. in another message type or on a
     780? (b) Why does a language save made by the ESP's presses leave the panel unchanged when the same
-    presses by hand change it?
+    presses by hand change it? (The Jacuzzi / Prolink status frame has no language field either, so it is
+    probably stored in the topside panel and not sent to the controller at all; this is a guess.)
 11. *(Partly answered 2026-11-16, by the owner's use of the panel.)* The Water Refresh list is circular like
     the other counters (it wraps from one end to the other, Off included). Still not checked on every step:
     does it step by 30 in both directions (150 → 120 was one press), and is the Filter Change grid
@@ -904,7 +908,8 @@ issue with timestamps and what the panel showed.
   until the next lock event (the state saved in flash is then out of date).
 - Water Refresh at 0 right after a power cut reads `Off` until the clock is set (f2 bit 7 has both
   meanings); the automatic sync sets the clock within minutes.
-- Filter Change at 0 after an ESP boot stays `unknown` until the boot read has checked the FC menu.
+- Filter Change at 0 after an ESP boot stays `unknown` until the boot read has checked the FC menu (the Alert sensor
+  already shows `Change Filter` at once; the component does not use that yet, see §6).
 - The service counters are text sensors (to show `Off` / `Change Now`), so HA cannot use them in
   numeric conditions or graphs.
 - After an ESP reboot the menu-only values are `unknown` for ~2–4 minutes until the boot read runs.

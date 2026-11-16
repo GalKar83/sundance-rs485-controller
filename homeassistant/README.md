@@ -132,8 +132,9 @@ nothing until the first date is recorded.
 Two template **binary sensors** (also in `config_entry_helpers.yaml`):
 
 - `binary_sensor.spa_quiet_hours` — on while now is inside the quiet hours (the window may cross midnight).
-- `binary_sensor.spa_unmapped_alert_bits` — on while one of the status bits `f10` 0–3 or 5 is set. Nobody has seen them set yet
-  (main README §6); it is a guess that an error sets them, used for the "the spa reports an error" banner.
+- `binary_sensor.spa_unmapped_alert_bits` — on while one of the status bits `f10` 0–3 or 5 is set. Kept as a diagnostic only: bit 5 turned
+  out to mean "ClearRay counter at 0" during a scheduled cycle (main README §6), so it no longer drives a banner. The spa's alerts and faults
+  come from `sensor.sundance_spa_alert` (the ESP's Alert text sensor).
 
 ### Heating plans, reminders and settings (added 3–6 Nov)
 
@@ -350,10 +351,13 @@ released automatically, the plan then sends the "Spa heating plan blocked" notic
 ### Alerts
 
 A red banner at the top of the Hot Tub page shows while a service counter is at 0 (`Change Now` — filter, ClearRay bulb,
-water) and while `binary_sensor.spa_unmapped_alert_bits` is on ("the spa reports an error", not decoded yet). It disappears
-when the counter is reset or the bits clear. The phone notice for a counter at 0 is `spa_service_counter_reached_0`; the
-raw-decoding automation reports a new unknown status value once. What a real panel alert looks like in the frames is
-still being captured (main README §13).
+water); it disappears when the counter is reset. The phone notice for a counter at 0 is `spa_service_counter_reached_0`.
+
+A second red banner, **Spa error**, shows while `sensor.sundance_spa_alert` reports a fault or `Unknown error (code N)` (not
+`None` or one of the three reminders), with a sentence explaining what it means; the texts come from the 680 manual and the
+Jacuzzi / Prolink error table, and only codes 1 and 3 are confirmed on a real spa. The automation `spa_error_alert` sends a phone
+notice when such an error appears and when it is gone (through `spa_notify`, so held in the quiet hours). The raw-decoding
+automation still reports a new unknown status value once.
 
 ### Reminders
 
@@ -485,7 +489,7 @@ The Hot Tub view uses the *sections* layout and has these sections:
   row. A Temperature row with −/+ (one panel step), and *Current Status*, which also says
   `Heating blocked (Eco until 17:00)` when the heater mode keeps the heater off and the water is
   at least 1° under the target.
-- **Alert banner:** red rows at the very top, only while a counter is at 0 or the spa reports an error (see *Alerts*).
+- **Alert banner:** red rows at the very top, only while a counter is at 0 or the Alert sensor reports a fault (see *Alerts*).
   Controls blocked by an active lock are greyed out (see *Locks*).
 - **Next plan:** one row that appears only when an enabled future plan exists (`sensor.spa_next_plan`).
 - **Temperature chart:** 24 h of water and target temperature, with heating runs in red; the
