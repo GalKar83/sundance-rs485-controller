@@ -803,44 +803,6 @@ sections:
   - type: grid
     cards:
       - type: heading
-        heading: Energy
-        heading_style: title
-        icon: mdi:lightning-bolt
-      - type: custom:mushroom-template-card
-        entity: sensor.sundance_spa_power
-        primary: Energy
-        secondary: >-
-          Now {{ states('sensor.sundance_spa_power') | float(0) | round(0) | int }} W · Today {{
-          states('sensor.sundance_spa_energy_today') | float(0) | round(1) }} · Week {{
-          states('sensor.sundance_spa_energy_week') | float(0) | round(1) }} · Month {{
-          states('sensor.sundance_spa_energy_month') | float(0) | round(1) }} kWh
-        icon: mdi:lightning-bolt
-        icon_color: amber
-        tap_action:
-          action: more-info
-        grid_options:
-          columns: full
-          rows: 1
-        card_mod:
-          style: 'ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }'
-      - type: energy-date-selection
-        grid_options:
-          columns: full
-      - type: statistics-graph
-        title: Hot Tub Energy
-        entities:
-          - entity: sensor.sundance_spa_energy_total
-            name: Hot Tub
-        stat_types:
-          - change
-        chart_type: bar
-        energy_date_selection: true
-        hide_legend: true
-        grid_options:
-          columns: full
-  - type: grid
-    cards:
-      - type: heading
         heading: Soaking
         heading_style: title
         icon: mdi:hot-tub
@@ -1090,45 +1052,118 @@ sections:
   - type: grid
     cards:
       - type: heading
-        heading: Monthly History
+        heading: Energy
+        heading_style: title
+        icon: mdi:lightning-bolt
+      - type: custom:mushroom-template-card
+        entity: sensor.sundance_spa_power
+        primary: Energy
+        secondary: >-
+          Now {{ states('sensor.sundance_spa_power') | float(0) | round(0) | int }} W · Today {{
+          states('sensor.sundance_spa_energy_today') | float(0) | round(1) }} · Week {{
+          states('sensor.sundance_spa_energy_week') | float(0) | round(1) }} · Month {{
+          states('sensor.sundance_spa_energy_month') | float(0) | round(1) }} kWh
+        icon: mdi:lightning-bolt
+        icon_color: amber
+        tap_action:
+          action: more-info
+        grid_options:
+          columns: full
+          rows: 1
+        card_mod:
+          style: 'ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }'
+  - type: grid
+    cards:
+      - type: heading
+        heading: Statistics
         heading_style: title
         icon: mdi:chart-bar
+      - type: energy-date-selection
+        grid_options:
+          columns: full
+      - type: custom:mushroom-select-card
+        entity: input_select.spa_history_metric
+        name: Show
+        icon: mdi:chart-bar
+        grid_options:
+          columns: full
       - type: statistics-graph
-        title: Heater time per month (hours)
+        title: Hot Tub Energy
+        entities:
+          - entity: sensor.sundance_spa_energy_total
+            name: Hot Tub
+        stat_types:
+          - change
+        chart_type: bar
+        energy_date_selection: true
+        hide_legend: true
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_history_metric
+            state: Energy (kWh)
+      - type: statistics-graph
+        title: Heater Time
         entities:
           - entity: sensor.sundance_spa_heater_total_time
             name: Heater
         stat_types:
           - change
         chart_type: bar
-        period: month
-        days_to_show: 730
+        energy_date_selection: true
         hide_legend: true
         grid_options:
           columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_history_metric
+            state: Heater time (h)
       - type: statistics-graph
-        title: Heater runs per month
+        title: Heater Runs
         entities:
           - entity: sensor.sundance_spa_heater_total_count
             name: Runs
         stat_types:
           - change
         chart_type: bar
-        period: month
-        days_to_show: 730
+        energy_date_selection: true
         hide_legend: true
         grid_options:
           columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_history_metric
+            state: Heater runs
       - type: statistics-graph
-        title: Spa energy per month (kWh)
+        title: Pump 1 Time
         entities:
-          - entity: sensor.sundance_spa_energy_total
-            name: Energy
+          - entity: sensor.sundance_spa_pump_1_total_time
+            name: Pump 1
         stat_types:
           - change
         chart_type: bar
-        period: month
-        days_to_show: 730
+        energy_date_selection: true
         hide_legend: true
         grid_options:
           columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_history_metric
+            state: Pump 1 time (h)
+      - type: statistics-graph
+        title: Pump 2 Time
+        entities:
+          - entity: sensor.sundance_spa_pump_2_total_time
+            name: Pump 2
+        stat_types:
+          - change
+        chart_type: bar
+        energy_date_selection: true
+        hide_legend: true
+        grid_options:
+          columns: full
+        visibility:
+          - condition: state
+            entity: input_select.spa_history_metric
+            state: Pump 2 time (h)

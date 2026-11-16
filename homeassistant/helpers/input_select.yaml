@@ -107,3 +107,13 @@ spa_set_lock:
     - Temperature Lock
     - Settings Lock
     - Service Lock
+spa_history_metric:
+  name: Spa History Metric
+  icon: mdi:chart-bar
+  options:
+    - Energy (kWh)
+    - Heater time (h)
+    - Heater runs
+    - Pump 1 time (h)
+    - Pump 2 time (h)
+  initial: Energy (kWh)
