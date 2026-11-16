@@ -891,8 +891,11 @@ issue with timestamps and what the panel showed.
     can leave no frame. (a) Is the stored language anywhere on the bus, e.g. in another message type or on a
     780? (b) Why does a language save made by the ESP's presses leave the panel unchanged when the same
     presses by hand change it?
-11. Does the Water Refresh list really step by 30 in both directions (150 → 120 was one press), and
-    is the Filter Change grid really 10-day steps up to 180?
+11. *(Partly answered 2026-11-16, by the owner's use of the panel.)* The Water Refresh list is circular like
+    the other counters (it wraps from one end to the other, Off included). Still not checked on every step:
+    does it step by 30 in both directions (150 → 120 was one press), and is the Filter Change grid
+    really 10-day steps up to 180? The settings write learns the direction on the first press and tries the
+    other button at a list end, so a wrap does not matter to it.
 
 ## 14. Known issues and limitations
 
