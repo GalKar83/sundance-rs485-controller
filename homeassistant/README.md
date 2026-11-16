@@ -272,7 +272,7 @@ The chain from power to energy:
 | `spa_lock_dropdown_follow_the_spa` / `send_a_change` | the Lock dropdown shows the spa's lock and sends a pick through `select.sundance_spa_lock_setting` | see *Locks* below |
 | `spa_after_a_service_lock_filter_rinsed` | after a Service Lock of 5+ min: "Did you rinse your filter?" (Rinsed / Replaced / No) | *Replaced* only when the Filter Change counter is at 0; stores the end time for the replaced question |
 | `spa_service_counter_reached_0` | phone notice when Filter Change, ClearRay or Water reaches 0 (`Change Now`) | through `spa_notify`, so held in the quiet hours |
-| `spa_error_alert` | phone notice when `sensor.sundance_spa_alert` shows a fault or `Unknown error (code N)` (not one of the three reminders), and when it is gone | through `spa_notify`; see *Alerts* |
+| `spa_error_alert` | phone notice when `sensor.sundance_spa_alert` shows a fault or `Unknown error (code N)` (not one of the three reminders), and when it is gone; the text includes the same explanation as the dashboard banner and a tap opens the Hot Tub page | through `spa_notify` (optional `url` field); see *Alerts* |
 | `spa_power_measurement_circulation`, `spa_power_measurement_jet_pump`, `spa_power_measurement_weekly_summary` | optional (`optional/power-measurement/`): measure circulation / jet power from the house load, log each result, and send a weekly summary to the phone | never change the settings, only measure and report |
 | `spa_panel_used_while_away` | alerts once per absence when someone presses a panel button | the Panel Button entity sees only physical presses |
 | `spa_raw_decoding_values_changed` | optional, diagnostic: reports unknown status values once | only while the raw entities exist |

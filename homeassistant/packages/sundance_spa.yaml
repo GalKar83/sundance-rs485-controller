@@ -1847,6 +1847,9 @@ automation:
       stereo), or 'Unknown error (code N)' for any number that is not in the table. Sent through
       script.spa_notify, so in the spa quiet hours (23:00-06:30 by default) it is held until they
       end. A second message says when the error is gone. Created 2026-11-16 for the Alert sensor.
+      Revised 2026-11-16: the message carries the same explanation sentence as the dashboard banner,
+      and tapping the notification opens the Hot Tub page (the banner there stays until the error is
+      gone).
     triggers:
       - trigger: state
         entity_id: sensor.sundance_spa_alert
@@ -1873,6 +1876,37 @@ automation:
           - unavailable
         id: cleared
     actions:
+      - variables:
+          alert: '{{ trigger.to_state.state }}'
+          explanation: >-
+            {%- set m = {'Flow switch open (FL-1)': 'The flow switch reads open, so the heater is
+            disabled. Usually the pump 1 filter is very dirty or an air lock formed at the pump
+            intake: clean the filter and let the air out. Call your dealer if it stays.', 'Flow
+            switch closed (FL-2)': 'The flow switch reads closed when it should be open, so the
+            heater is disabled. Call your dealer or service organization.', 'Temperature sensor
+            fault (SN)': 'A temperature sensor is not working (high-limit sensor SN-1 or water
+            sensor SN-2), so the heater is disabled. Call your dealer or service organization.',
+            'Controller temperature too high': 'The temperature of the controller is above the
+            limit. Shade the equipment side of the spa; if it persists, call your dealer or service
+            organization.', 'Change depth filter': 'It is time to replace the depth filter (Jacuzzi
+            code, not expected on a Sundance).', 'Water too hot - do not enter the water': 'The
+            water is above the safe limit (44 °C) and the spa is deactivated. Do not enter the
+            water. Remove the cover to cool it faster; if it persists, call your dealer or service
+            organization.', 'Shorted flow switch at start-up': 'The flow switch was found shorted at
+            start-up and the system is disabled. Call your dealer or service organization.',
+            'Shorted flow switch and freeze at start-up': 'The flow switch was found shorted at
+            start-up together with a freeze condition. Call your dealer or service organization.',
+            'Water 20 F below set point (COOL), heating': 'The water is more than 11 °C (20 °F)
+            below the set point, so the heater and pump 1 run until it is within 8 °C (15 °F). No
+            action is needed; it is common after filling with cold water.', 'Potential freeze (ICE),
+            pumps running': 'A freeze condition may be starting, so the pumps and heater run until
+            the danger has passed. No action is needed; call your dealer if it persists.', 'Light
+            sensor fault': 'The light sensor is not working. Call your dealer or service
+            organization.', 'Stereo communication trouble': 'The stereo has trouble communicating
+            with the spa. Call your dealer or service organization.'} -%}{%- set s = alert -%}{{
+            m[s] if s in m else 'The spa reported an error code that is not in the table of known
+            codes. Read the message on the spa panel, look it up in the owner\'s manual (section
+            13), and tell Claude what it says so it can be added. The heater may be disabled.' }}
       - choose:
           - conditions:
               - condition: trigger
@@ -1881,10 +1915,9 @@ automation:
               - action: script.spa_notify
                 data:
                   title: Spa error
-                  message: >-
-                    {{ trigger.to_state.state }} ({{ now().strftime('%d/%m/%Y %H:%M') }}). Check the
-                    spa panel.
+                  message: '{{ alert }} ({{ now().strftime(''%d/%m/%Y %H:%M'') }}). {{ explanation }}'
                   tag: spa_error
+                  url: /home-control/hot-tub
           - conditions:
               - condition: trigger
                 id: cleared
@@ -1894,6 +1927,7 @@ automation:
                   title: Spa error cleared
                   message: '{{ trigger.from_state.state }} is gone ({{ now().strftime(''%d/%m/%Y %H:%M'') }}).'
                   tag: spa_error
+                  url: /home-control/hot-tub
     mode: queued
     max: 5
   - id: sundance_spa_spa_filter_rinse_reminder
@@ -3397,6 +3431,13 @@ script:
         required: false
         selector:
           text: {}
+      url:
+        description: >-
+          Optional dashboard path to open when the notification is tapped (for example
+          /home-control/hot-tub)
+        required: false
+        selector:
+          text: {}
     sequence:
       - if:
           - condition: time
@@ -3417,10 +3458,9 @@ script:
             data:
               title: '{{ title }}'
               message: '{{ message }}'
-              data:
-                tag: '{{ tag | default(''spa_info'', true) }}'
-                ttl: 0
-                priority: high
+              data: >-
+                {{ {'tag': tag | default('spa_info', true), 'ttl': 0, 'priority': 'high'} |
+                combine({'clickAction': url, 'url': url} if url is defined and url else {}) }}
   spa_plan_add:
     alias: Spa - Add heating plan
     description: >-

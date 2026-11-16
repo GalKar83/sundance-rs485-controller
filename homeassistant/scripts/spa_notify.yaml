@@ -25,6 +25,11 @@ fields:
     required: false
     selector:
       text: {}
+  url:
+    description: Optional dashboard path to open when the notification is tapped (for example /home-control/hot-tub)
+    required: false
+    selector:
+      text: {}
 sequence:
   - if:
       - condition: time
@@ -45,7 +50,5 @@ sequence:
         data:
           title: '{{ title }}'
           message: '{{ message }}'
-          data:
-            tag: '{{ tag | default(''spa_info'', true) }}'
-            ttl: 0
-            priority: high
+          data: >-
+            {{ {'tag': tag | default('spa_info', true), 'ttl': 0, 'priority': 'high'} | combine({'clickAction': url, 'url': url} if url is defined and url else {}) }}
