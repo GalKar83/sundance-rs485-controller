@@ -112,26 +112,6 @@ sections:
               - Change ClearRay Bulb
               - unavailable
               - unknown
-      - type: custom:mushroom-template-card
-        primary: 'Spa alert: the spa reports an error'
-        secondary: >-
-          There is an error on the spa (not decoded yet - see the spa panel). Shown until the spa
-          clears it.
-        icon: mdi:alert-circle
-        icon_color: red
-        multiline_secondary: true
-        tap_action:
-          action: none
-        hold_action:
-          action: none
-        grid_options:
-          columns: full
-        card_mod:
-          style: 'ha-card { border: 2px solid var(--error-color); }'
-        visibility:
-          - condition: state
-            entity: binary_sensor.spa_unmapped_alert_bits
-            state: 'on'
       - type: heading
         heading: Control Panel
         heading_style: title
