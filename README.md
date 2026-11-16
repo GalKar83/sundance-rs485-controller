@@ -429,6 +429,20 @@ Frame layout (unchanged from the 780):
   every byte can be read alone (payload XOR last byte XOR `0x24 + position`); in 0xC4 only known fields
   moved in the set point, light, Jets 1 and heater tests (see [Pete Jorgensen's
   DECODING.md](https://github.com/pete-jorgensen/SundanceHotTub2MQTT/blob/master/DECODING.md) §3.8 and §7).
+- **The last byte of 0xC4 carries the alert (error) code** 🟡 (2026-11-16; the counters were taken to 0 by setting the
+  spa clock to 11:59 PM with the Panel Press buttons and letting it pass midnight, three times: each pass
+  lowers all three service counters by one day; the clock and date were put back with *Clock Sync Now*):
+  `first ^ last` is `38 ^ code`, with code 0 = no alert
+  (38), **1 = CHANGE FILTER** (39), **3 = CHANGE CLEARRAY BULB** (37). The panel shows one message at a time:
+  with the Filter Change counter and the ClearRay counter both at 0 the byte read 39 and the panel said
+  CHANGE FILTER; right after the filter counter was reset it read 37 and the panel changed to CHANGE
+  CLEARRAY BULB, and it returned to 38 after the ClearRay counter was reset too. Whether a fixed priority or the order in which they came due decides which one is shown is not settled (the filter came due first). The numbers match the error
+  codes of the Jacuzzi / Prolink status frame (1 = clean filters, 2 = drain and refill the water, 3 = replace
+  the ClearRay bulb; see pyjacuzzi), which suggests that **CHANGE WATER is 2 (36)**; not tested yet (the
+  menu cannot set Water Refresh to 0, so it needs the counter to run out). Fault codes (flow switch, sensors,
+  over-temperature, COOL, ICE) are presumably in the same byte, not seen. Nothing else in the frame
+  changed when the alert came on (apart from the counter fields themselves), and the byte is not in any
+  decoded field, so the component does not publish it yet.
 
 Message types seen on a 680 (sensor *Bus Message Types*):
 
@@ -493,7 +507,8 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f10.4 | **Temperature Lock (TL)** active | ✅ |
 | f10.6 | heater on | ✅ |
 | f10.7 | set during the scheduled filtration cycle (whole cycle, also while the cleanup runs Jet 2) and during the power-up purge; clear when the pump runs for heat demand or manually | ✅ |
-| f10.0–3,5 | ? never set — maybe alerts/errors | ❓ |
+| f10.5 | **ClearRay counter at 0** 🟡 (seen once): set during the scheduled filtration cycle from its start while the ClearRay days were 0, cleared at the moment the ClearRay counter was saved above 0; clear in the minute after the counter ran out while the pump was off. Not a message code, see the alert byte under Frame | 🟡 |
+| f10.0–3 | ? never set | ❓ |
 | f14.7 | **daily cleanup** (first filtration cycle of the day, from its start until Jet 2 stops); details under [f14](#f14) | 🟡 |
 
 <a id="f14"></a>**f14.** Bits 0–5 are a second water temperature **V** XOR-ed with flags; bit 6 is °F; bit 7 is
@@ -860,8 +875,11 @@ issue with timestamps and what the panel showed.
 2. *(Answered 2026-11-16.)* **What is V in f14?** A second water-temperature sensor, always in °F:
    `(f14 & 0x3F) + 64` is the water temperature in °F (see [f14](#f14)). Which part of the plumbing it
    sits in is still unknown.
-3. **f10 bits 0–3, 5** — alerts? (CHANGE FILTER, CHANGE CLEARRAY BULB, CHANGE WATER, COOL, ICE, SN,
-   FL, T-OH, H-OH have not occurred yet.) How do these message screens look in f13?
+3. *(Partly answered 2026-11-16.)* **Alerts.** CHANGE FILTER and CHANGE CLEARRAY BULB are in the last byte of
+   the 0xC4 frame (`first ^ last` = 38 ^ code, 1 and 3), not in f10 or f13 (see Frame); f10 bit 5 is set
+   while the ClearRay counter is at 0. Still open: CHANGE WATER (expected 2), and COOL, ICE, SN, FL, T-OH,
+   H-OH, which have not occurred. Which codes do they use? (The Jacuzzi table has 11/12 flow switch, 13–18
+   temperature sensor, 22/23/28/29 water too hot, 26 water 20 °F below the set point, 27 freeze.)
 4. **f4** (always 6), **f11 bit 7**, remaining lights-frame bytes.
 5. **f1 bit 5 vs bit 6** — command vs. confirmation?
 6. **Light behaviour for presses 3.4–5.2 s apart.**
