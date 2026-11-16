@@ -35,6 +35,9 @@ offered under the same terms as the files above.
 
 ## Not affected
 
+The alert / error code table (numbers, names and explanation texts) follows
+[dhmsjs/pyjacuzzi](https://github.com/dhmsjs/pyjacuzzi) (Apache-2.0), `docs/ProlinkMessageTypes.txt`; the credit stays with its author.
+
 The protocol decoding that was shared with
 [pete-jorgensen/SundanceHotTub2MQTT](https://github.com/pete-jorgensen/SundanceHotTub2MQTT) (Apache-2.0) stays under that
 repository's licence. Facts about how the spa talks on its bus (which bit means what) are not something a licence can restrict.

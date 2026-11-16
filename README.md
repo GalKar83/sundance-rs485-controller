@@ -180,6 +180,10 @@ for the component; it is the owner's complete setup.
   (Balboa protocol notes), and the hardware approach of
   [cribskip/esp8266_spa](https://github.com/cribskip/esp8266_spa) and
   [jrowny/ESPHomeSpa](https://github.com/jrowny/ESPHomeSpa).
+- Alert / error codes: the numbers and names of the fault codes (1 clean filters, 2 drain and refill the water, 3 replace the ClearRay
+  bulb, 11-32 flow switch, temperature sensor, water too hot, freeze, COOL, light sensor, stereo) and their explanation texts follow
+  [dhmsjs/pyjacuzzi](https://github.com/dhmsjs/pyjacuzzi) (Apache 2.0), file `docs/ProlinkMessageTypes.txt`, which documents the Jacuzzi
+  Prolink status message. Only codes 1 and 3 are confirmed on a 680; the rest is by analogy.
 - **Licence and credit.** The upstream repository has no LICENSE file, so this fork is shared as a
   free hobby project, with all credit for the original work going to its author. If the original
   author (or anyone else whose work is included) asks for something to be changed or removed, it

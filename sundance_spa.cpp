@@ -1029,7 +1029,7 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
 }
 
 // Alert code of the spa: first ^ last byte of the C4 payload is 38 ^ code. Names follow the Jacuzzi / Prolink error
-// table (pyjacuzzi); only 1 (filter) and 3 (ClearRay bulb) are confirmed on this spa, the rest is by analogy and
+// table (github.com/dhmsjs/pyjacuzzi, docs/ProlinkMessageTypes.txt, Apache-2.0); only 1 (filter) and 3 (ClearRay bulb) are confirmed on this spa, the rest is by analogy and
 // anything else is reported as an unknown error with its number.
 void SundanceSpa::alert_text_(int code, char *buf, size_t n) {
   const char *t = nullptr;
