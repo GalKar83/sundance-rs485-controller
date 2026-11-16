@@ -168,6 +168,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   void set_raw_tail_text_sensor(text_sensor::TextSensor *s) { this->raw_tail_text_sensor_ = s; }
   void set_last_settings_read_text_sensor(text_sensor::TextSensor *s) { this->last_settings_read_text_sensor_ = s; }
   void set_raw_c4_text_sensor(text_sensor::TextSensor *s) { this->raw_c4_text_sensor_ = s; }
+  void set_alert_text_sensor(text_sensor::TextSensor *s) { this->alert_text_sensor_ = s; }
   void set_raw_ca_text_sensor(text_sensor::TextSensor *s) { this->raw_ca_text_sensor_ = s; }
   void set_time_text_sensor(text_sensor::TextSensor *s) { this->time_text_sensor_ = s; }
   void set_heater_mode_text_sensor(text_sensor::TextSensor *s) { this->heater_mode_text_sensor_ = s; }
@@ -343,6 +344,16 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   // leaves unread (odd payload length). -1 = not seen yet. Pete (780): probably "frame key XOR 38", no data.
   text_sensor::TextSensor *raw_tail_text_sensor_{nullptr};
   int status_tail_{-1};
+  // Alert (error) code: the last byte of the C4 payload is mask ^ 38 ^ code (first ^ last = 38 ^ code, measured
+  // 2026-11-16: 0 none, 1 CHANGE FILTER, 3 CHANGE CLEARRAY BULB; the other names are the Jacuzzi / Prolink error codes,
+  // not yet seen on this spa). Published as text once the same code has held for a few seconds.
+  text_sensor::TextSensor *alert_text_sensor_{nullptr};
+  int alert_candidate_{-1};
+  uint32_t alert_candidate_ms_{0};
+  int alert_candidate_n_{0};
+  int alert_code_{-1};
+  void update_alert_(const uint8_t *enc, size_t len);
+  static void alert_text_(int code, char *buf, size_t n);
   int lights_tail_{-1};
   std::string raw_tail_published_;
   uint32_t raw_tail_ms_{0};

@@ -906,6 +906,7 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
   if (enc_len % 2 == 1) {
     this->status_tail_ = enc[enc_len - 1];
     this->publish_raw_tail_();
+    this->update_alert_(enc, enc_len);
   }
   this->publish_raw_payload_(this->raw_c4_text_sensor_, &this->raw_c4_ms_, enc, enc_len);
   if (data.size() < 15) {
@@ -1025,6 +1026,60 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
     this->publish_states_();
   }
   this->service_command_retries_();
+}
+
+// Alert code of the spa: first ^ last byte of the C4 payload is 38 ^ code. Names follow the Jacuzzi / Prolink error
+// table (pyjacuzzi); only 1 (filter) and 3 (ClearRay bulb) are confirmed on this spa, the rest is by analogy and
+// anything else is reported as an unknown error with its number.
+void SundanceSpa::alert_text_(int code, char *buf, size_t n) {
+  const char *t = nullptr;
+  switch (code) {
+    case 0: t = "None"; break;
+    case 1: t = "Change Filter"; break;
+    case 2: t = "Change Water"; break;
+    case 3: t = "Change ClearRay Bulb"; break;
+    case 11: t = "Flow switch open (FL-1)"; break;
+    case 12: t = "Flow switch closed (FL-2)"; break;
+    case 13: case 15: case 16: case 17: case 18: t = "Temperature sensor fault (SN)"; break;
+    case 19: case 20: t = "Controller temperature too high"; break;
+    case 21: t = "Change depth filter"; break;
+    case 22: case 23: case 28: case 29: t = "Water too hot - do not enter the water"; break;
+    case 24: t = "Shorted flow switch at start-up"; break;
+    case 25: t = "Shorted flow switch and freeze at start-up"; break;
+    case 26: t = "Water 20 F below set point (COOL), heating"; break;
+    case 27: t = "Potential freeze (ICE), pumps running"; break;
+    case 30: case 31: t = "Light sensor fault"; break;
+    case 32: t = "Stereo communication trouble"; break;
+    default: break;
+  }
+  if (t != nullptr)
+    snprintf(buf, n, "%s", t);
+  else
+    snprintf(buf, n, "Unknown error (code %d)", code);
+}
+
+void SundanceSpa::update_alert_(const uint8_t *enc, size_t len) {
+  if (this->alert_text_sensor_ == nullptr || len != 33)
+    return;
+  const int code = enc[0] ^ enc[len - 1] ^ 38;
+  if (code < 0 || code > 63)  // not a plausible code (damaged frame): ignore
+    return;
+  const uint32_t now = millis();
+  if (code != this->alert_candidate_) {
+    this->alert_candidate_ = code;
+    this->alert_candidate_ms_ = now;
+    this->alert_candidate_n_ = 1;
+    return;
+  }
+  this->alert_candidate_n_++;
+  // The same code for at least 8 frames and 3 s before it counts (a single odd frame must not raise an alert).
+  if (code == this->alert_code_ || this->alert_candidate_n_ < 8 || now - this->alert_candidate_ms_ < 3000)
+    return;
+  this->alert_code_ = code;
+  char buf[64];
+  alert_text_(code, buf, sizeof(buf));
+  ESP_LOGI(TAG, "Alert code %d: %s", code, buf);
+  this->alert_text_sensor_->publish_state(buf);
 }
 
 // Shows the unread last payload byte of C4 and CA next to the screen key, so the "tail = key XOR constant" idea can

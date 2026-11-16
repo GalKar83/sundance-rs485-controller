@@ -192,6 +192,10 @@ sundance_spa:
     name: "Raw Lights"
   raw_tail_text_sensor:
     name: "Raw Frame Tail"
+  # Alert: the spa's own alert / error code from the last byte of the status frame: None, Change Filter, Change Water,
+  # Change ClearRay Bulb, or a fault name; unknown codes show as "Unknown error (code N)"
+  alert_text_sensor:
+    name: "Alert"
   # Full C4 / CA payloads (one state per 10 s each): disable the entities in Home Assistant when not capturing
   raw_c4_text_sensor:
     name: "Raw Frame C4"
