@@ -7,7 +7,7 @@ to work; take what you want.
 
 > **Note:** the spa device has many diagnostic / raw-value entities. They are there on purpose while the project is in development, so that a bug report can include their output; see [the main README §12](../README.md#12-diagnostics-entities). You may hide or disable them.
 
-- [`automations/`](automations) — one YAML file per automation (23; the optional power-measurement ones are in
+- [`automations/`](automations) — one YAML file per automation (27; the optional power-measurement ones are in
   [`optional/`](optional/power-measurement)). Paste it into a new
   automation with *Edit in YAML*.
 - [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), `spa_deliver_night_alerts_now` (sends the queue at once), the plan scripts
@@ -20,7 +20,8 @@ to work; take what you want.
   (`domain` = helper type, `options` = its settings; the `device_id` was removed — assign them to
   your own spa device).
 - [`dashboard/`](dashboard) — the four pages: `hot_tub_view.yaml`, `hot_tub_settings_view.yaml`,
-  `hot_tub_quiet_hours_view.yaml` and `hot_tub_plans_view.yaml` (screenshots in the main README §4). They are *sections* views;
+  `hot_tub_quiet_hours_view.yaml` and `hot_tub_plans_view.yaml` (screenshots in the main README §4), and `hot_tub_setup_view.yaml`, the
+  Setup page of the package install ([packages/README.md](packages/README.md)). They are *sections* views;
   add each to a dashboard with its raw configuration editor. The owner's outdoor weather block was
   left out of the Hot Tub page.
 - **Spa Audio** (optional, Android Companion app): who is connected to the spa's Bluetooth audio and what is playing, with
@@ -104,6 +105,9 @@ Contents
 | `input_datetime.last_rinse_filter` | date + time | when the spa came back on after the last power cut answered "Yes, rinsed" |
 | `input_datetime.last_replacement_filter_date`, `…_clearray_bulb_date`, `…_water_date` | date | date of the counter reset answered "Yes, replaced" |
 | `counter.spa_soaking_sessions_total`, `counter.spa_maintenance_sessions_total` | counter | number of answered sessions |
+| `counter.spa_bromine_additions_total` | counter | number of bromine additions (the phone *Yes*, or a date typed by hand, see *Reminders*) |
+| `input_select.spa_history_metric` | Energy (kWh) / Heater time (h) / Heater runs / Pump 1 time (h) / Pump 2 time (h) | the *Show* dropdown of the Statistics section of the Hot Tub page |
+| `calendar.spa_log` | Local Calendar integration (optional) | the permanent log of maintenance, bromine, filter rinses and replacements (see *Reminders*) |
 | `input_number.spa_soaking_minutes_total`, `input_number.spa_maintenance_minutes_total` | box, 0–100000000, step 0.1, min | total minutes |
 | `input_text.spa_last_heating` | text, max 100 | "34.0 → 35.0 °C · 31 min · 30/10 04:36" |
 | `input_text.spa_heating_run_data` | text, max 60 | open heating run `start_ts;min;max` (empty = none) |
@@ -123,6 +127,7 @@ Contents
 | Maintenance Time Total → `sensor.sundance_spa_maintenance_time_total` | `{{ states('input_number.spa_maintenance_minutes_total') \| float(0) }}` | min / duration / total_increasing |
 | Soaking Count Total → `sensor.sundance_spa_soaking_count_total` | `{{ states('counter.spa_soaking_sessions_total') \| int(0) }}` | – / – / total_increasing |
 | Maintenance Count Total → `sensor.sundance_spa_maintenance_count_total` | `{{ states('counter.spa_maintenance_sessions_total') \| int(0) }}` | – / – / total_increasing |
+| Bromine Count Total → `sensor.sundance_spa_bromine_count_total` | `{{ states('counter.spa_bromine_additions_total') \| int(0) }}` | – / – / total_increasing |
 | Last Soak, Last Maintenance, Last Rinse Filter → `sensor.sundance_spa_last_…` | `{% set d = states('input_datetime.last_soak') %}{{ as_datetime(d).strftime('%d/%m/%Y %H:%M') if d >= '2000' else none }}` | text |
 | Last Replacement Filter / ClearRay Bulb / Water Date → `sensor.sundance_spa_last_replacement_…_date` | same with `'%d/%m/%Y'` on `input_datetime.last_replacement_…_date` | text |
 
@@ -181,7 +186,7 @@ drop does not lose time.
 
 Soaking / maintenance meters are utility meters on the totals above, with *periodically
 resetting* off: Soaking Time Today / Week / Month, Soaking Count Today / Week / Month, and
-Maintenance Count Today / Week / Month.
+Maintenance Count Today / Week / Month, and Bromine Count Today / Week / Month (on `sensor.sundance_spa_bromine_count_total`).
 
 Meter cycles:
 
@@ -267,6 +272,8 @@ The chain from power to energy:
 | `spa_lock_dropdown_follow_the_spa` / `send_a_change` | the Lock dropdown shows the spa's lock and sends a pick through `select.sundance_spa_lock_setting` | see *Locks* below |
 | `spa_after_a_service_lock_filter_rinsed` | after a Service Lock of 5+ min: "Did you rinse your filter?" (Rinsed / Replaced / No) | *Replaced* only when the Filter Change counter is at 0; stores the end time for the replaced question |
 | `spa_service_counter_reached_0` | phone notice when Filter Change, ClearRay or Water reaches 0 (`Change Now`) | through `spa_notify`, so held in the quiet hours |
+| `spa_error_alert` | phone notice when `sensor.sundance_spa_alert` shows a fault or `Unknown error (code N)` (not one of the three reminders), and when it is gone | through `spa_notify`; see *Alerts* |
+| `spa_power_measurement_circulation`, `spa_power_measurement_jet_pump`, `spa_power_measurement_weekly_summary` | optional (`optional/power-measurement/`): measure circulation / jet power from the house load, log each result, and send a weekly summary to the phone | never change the settings, only measure and report |
 | `spa_panel_used_while_away` | alerts once per absence when someone presses a panel button | the Panel Button entity sees only physical presses |
 | `spa_raw_decoding_values_changed` | optional, diagnostic: reports unknown status values once | only while the raw entities exist |
 | `Spa - Heating plans` | runs the plans of the Scheduled Plans page | details below |
@@ -275,9 +282,11 @@ The chain from power to energy:
 | `Spa - Plan form: When stays in the future` | keeps the form's time at the earliest possible moment | one-off plans only |
 | `Spa - Plan temperature follows the panel unit` | swaps the form's temperature list between °C and °F | also at HA start |
 | `Spa - Settings dropdowns: follow the spa` / `send a change` | the settings page dropdowns show the spa's value and send a pick through the ESP's number controls | details below |
-| `Spa - Bromine reminder` | 08:00, from 4 calendar days after the last addition | Yes / No buttons |
+| `Spa - Bromine reminder` | 08:00, from 4 calendar days after the last addition | Yes / No buttons; Yes also counts and logs the addition |
 | `Spa - Maintenance reminder` | 08:00, from 8 calendar days after the last maintenance | Done / Not yet |
 | `Spa - Filter rinse reminder` | 08:00, from 30 calendar days after the last rinse | Done / Not yet |
+| `spa_count_manual_maintenance_date` / `spa_count_manual_bromine_date` | a date typed by hand into *Last Maintenance* / *Last Bromine* adds one to the maintenance / bromine count and is logged to `calendar.spa_log` | waits 2 minutes after the last change (restart mode), so the date and time picker counts once; changes made by automations have no user and are ignored |
+| `spa_log_rinse_and_replacement_dates` | one `calendar.spa_log` event for each filter rinse and each real filter / ClearRay bulb / water replacement | follows the four dates, which are only set by an answer or by hand, never by a counter alone; 2-minute wait, an unset 1970 date is ignored |
 
 ### Heating plans
 
@@ -365,12 +374,19 @@ Three morning reminders, each at 08:00, each with phone buttons that are their o
 
 | Reminder | Asks when | Buttons | Moves the date |
 |---|---|---|---|
-| Bromine | 4 or more calendar days after `input_datetime.spa_last_bromine` (or never) | Yes / No | Yes sets it to now |
-| Maintenance | 8 or more calendar days after `input_datetime.last_maintenance` | Done / Not yet | Done sets it to now and adds one to the maintenance count; a maintenance session recorded by the soak/maintenance question also moves it and clears the question |
+| Bromine | 4 or more calendar days after `input_datetime.spa_last_bromine` (or never) | Yes / No | Yes sets it to now, adds one to the bromine count and logs it |
+| Maintenance | 8 or more calendar days after `input_datetime.last_maintenance` | Done / Not yet | Done sets it to now, adds one to the maintenance count and logs it; a maintenance session recorded by the soak/maintenance question also moves it and clears the question |
 | Filter rinse | 30 or more calendar days after `input_datetime.last_rinse_filter` | Done / Not yet | Done sets it to now; the power-cut rinse question and a manual edit also clear it |
 
 Not yet, No, or no answer: asked again the next morning. The dashboard shows each *Next* date.
-| `spa_power_measurement_circulation`, `spa_power_measurement_jet_pump`, `spa_power_measurement_weekly_summary` | optional (`optional/power-measurement/`): measure circulation / jet power from the house load, log each result, and send a weekly summary to the phone | never change the settings, only measure and report |
+
+**Counting and logging by hand.** A date typed into *Last Maintenance* or *Last Bromine* on the Hot Tub page also adds one to the matching count,
+2 minutes after the last change; the Today / Week / Month counters count at that moment, so a date from an earlier day is still counted as now.
+**Spa Log** (optional): every counted maintenance and bromine action, and each recorded filter rinse and real replacement
+(filter, ClearRay bulb, water), is also written as an event to a Local Calendar called `Spa Log` (`calendar.spa_log`), with the date and
+time as entered. The calendar is a file that is never purged, so the exact times survive the 10-day detailed history of the recorder; the
+counters themselves are kept as long-term statistics (hourly, forever). Without the calendar everything else works (the calendar
+actions are `continue_on_error`).
 
 ### Soaking or maintenance
 
@@ -478,7 +494,7 @@ Replace the phone entity ids in the templates (`sensor.person1_phone_bluetooth_c
 
 **Requirement: the dashboard does not work without these three frontend add-ons** (install them from [HACS](https://hacs.xyz) → Frontend, then reload the browser): [Mushroom](https://github.com/piitaya/lovelace-mushroom), [ApexCharts Card](https://github.com/RomRider/apexcharts-card) and [card-mod](https://github.com/thomasloven/lovelace-card-mod). Without them the cards show "Custom element doesn't exist". There is also a **Hot Tub Setup** page (`dashboard/hot_tub_setup_view.yaml`) for the package install, see [packages/README.md](packages/README.md).
 
-There are four pages: **Hot Tub**, **Settings** (`hot-tub-settings`), **Quiet Hours** (`hot-tub-quiet-hours`, opened from the
+There are four pages (plus the Setup page of the package install): **Hot Tub**, **Settings** (`hot-tub-settings`), **Quiet Hours** (`hot-tub-quiet-hours`, opened from the
 Settings page) and **Scheduled Plans** (`hot-tub-plans`), all in one dashboard. Most rows are Mushroom template cards, one line each, with
 the numbers and units in smaller type (card-mod); several are shown in °C or °F depending on
 `sensor.sundance_spa_temperature_format`.
@@ -494,7 +510,9 @@ The Hot Tub view uses the *sections* layout and has these sections:
 - **Next plan:** one row that appears only when an enabled future plan exists (`sensor.spa_next_plan`).
 - **Temperature chart:** 24 h of water and target temperature, with heating runs in red; the
   header numbers use the raw value and `update_delay` so they follow live.
-- **Energy:** today / week / month tiles and one bar chart.
+- **Energy:** today / week / month tiles.
+- **Statistics:** the energy date selector, a *Show* dropdown (`input_select.spa_history_metric`) and five statistics graphs of which one is shown
+  at a time: Energy, Heater Time, Heater Runs, Pump 1 Time and Pump 2 Time; the date selector drives all of them.
 - **Soaking and Maintenance:** last and previous session, totals and counts, with the bromine
   row and its *Next* date.
 - **Service:** remaining days and last replacement for water, filter and ClearRay bulb; the
@@ -518,7 +536,7 @@ without a house power sensor it only says "no valid measurement"), and a Diagnos
 
 Details worth knowing:
 
-- **Energy chart.** An `energy-date-selection` card drives a `statistics-graph` with
+- **Statistics graphs.** An `energy-date-selection` card drives the `statistics-graph` cards (one per *Show* choice, shown by a visibility condition) with
   `energy_date_selection: true`. The resolution follows the picker: hours for a day, days for a
   week or month, months for a year. This gives the Energy dashboard's behaviour for the spa
   alone, without adding the spa to the Energy dashboard.
