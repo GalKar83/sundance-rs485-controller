@@ -1087,3 +1087,48 @@ sections:
           rows: 1
         card_mod:
           style: 'ha-card { --card-secondary-font-size: 10px; --ha-tile-info-secondary-font-size: 10px; }'
+  - type: grid
+    cards:
+      - type: heading
+        heading: Monthly History
+        heading_style: title
+        icon: mdi:chart-bar
+      - type: statistics-graph
+        title: Heater time per month (hours)
+        entities:
+          - entity: sensor.sundance_spa_heater_total_time
+            name: Heater
+        stat_types:
+          - change
+        chart_type: bar
+        period: month
+        days_to_show: 730
+        hide_legend: true
+        grid_options:
+          columns: full
+      - type: statistics-graph
+        title: Heater runs per month
+        entities:
+          - entity: sensor.sundance_spa_heater_total_count
+            name: Runs
+        stat_types:
+          - change
+        chart_type: bar
+        period: month
+        days_to_show: 730
+        hide_legend: true
+        grid_options:
+          columns: full
+      - type: statistics-graph
+        title: Spa energy per month (kWh)
+        entities:
+          - entity: sensor.sundance_spa_energy_total
+            name: Energy
+        stat_types:
+          - change
+        chart_type: bar
+        period: month
+        days_to_show: 730
+        hide_legend: true
+        grid_options:
+          columns: full
