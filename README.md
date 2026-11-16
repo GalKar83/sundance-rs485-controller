@@ -315,6 +315,7 @@ Names are chosen so that related entities sort together (same first word).
 | *Item* Active (binary), In Use Session | Active = running now (In Use = Jet 2 or Jet 1 high); In Use Session = on once a use has lasted 10 min | computed; items: In Use, Jet 1, Jet 2, Heating Run, Primary Filter Active |
 | Communication | on/off | frames received |
 | Decoder Notice | `OK`, or the last thing the decoder could not handle (see below); back to `OK` after an hour | ESP |
+| Alert | The spa's own alert / error code, from the last byte of the status frame (§6): `None`, `Change Filter`, `Change Water`, `Change ClearRay Bulb`, a fault name (flow switch, temperature sensor, controller temperature, water too hot, freeze, COOL, light sensor, stereo) or `Unknown error (code N)`. Only codes 1 (filter) and 3 (ClearRay bulb) are confirmed on a 680; the fault names follow the Jacuzzi / Prolink error table and are by analogy. A code must hold for 8 frames and 3 s | status frame |
 
 **Primary Filter states** (in this order of precedence):
 `Purge` — the 2-minute sequence after power-up or a Service Lock unlock (Jet 1 low, then Jet 2):

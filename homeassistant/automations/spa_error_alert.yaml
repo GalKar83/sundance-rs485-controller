@@ -8,7 +8,7 @@ description: >-
   sensor, controller temperature, water too hot, freeze, COOL, light sensor, stereo), or 'Unknown
   error (code N)' for any number that is not in the table. Sent through script.spa_notify, so in the
   spa quiet hours (23:00-06:30 by default) it is held until they end. A second message says when the
-  error is gone. Created 2026-11-16 for the Alert sensor (appears after the flash with it).
+  error is gone. Created 2026-11-16 for the Alert sensor.
 triggers:
   - trigger: state
     entity_id: sensor.sundance_spa_alert

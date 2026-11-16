@@ -65,7 +65,7 @@ are all-day events; the unset 1970 value is ignored.
 ## What the package contains
 
 Helpers (`input_*`, `counter`), the 35 `utility_meter` sensors, the template sensors (power, filter / bulb / water dates, plan, quiet hours, ...),
-25 automations and 5 scripts. They are the same objects as in the per-file folders; those folders stay for anyone who prefers to create things
+26 automations and 5 scripts. They are the same objects as in the per-file folders; those folders stay for anyone who prefers to create things
 through the UI. Use **one way or the other, not both**, or the entities will be duplicated.
 
 ## Notes
