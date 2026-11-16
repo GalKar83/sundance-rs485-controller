@@ -56,10 +56,16 @@ detailed history is purged; the calendar only adds the exact time of each action
 A date typed by hand into *Last Maintenance* or *Last Bromine* on the Hot Tub page also counts and is logged, 2 minutes after the last change
 (so stepping through the date and time picker counts once).
 
+The same calendar also gets one event for each **filter rinse** and each **real replacement** (filter, ClearRay bulb, water): the automation
+*Spa - Log rinse and replacement dates* follows the four dates (`last_rinse_filter`, `last_replacement_filter_date`,
+`last_replacement_clearray_bulb_date`, `last_replacement_water_date`). Those dates are only set by an answer on the phone (Rinsed / Replaced / Yes)
+or typed by hand, never by the service counters alone, so a counter that reaches 0 or is reset without an answer is not logged. Dates without a time
+are all-day events; the unset 1970 value is ignored.
+
 ## What the package contains
 
 Helpers (`input_*`, `counter`), the 35 `utility_meter` sensors, the template sensors (power, filter / bulb / water dates, plan, quiet hours, ...),
-24 automations and 5 scripts. They are the same objects as in the per-file folders; those folders stay for anyone who prefers to create things
+25 automations and 5 scripts. They are the same objects as in the per-file folders; those folders stay for anyone who prefers to create things
 through the UI. Use **one way or the other, not both**, or the entities will be duplicated.
 
 ## Notes

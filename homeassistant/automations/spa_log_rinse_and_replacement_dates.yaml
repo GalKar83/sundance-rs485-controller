@@ -1,0 +1,72 @@
+alias: Spa - Log rinse and replacement dates
+description: >-
+  Writes to the Spa Log calendar (calendar.spa_log) one event whenever a filter rinse or a real
+  replacement is recorded: input_datetime.last_rinse_filter (Filter rinse),
+  last_replacement_filter_date (Filter replaced), last_replacement_clearray_bulb_date (ClearRay bulb
+  replaced), last_replacement_water_date (Water replaced). The dates are only set by a real answer
+  (the phone Rinsed / Replaced / Yes buttons) or typed by hand, never by the service counters alone,
+  so a counter reaching 0 or being reset without an answer is not logged. Waits 2 minutes after the
+  last change of a date and logs only the value that stays, so the date picker is logged once. Dates
+  without a time are all-day events. An unset date (1970) is ignored. Created 2026-11-16.
+mode: parallel
+max: 10
+triggers:
+  - trigger: state
+    entity_id:
+      - input_datetime.last_rinse_filter
+      - input_datetime.last_replacement_filter_date
+      - input_datetime.last_replacement_clearray_bulb_date
+      - input_datetime.last_replacement_water_date
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
+conditions:
+  - condition: template
+    value_template: '{{ trigger.to_state.state[:4] | int(0) >= 2000 }}'
+    note: Ignore the unset 1970 value.
+actions:
+  - delay:
+      minutes: 2
+    note: Wait for the last change of the date and time picker.
+  - condition: template
+    value_template: >-
+      {{ states[trigger.entity_id].state == trigger.to_state.state and (now() -
+      states[trigger.entity_id].last_changed).total_seconds() >= 115 }}
+    note: Only the value that stayed for 2 minutes is logged.
+  - variables:
+      summary: >-
+        {{ {'input_datetime.last_rinse_filter': 'Filter rinse',
+        'input_datetime.last_replacement_filter_date': 'Filter replaced',
+        'input_datetime.last_replacement_clearray_bulb_date': 'ClearRay bulb replaced',
+        'input_datetime.last_replacement_water_date': 'Water replaced'}[trigger.entity_id] }}
+      has_time: '{{ state_attr(trigger.entity_id, ''has_time'') }}'
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: '{{ has_time }}'
+        sequence:
+          - action: calendar.create_event
+            target:
+              entity_id: calendar.spa_log
+            data:
+              summary: '{{ summary }}'
+              start_date_time: '{{ trigger.to_state.state }}'
+              end_date_time: >-
+                {{ (as_timestamp(trigger.to_state.state) + 60) | timestamp_custom('%Y-%m-%d
+                %H:%M:%S') }}
+            continue_on_error: true
+    default:
+      - action: calendar.create_event
+        target:
+          entity_id: calendar.spa_log
+        data:
+          summary: '{{ summary }}'
+          start_date: '{{ trigger.to_state.state }}'
+          end_date: >-
+            {{ (as_timestamp(trigger.to_state.state ~ ' 00:00:00') + 86400) |
+            timestamp_custom('%Y-%m-%d') }}
+        continue_on_error: true
+    note: A date with a time is a short event, a date only is all-day.
