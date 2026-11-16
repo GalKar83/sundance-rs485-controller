@@ -1,11 +1,12 @@
 alias: Spa - Count manual bromine date
 description: >-
-  When Spa Last Bromine (input_datetime.spa_last_bromine) is set by hand from the dashboard, adds one to counter.spa_bromine_additions_total, which feeds
-  the Today / Week / Month / Total counters. Waits 2 minutes after the LAST change (every new
-  change restarts the wait), so stepping through the date and time picker counts once. Changes made
-  by automations (the phone answers) have no user and are ignored here, they already count
-  themselves. The counters count at the moment this runs, so a date from an earlier day is still
-  counted as now. Created 2026-11-16.
+  When Spa Last Bromine (input_datetime.spa_last_bromine) is set by hand from the dashboard, adds
+  one to counter.spa_bromine_additions_total, which feeds the Today / Week / Month / Total counters.
+  Waits 2 minutes after the LAST change (every new change restarts the wait), so stepping through
+  the date and time picker counts once. Changes made by automations (the phone answers) have no user
+  and are ignored here, they already count themselves. The counters count at the moment this runs,
+  so a date from an earlier day is still counted as now. Created 2026-11-16. Also writes the entered
+  date and time to calendar.spa_log.
 triggers:
   - trigger: state
     entity_id: input_datetime.spa_last_bromine
@@ -26,4 +27,14 @@ actions:
   - action: counter.increment
     target:
       entity_id: counter.spa_bromine_additions_total
+  - action: calendar.create_event
+    target:
+      entity_id: calendar.spa_log
+    data:
+      summary: Bromine
+      start_date_time: '{{ states(''input_datetime.spa_last_bromine'') }}'
+      end_date_time: >-
+        {{ (as_timestamp(states('input_datetime.spa_last_bromine')) + 60) |
+        timestamp_custom('%Y-%m-%d %H:%M:%S') }}
+    note: 'Spa Log: the date and time as entered'
 mode: restart

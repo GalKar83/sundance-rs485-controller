@@ -20,19 +20,20 @@ description: >-
   23:00-06:30 by default, set on the Hot Tub Settings page - it waits and asks when they end.
   Revised 2026-11-06: a recorded soak first copies the old input_datetime.last_soak to
   input_datetime.spa_previous_soak (shown as 'Previous Soak' on the Hot Tub page). Revised
-  2026-11-08: quiet hours from binary_sensor.spa_quiet_hours (the two time helpers).
+  2026-11-08: quiet hours from binary_sensor.spa_quiet_hours (the two time helpers). Revised
+  2026-11-16: a recorded maintenance is also written to calendar.spa_log.
 triggers:
   - trigger: state
     entity_id: binary_sensor.sundance_spa_in_use
-    not_from: off
-    to: off
+    not_from: 'off'
+    to: 'off'
     note: >-
       Any change to off, also via unavailable (a WiFi blip at the moment the jets stop) - the run
       start comes from input_datetime.spa_in_use_since.
 conditions:
   - condition: state
     entity_id: input_boolean.spa_session_merging
-    state: off
+    state: 'off'
     note: >-
       A run that ends while an earlier session is still collecting follow-up runs is merged into
       that one, not asked about separately.
@@ -63,7 +64,7 @@ actions:
         - wait_for_trigger:
             - trigger: state
               entity_id: binary_sensor.sundance_spa_in_use
-              to: on
+              to: 'on'
           timeout:
             minutes: 5
           continue_on_timeout: true
@@ -77,7 +78,7 @@ actions:
             - wait_for_trigger:
                 - trigger: state
                   entity_id: binary_sensor.sundance_spa_in_use
-                  to: off
+                  to: 'off'
               timeout:
                 hours: 3
               continue_on_timeout: true
@@ -223,6 +224,15 @@ actions:
           - action: counter.increment
             target:
               entity_id: counter.spa_maintenance_sessions_total
+          - action: calendar.create_event
+            target:
+              entity_id: calendar.spa_log
+            data:
+              summary: Maintenance
+              start_date_time: '{{ ended | float(0) | timestamp_custom(''%Y-%m-%d %H:%M:%S'') }}'
+              end_date_time: '{{ (ended | float(0) + 60) | timestamp_custom(''%Y-%m-%d %H:%M:%S'') }}'
+            continue_on_error: true
+            note: 'Spa Log: one event at the end of the session'
           - action: input_number.set_value
             target:
               entity_id: input_number.spa_maintenance_minutes_total

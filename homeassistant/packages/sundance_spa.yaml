@@ -1339,7 +1339,8 @@ automation:
       Tub Settings page - it waits and asks when they end. Revised 2026-11-06: a recorded soak first
       copies the old input_datetime.last_soak to input_datetime.spa_previous_soak (shown as
       'Previous Soak' on the Hot Tub page). Revised 2026-11-08: quiet hours from
-      binary_sensor.spa_quiet_hours (the two time helpers).
+      binary_sensor.spa_quiet_hours (the two time helpers). Revised 2026-11-16: a recorded
+      maintenance is also written to calendar.spa_log.
     triggers:
       - trigger: state
         entity_id: binary_sensor.sundance_spa_in_use
@@ -1546,6 +1547,15 @@ automation:
               - action: counter.increment
                 target:
                   entity_id: counter.spa_maintenance_sessions_total
+              - action: calendar.create_event
+                target:
+                  entity_id: calendar.spa_log
+                data:
+                  summary: Maintenance
+                  start_date_time: '{{ ended | float(0) | timestamp_custom(''%Y-%m-%d %H:%M:%S'') }}'
+                  end_date_time: '{{ (ended | float(0) + 60) | timestamp_custom(''%Y-%m-%d %H:%M:%S'') }}'
+                continue_on_error: true
+                note: 'Spa Log: one event at the end of the session'
               - action: input_number.set_value
                 target:
                   entity_id: input_number.spa_maintenance_minutes_total
@@ -1577,7 +1587,8 @@ automation:
       the bromine counter (counter.spa_bromine_additions_total). No, or no answer: asked again the
       next morning at 08:00. The answer is its own trigger, so it still works after an HA restart.
       The date can also be set by hand from the Hot Tub page (counted by 'Spa - Count manual bromine
-      date'). Created 2026-11-05. Revised 2026-11-16: Yes also counts.
+      date'). Created 2026-11-05. Revised 2026-11-16: Yes also counts. Yes also writes the addition
+      to calendar.spa_log.
     triggers:
       - trigger: time
         at: '08:00:00'
@@ -1636,6 +1647,15 @@ automation:
                   entity_id: input_datetime.spa_last_bromine
                 data:
                   timestamp: '{{ as_timestamp(now()) | int }}'
+              - action: calendar.create_event
+                target:
+                  entity_id: calendar.spa_log
+                data:
+                  summary: Bromine
+                  start_date_time: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+                  end_date_time: '{{ (now() + timedelta(minutes=1)).strftime(''%Y-%m-%d %H:%M:%S'') }}'
+                continue_on_error: true
+                note: Spa Log
               - action: '{{ states(''input_text.spa_notify_service'') }}'
                 data:
                   message: clear_notification
@@ -1660,7 +1680,7 @@ automation:
       stepping through the date and time picker counts once. Changes made by automations (the phone
       answers) have no user and are ignored here, they already count themselves. The counters count
       at the moment this runs, so a date from an earlier day is still counted as now. Created
-      2026-11-16.
+      2026-11-16. Also writes the entered date and time to calendar.spa_log.
     triggers:
       - trigger: state
         entity_id: input_datetime.spa_last_bromine
@@ -1681,6 +1701,16 @@ automation:
       - action: counter.increment
         target:
           entity_id: counter.spa_bromine_additions_total
+      - action: calendar.create_event
+        target:
+          entity_id: calendar.spa_log
+        data:
+          summary: Bromine
+          start_date_time: '{{ states(''input_datetime.spa_last_bromine'') }}'
+          end_date_time: >-
+            {{ (as_timestamp(states('input_datetime.spa_last_bromine')) + 60) |
+            timestamp_custom('%Y-%m-%d %H:%M:%S') }}
+        note: 'Spa Log: the date and time as entered'
     mode: restart
   - id: sundance_spa_spa_count_manual_maintenance_date
     alias: Spa - Count manual maintenance date
@@ -1691,7 +1721,7 @@ automation:
       stepping through the date and time picker counts once. Changes made by automations (the phone
       answers) have no user and are ignored here, they already count themselves. The counters count
       at the moment this runs, so a date from an earlier day is still counted as now. Created
-      2026-11-16.
+      2026-11-16. Also writes the entered date and time to calendar.spa_log.
     triggers:
       - trigger: state
         entity_id: input_datetime.last_maintenance
@@ -1712,6 +1742,16 @@ automation:
       - action: counter.increment
         target:
           entity_id: counter.spa_maintenance_sessions_total
+      - action: calendar.create_event
+        target:
+          entity_id: calendar.spa_log
+        data:
+          summary: Maintenance
+          start_date_time: '{{ states(''input_datetime.last_maintenance'') }}'
+          end_date_time: >-
+            {{ (as_timestamp(states('input_datetime.last_maintenance')) + 60) |
+            timestamp_custom('%Y-%m-%d %H:%M:%S') }}
+        note: 'Spa Log: the date and time as entered'
     mode: restart
   - id: sundance_spa_spa_decoder_notice
     alias: Spa - Decoder notice
@@ -2343,6 +2383,7 @@ automation:
       or no answer: asked again the next morning. Done also adds one to the maintenance count
       (counter.spa_maintenance_sessions_total); maintenance time counts only real pump sessions.
       Answers are their own triggers, so they still work after an HA restart. Created 2026-11-05.
+      Revised 2026-11-16: Done also writes the maintenance to calendar.spa_log.
     triggers:
       - trigger: time
         at: '08:00:00'
@@ -2408,6 +2449,15 @@ automation:
                   entity_id: input_datetime.last_maintenance
                 data:
                   timestamp: '{{ as_timestamp(now()) | int }}'
+              - action: calendar.create_event
+                target:
+                  entity_id: calendar.spa_log
+                data:
+                  summary: Maintenance
+                  start_date_time: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+                  end_date_time: '{{ (now() + timedelta(minutes=1)).strftime(''%Y-%m-%d %H:%M:%S'') }}'
+                continue_on_error: true
+                note: Spa Log
               - action: '{{ states(''input_text.spa_notify_service'') }}'
                 data:
                   message: clear_notification

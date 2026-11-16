@@ -45,10 +45,21 @@ They are in [`../optional-packages`](../optional-packages) (outside `packages`, 
 
 > **Many entities are for debugging.** The ESPHome device exposes many diagnostic / raw-value entities because the project is still in development; they are kept so that you can be asked for their output when a bug is found. You can hide or disable them (details: [main README §12](../../README.md#12-diagnostics-entities)).
 
+### Optional: a permanent log of maintenance and bromine (Spa Log)
+
+The maintenance and bromine automations write one event per action (date, time and type) to a calendar called **Spa Log**, if it exists.
+To get it, add the built-in **Local Calendar** integration (Settings > Devices & services > Add integration) and name the calendar exactly
+`Spa Log` (entity `calendar.spa_log`). Without it everything else works; nothing is logged. The counters (`counter.spa_maintenance_sessions_total`,
+`counter.spa_bromine_additions_total` and their Today / Week / Month sensors) are kept by Home Assistant's long-term statistics even after the
+detailed history is purged; the calendar only adds the exact time of each action.
+
+A date typed by hand into *Last Maintenance* or *Last Bromine* on the Hot Tub page also counts and is logged, 2 minutes after the last change
+(so stepping through the date and time picker counts once).
+
 ## What the package contains
 
-Helpers (`input_*`, `counter`), the 32 `utility_meter` sensors, the template sensors (power, filter / bulb / water dates, plan, quiet hours, ...),
-22 automations and 5 scripts. They are the same objects as in the per-file folders; those folders stay for anyone who prefers to create things
+Helpers (`input_*`, `counter`), the 35 `utility_meter` sensors, the template sensors (power, filter / bulb / water dates, plan, quiet hours, ...),
+24 automations and 5 scripts. They are the same objects as in the per-file folders; those folders stay for anyone who prefers to create things
 through the UI. Use **one way or the other, not both**, or the entities will be duplicated.
 
 ## Notes

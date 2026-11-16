@@ -6,7 +6,8 @@ description: >-
   Ask: Soaking or Maintenance' moves the date as well and clears the question. Not yet, or no
   answer: asked again the next morning. Done also adds one to the maintenance count
   (counter.spa_maintenance_sessions_total); maintenance time counts only real pump sessions. Answers
-  are their own triggers, so they still work after an HA restart. Created 2026-11-05.
+  are their own triggers, so they still work after an HA restart. Created 2026-11-05. Revised
+  2026-11-16: Done also writes the maintenance to calendar.spa_log.
 triggers:
   - trigger: time
     at: '08:00:00'
@@ -72,6 +73,15 @@ actions:
               entity_id: input_datetime.last_maintenance
             data:
               timestamp: '{{ as_timestamp(now()) | int }}'
+          - action: calendar.create_event
+            target:
+              entity_id: calendar.spa_log
+            data:
+              summary: Maintenance
+              start_date_time: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+              end_date_time: '{{ (now() + timedelta(minutes=1)).strftime(''%Y-%m-%d %H:%M:%S'') }}'
+            continue_on_error: true
+            note: Spa Log
           - action: notify.mobile_app_your_phone
             data:
               message: clear_notification

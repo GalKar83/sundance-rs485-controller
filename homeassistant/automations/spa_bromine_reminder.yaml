@@ -3,10 +3,11 @@ description: >-
   Every morning at 08:00, if bromine was last added 4 or more calendar days ago
   (input_datetime.spa_last_bromine, or never), asks the phone 'Added bromine?' with Yes / No. Yes
   sets the date and time to now, so the next question comes 4 days later, and adds one to the
-  bromine counter (counter.spa_bromine_additions_total). No, or no answer: asked
-  again the next morning at 08:00. The answer is its own trigger, so it still works after an HA
-  restart. The date can also be set by hand from the Hot Tub page (counted by 'Spa - Count manual bromine
-  date'). Created 2026-11-05. Revised 2026-11-16: Yes also counts.
+  bromine counter (counter.spa_bromine_additions_total). No, or no answer: asked again the next
+  morning at 08:00. The answer is its own trigger, so it still works after an HA restart. The date
+  can also be set by hand from the Hot Tub page (counted by 'Spa - Count manual bromine date').
+  Created 2026-11-05. Revised 2026-11-16: Yes also counts. Yes also writes the addition to
+  calendar.spa_log.
 triggers:
   - trigger: time
     at: '08:00:00'
@@ -64,6 +65,15 @@ actions:
               entity_id: input_datetime.spa_last_bromine
             data:
               timestamp: '{{ as_timestamp(now()) | int }}'
+          - action: calendar.create_event
+            target:
+              entity_id: calendar.spa_log
+            data:
+              summary: Bromine
+              start_date_time: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+              end_date_time: '{{ (now() + timedelta(minutes=1)).strftime(''%Y-%m-%d %H:%M:%S'') }}'
+            continue_on_error: true
+            note: Spa Log
           - action: notify.mobile_app_your_phone
             data:
               message: clear_notification
