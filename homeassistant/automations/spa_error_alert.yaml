@@ -1,0 +1,58 @@
+alias: Spa - Error alert
+description: >-
+  Tells the owner's phone when the spa reports an error code that is not one of the three service
+  reminders. The ESP publishes sensor.sundance_spa_alert from the last byte of the status frame:
+  None, Change Filter, Change Water, Change ClearRay Bulb (these three are already covered by the
+  counters and 'Spa - Service counter reached 0'), a fault name from the Jacuzzi / Prolink error
+  table (only codes 1 and 3 are confirmed on a 680, the rest is by analogy: flow switch, temperature
+  sensor, controller temperature, water too hot, freeze, COOL, light sensor, stereo), or 'Unknown
+  error (code N)' for any number that is not in the table. Sent through script.spa_notify, so in the
+  spa quiet hours (23:00-06:30 by default) it is held until they end. A second message says when the
+  error is gone. Created 2026-11-16 for the Alert sensor (appears after the flash with it).
+triggers:
+  - trigger: state
+    entity_id: sensor.sundance_spa_alert
+    not_to:
+      - None
+      - Change Filter
+      - Change Water
+      - Change ClearRay Bulb
+      - unknown
+      - unavailable
+    not_from:
+      - unknown
+      - unavailable
+    id: fault
+  - trigger: state
+    entity_id: sensor.sundance_spa_alert
+    to: None
+    not_from:
+      - None
+      - Change Filter
+      - Change Water
+      - Change ClearRay Bulb
+      - unknown
+      - unavailable
+    id: cleared
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: fault
+        sequence:
+          - action: script.spa_notify
+            data:
+              title: Spa error
+              message: '{{ trigger.to_state.state }} ({{ now().strftime(''%d/%m/%Y %H:%M'') }}). Check the spa panel.'
+              tag: spa_error
+      - conditions:
+          - condition: trigger
+            id: cleared
+        sequence:
+          - action: script.spa_notify
+            data:
+              title: Spa error cleared
+              message: '{{ trigger.from_state.state }} is gone ({{ now().strftime(''%d/%m/%Y %H:%M'') }}).'
+              tag: spa_error
+mode: queued
+max: 5
