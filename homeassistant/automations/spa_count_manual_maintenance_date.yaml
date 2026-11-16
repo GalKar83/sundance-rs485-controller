@@ -1,0 +1,29 @@
+alias: Spa - Count manual maintenance date
+description: >-
+  When Last Maintenance (input_datetime.last_maintenance) is set by hand from the dashboard, adds one to counter.spa_maintenance_sessions_total, which feeds
+  the Today / Week / Month / Total counters. Waits 2 minutes after the LAST change (every new
+  change restarts the wait), so stepping through the date and time picker counts once. Changes made
+  by automations (the phone answers) have no user and are ignored here, they already count
+  themselves. The counters count at the moment this runs, so a date from an earlier day is still
+  counted as now. Created 2026-11-16.
+triggers:
+  - trigger: state
+    entity_id: input_datetime.last_maintenance
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
+conditions:
+  - condition: template
+    value_template: '{{ trigger.to_state.context.user_id is not none }}'
+    note: Only a change made by a person from the UI; automations have no user.
+actions:
+  - delay:
+      minutes: 2
+    note: Wait for the last change of the date and time picker.
+  - action: counter.increment
+    target:
+      entity_id: counter.spa_maintenance_sessions_total
+mode: restart

@@ -16,3 +16,11 @@ spa_maintenance_sessions_total:
   step: 1
   restore: true
   maximum: null
+spa_bromine_additions_total:
+  name: Spa Bromine Additions Total
+  icon: mdi:bottle-tonic-plus
+  initial: 0
+  minimum: 0
+  step: 1
+  restore: true
+  maximum: null

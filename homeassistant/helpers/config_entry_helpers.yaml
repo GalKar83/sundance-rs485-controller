@@ -206,6 +206,51 @@
     periodically_resetting: false
     source: sensor.sundance_spa_maintenance_count_total
     tariffs: []
+- domain: template
+  title: Bromine Count Total
+  options:
+    additional_options:
+      availability: '{{ has_value(''counter.spa_bromine_additions_total'') }}'
+    name: Spa Bromine Count Total
+    state: '{{ states(''counter.spa_bromine_additions_total'') | int(0) }}'
+    state_class: total_increasing
+    template_type: sensor
+- domain: utility_meter
+  title: Bromine Count Today
+  options:
+    always_available: true
+    cycle: daily
+    delta_values: false
+    name: Spa Bromine Count Today
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_bromine_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Bromine Count Week
+  options:
+    always_available: true
+    cycle: weekly
+    delta_values: false
+    name: Spa Bromine Count Week
+    net_consumption: false
+    offset: 6
+    periodically_resetting: false
+    source: sensor.sundance_spa_bromine_count_total
+    tariffs: []
+- domain: utility_meter
+  title: Bromine Count Month
+  options:
+    always_available: true
+    cycle: monthly
+    delta_values: false
+    name: Spa Bromine Count Month
+    net_consumption: false
+    offset: 0
+    periodically_resetting: false
+    source: sensor.sundance_spa_bromine_count_total
+    tariffs: []
 - domain: utility_meter
   title: Pumps Time Week
   options:

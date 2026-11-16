@@ -346,6 +346,14 @@ counter:
     step: 1
     restore: true
     maximum: null
+  spa_bromine_additions_total:
+    name: Spa Bromine Additions Total
+    icon: mdi:bottle-tonic-plus
+    initial: 0
+    minimum: 0
+    step: 1
+    restore: true
+    maximum: null
 utility_meter:
   sundance_spa_pumps_time_month:
     name: In Use Time Month
@@ -438,6 +446,26 @@ utility_meter:
   sundance_spa_maintenance_count_month:
     name: Spa Maintenance Count Month
     source: sensor.sundance_spa_maintenance_count_total
+    cycle: monthly
+    periodically_resetting: false
+    always_available: true
+  sundance_spa_bromine_count_today:
+    name: Spa Bromine Count Today
+    source: sensor.sundance_spa_bromine_count_total
+    cycle: daily
+    periodically_resetting: false
+    always_available: true
+  sundance_spa_bromine_count_week:
+    name: Spa Bromine Count Week
+    source: sensor.sundance_spa_bromine_count_total
+    cycle: weekly
+    offset:
+      days: 6
+    periodically_resetting: false
+    always_available: true
+  sundance_spa_bromine_count_month:
+    name: Spa Bromine Count Month
+    source: sensor.sundance_spa_bromine_count_total
     cycle: monthly
     periodically_resetting: false
     always_available: true
@@ -601,6 +629,12 @@ template:
         state_class: total_increasing
         availability: '{{ has_value(''counter.spa_maintenance_sessions_total'') }}'
         default_entity_id: sensor.sundance_spa_maintenance_count_total
+      - name: Spa Bromine Count Total
+        unique_id: sundance_spa_spa_bromine_count_total
+        state: '{{ states(''counter.spa_bromine_additions_total'') | int(0) }}'
+        state_class: total_increasing
+        availability: '{{ has_value(''counter.spa_bromine_additions_total'') }}'
+        default_entity_id: sensor.sundance_spa_bromine_count_total
       - name: Filter Last Replacement
         unique_id: sundance_spa_filter_last_replacement
         state: >-
@@ -1539,9 +1573,11 @@ automation:
     description: >-
       Every morning at 08:00, if bromine was last added 4 or more calendar days ago
       (input_datetime.spa_last_bromine, or never), asks the phone 'Added bromine?' with Yes / No.
-      Yes sets the date and time to now, so the next question comes 4 days later. No, or no answer:
-      asked again the next morning at 08:00. The answer is its own trigger, so it still works after
-      an HA restart. The date can also be set by hand from the Hot Tub page. Created 2026-11-05.
+      Yes sets the date and time to now, so the next question comes 4 days later, and adds one to
+      the bromine counter (counter.spa_bromine_additions_total). No, or no answer: asked again the
+      next morning at 08:00. The answer is its own trigger, so it still works after an HA restart.
+      The date can also be set by hand from the Hot Tub page (counted by 'Spa - Count manual bromine
+      date'). Created 2026-11-05. Revised 2026-11-16: Yes also counts.
     triggers:
       - trigger: time
         at: '08:00:00'
@@ -1592,6 +1628,9 @@ automation:
               - condition: trigger
                 id: 'yes'
             sequence:
+              - action: counter.increment
+                target:
+                  entity_id: counter.spa_bromine_additions_total
               - action: input_datetime.set_datetime
                 target:
                   entity_id: input_datetime.spa_last_bromine
@@ -1612,6 +1651,68 @@ automation:
                   data:
                     tag: spa_bromine
     mode: queued
+  - id: sundance_spa_spa_count_manual_bromine_date
+    alias: Spa - Count manual bromine date
+    description: >-
+      When Spa Last Bromine (input_datetime.spa_last_bromine) is set by hand from the dashboard,
+      adds one to counter.spa_bromine_additions_total, which feeds the Today / Week / Month / Total
+      counters. Waits 2 minutes after the LAST change (every new change restarts the wait), so
+      stepping through the date and time picker counts once. Changes made by automations (the phone
+      answers) have no user and are ignored here, they already count themselves. The counters count
+      at the moment this runs, so a date from an earlier day is still counted as now. Created
+      2026-11-16.
+    triggers:
+      - trigger: state
+        entity_id: input_datetime.spa_last_bromine
+        not_from:
+          - unavailable
+          - unknown
+        not_to:
+          - unavailable
+          - unknown
+    conditions:
+      - condition: template
+        value_template: '{{ trigger.to_state.context.user_id is not none }}'
+        note: Only a change made by a person from the UI; automations have no user.
+    actions:
+      - delay:
+          minutes: 2
+        note: Wait for the last change of the date and time picker.
+      - action: counter.increment
+        target:
+          entity_id: counter.spa_bromine_additions_total
+    mode: restart
+  - id: sundance_spa_spa_count_manual_maintenance_date
+    alias: Spa - Count manual maintenance date
+    description: >-
+      When Last Maintenance (input_datetime.last_maintenance) is set by hand from the dashboard,
+      adds one to counter.spa_maintenance_sessions_total, which feeds the Today / Week / Month /
+      Total counters. Waits 2 minutes after the LAST change (every new change restarts the wait), so
+      stepping through the date and time picker counts once. Changes made by automations (the phone
+      answers) have no user and are ignored here, they already count themselves. The counters count
+      at the moment this runs, so a date from an earlier day is still counted as now. Created
+      2026-11-16.
+    triggers:
+      - trigger: state
+        entity_id: input_datetime.last_maintenance
+        not_from:
+          - unavailable
+          - unknown
+        not_to:
+          - unavailable
+          - unknown
+    conditions:
+      - condition: template
+        value_template: '{{ trigger.to_state.context.user_id is not none }}'
+        note: Only a change made by a person from the UI; automations have no user.
+    actions:
+      - delay:
+          minutes: 2
+        note: Wait for the last change of the date and time picker.
+      - action: counter.increment
+        target:
+          entity_id: counter.spa_maintenance_sessions_total
+    mode: restart
   - id: sundance_spa_spa_decoder_notice
     alias: Spa - Decoder notice
     description: >-
