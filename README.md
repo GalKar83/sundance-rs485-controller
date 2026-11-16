@@ -471,7 +471,7 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f3 | Filter Change days remaining | `f3 ^ 250`; raw 250 (= 0) both when the reminder is **Off** and when it is due (see below) | ✅ |
 | f4 | ? | always 6 so far | ❓ |
 | f13 | topside screen code | **XOR-masked**, see §9 | ✅ |
-| f14 | slow value + flags | see [f14](#f14) below | ✅ |
+| f14 | second water temperature (°F) + flags | see [f14](#f14) below | ✅ |
 | f15 | value shown in the current menu screen | plain, screen-specific encoding (§9) | ✅ |
 
 ### Bits
@@ -494,23 +494,41 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f10.6 | heater on | ✅ |
 | f10.7 | set during the scheduled filtration cycle (whole cycle, also while the cleanup runs Jet 2) and during the power-up purge; clear when the pump runs for heat demand or manually | ✅ |
 | f10.0–3,5 | ? never set — maybe alerts/errors | ❓ |
+| f14.7 | **daily cleanup** (first filtration cycle of the day, from its start until Jet 2 stops); details under [f14](#f14) | 🟡 |
 
-<a id="f14"></a>**f14.** Bits 0–5 are a slowly drifting value **V** XOR-ed with flags; bit 6 is °F:
+<a id="f14"></a>**f14.** Bits 0–5 are a second water temperature **V** XOR-ed with flags; bit 6 is °F; bit 7 is
+the daily-cleanup flag:
 
 ```
-f14 = (V ^ (SL << 1) ^ (SVL << 2) ^ (pump << 5)) & 0x3F | (fahrenheit << 6)
+f14 = (V ^ (SL << 1) ^ (SVL << 2) ^ (pump << 5)) & 0x3F | (fahrenheit << 6) | (cleanup << 7)
 ```
 
-- **V** behaves like a temperature (pipe or heater sensor?): idle it falls about 1 per hour
-  (33 → 30 over 3 h in the evening) and it rises while the pump runs (about +3 over a 2 h cycle);
-  it dithers ±1 (bit 0) for a few minutes at every step. Units unknown.
+- **V is a second water-temperature sensor, always in °F** (decoded 2026-11-16 from the recorder
+  history of 11–12 Nov, 981 samples without bit 7, panel in °C, no lock set): `V + 64` is the water
+  temperature in °F — equal to the main sensor or 1 °F above it in 357 of 388 samples while the pump
+  circulates (another 19 are within −3…+2 °F, and 12 are frames of a transition that are 30–33 off
+  because the bit 5 flip changes within the frame), and 3 °F below to 2 °F above it in 592 of 593
+  samples when nothing runs. The sensor
+  seems to sit in the plumbing: with no flow it cools below the water (idle it falls about 1 per
+  hour, 33 → 30 over 3 h in the evening), and within a minute or two of a circulation start it
+  rises towards the water temperature (+2 in the first 1–2 minutes). It dithers ±1 (bit 0) for a few
+  minutes at every step. The value is 64–127 °F, so bit 6 would be 1 anyway; in °C mode the
+  controller clears it, so bit 6 is a real °F flag and the value still reads `(f14 & 0x3F) + 64` °F
+  (95 °F = 35 °C reads 31 in °C mode and 95 in °F mode). The 780 gives the same picture (Pete
+  Jorgensen's DECODING.md §3.4: `(f5 ^ 2) − f14` between −1 and +3 °F in 424 of 424 frames).
 - **bit 5** flips while the Jet 1 pump runs (idle 30 → 62 at pump start, 33 → 1 …). This is why
   the "pump on" readings looked like 0/1 or 61–63 depending on V.
 - **bit 1 = Settings Lock**: SL confirmed 31 → 29, unlock 29 → 31 (2026-10-25, pump off).
 - **bit 2 = Service Lock**: SVL confirmed 31 → 27, unlock 27 → 63 (= 31 with the purge pump bit).
 - **bit 6 = °F**: 32 → 96 and back (2026-10-24).
+- **bit 7 = daily cleanup** 🟡 (2 days, 11 and 12 Nov 2026): set from the start of the first filtration
+  cycle of the day (12:00 here) and cleared at the moment Jet 2 stops, so it covers the minute of
+  waiting plus the minute of cleanup (f14 190/191 → 63 on 11 Nov, 189/190 → 62 on 12 Nov, with f1 32 → 96 →
+  100 → 96). It is not set in the other three cycles of the day. The 780 shows it in a few frames
+  during automatic circulation (DECODING.md §3.4), where the first cycle starts at 08:00.
 
-Because V is unknown, the absolute lock state cannot be read from f14 alone. The component tracks
+V is now known, but it differs from the main water temperature by 0 to −3 °F, which is the same size
+as bits 0–2, so **the absolute lock state still cannot be read from f14 alone**. The component tracks
 SL/SVL from the panel events that change them — **Jets 1 on the SL (98) or SVL (13) option screen**
 sets the lock, **Menu held (209)** clears it — and accepts the change only if the matching f14 bit
 flips (bits 0 and 5 ignored) within 5 s of the event. The state is stored in ESP flash so it
@@ -839,7 +857,9 @@ issue with timestamps and what the panel showed.
 1. **Does the ClearRay bulb really run whenever the icon is on** (Jet 1 at any speed), or only for
    an automatic reason as the manual says? Check the red LED on the ClearRay ballast with Jet 1 high
    started by hand, outside a filter cycle and with no heat call. (§11)
-2. **What is V in f14?** Which sensor, which units? Does it track the water or outdoor temperature?
+2. *(Answered 2026-11-16.)* **What is V in f14?** A second water-temperature sensor, always in °F:
+   `(f14 & 0x3F) + 64` is the water temperature in °F (see [f14](#f14)). Which part of the plumbing it
+   sits in is still unknown.
 3. **f10 bits 0–3, 5** — alerts? (CHANGE FILTER, CHANGE CLEARRAY BULB, CHANGE WATER, COOL, ICE, SN,
    FL, T-OH, H-OH have not occurred yet.) How do these message screens look in f13?
 4. **f4** (always 6), **f11 bit 7**, remaining lights-frame bytes.
