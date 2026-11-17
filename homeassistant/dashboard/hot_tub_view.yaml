@@ -275,7 +275,8 @@ sections:
           9 / 5 + 32) | round(0) | int }}°F · Target {{ (g * 9 / 5 + 32) | round(0) | int }}°F{%-
           else -%}Water {{ '%.1f' % w }}°C · Target {{ '%.1f' % g }}°C{%- endif -%}
         icon: mdi:thermometer
-        icon_color: orange
+        icon_color: >-
+          {%- set pf = is_state('sensor.sundance_spa_temperature_format', '°F') -%}{%- set w = state_attr('climate.sundance_spa', 'current_temperature') | float(0) -%}{%- set g = state_attr('climate.sundance_spa', 'temperature') | float(0) -%}{%- if pf -%}{%- set w = (w * 9 / 5 + 32) | round(0) -%}{%- set g = (g * 9 / 5 + 32) | round(0) -%}{%- endif -%}{{ '#f44336' if w > g else ('#ff9800' if w == g else '#2196f3') }}
         tap_action:
           action: more-info
         grid_options:
@@ -580,7 +581,7 @@ sections:
             attribute: temperature
             name: Target
             unit: °C
-            color: '#2196f3'
+            color: '#ff9800'
             curve: stepline
             stroke_dash: 4
             float_precision: 1
@@ -589,7 +590,32 @@ sections:
               in_header: raw
               in_chart: false
           - entity: climate.sundance_spa
-            name: Water line
+            name: Water below target
+            unit: °C
+            color: '#2196f3'
+            curve: stepline
+            float_precision: 1
+            yaxis_id: temp
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const rank = {at: 0, below: 1, above: 1}; const rows =
+              st.map(s => { const a = s.a || {}; let v = a.current_temperature; let g = a.temperature; if
+              (typeof v !== 'number' || typeof g !== 'number') return null; return [(s.lu || s.lc) * 1000,
+              v, v > g ? 'above' : (v < g ? 'below' : 'at')]; }); const out = []; let pv = null; let pc =
+              null; for (let i = 0; i < st.length; i++) { const row = rows[i]; if (row === null) { pv =
+              null; pc = null; continue; } const t = Math.max(row[0], start.getTime()); const tn = (i + 1 <
+              st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 : end.getTime(); if (row[2] === 'below') {
+              if (pv !== null && rank[pc] <= rank['below']) out.push([t, pv]); out.push([t, row[1]]);
+              out.push([Math.max(tn - 1, t), row[1]]); const nx = (i + 1 < st.length) ? rows[i + 1] : null;
+              if (nx !== null && nx[2] !== 'below' && rank[nx[2]] < rank['below']) out.push([tn, nx[1]]); if
+              (nx === null || nx[2] !== 'below') out.push([tn, null]); } pv = row[1]; pc = row[2]; } return
+              out;
+            show:
+              in_header: false
+          - entity: climate.sundance_spa
+            name: Water at target
             unit: °C
             color: '#ff9800'
             curve: stepline
@@ -597,14 +623,44 @@ sections:
             yaxis_id: temp
             data_generator: >-
               const r = await hass.callWS({type: 'history/history_during_period', start_time:
-              start.toISOString(), end_time: end.toISOString(), entity_ids:
-              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
-              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
-              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
-              st[i].lc) * 1000, start.getTime()); const v = (st[i].a || {}).current_temperature;
-              const ok = typeof v === 'number'; const tn = (i + 1 < st.length) ? (st[i + 1].lu ||
-              st[i + 1].lc) * 1000 : end.getTime(); out.push([t, ok ? v : null]); if (ok)
-              out.push([Math.max(tn - 1, t), v]); } return out;
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const rank = {at: 0, below: 1, above: 1}; const rows =
+              st.map(s => { const a = s.a || {}; let v = a.current_temperature; let g = a.temperature; if
+              (typeof v !== 'number' || typeof g !== 'number') return null; return [(s.lu || s.lc) * 1000,
+              v, v > g ? 'above' : (v < g ? 'below' : 'at')]; }); const out = []; let pv = null; let pc =
+              null; for (let i = 0; i < st.length; i++) { const row = rows[i]; if (row === null) { pv =
+              null; pc = null; continue; } const t = Math.max(row[0], start.getTime()); const tn = (i + 1 <
+              st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 : end.getTime(); if (row[2] === 'at') { if
+              (pv !== null && rank[pc] <= rank['at']) out.push([t, pv]); out.push([t, row[1]]);
+              out.push([Math.max(tn - 1, t), row[1]]); const nx = (i + 1 < st.length) ? rows[i + 1] : null;
+              if (nx !== null && nx[2] !== 'at' && rank[nx[2]] < rank['at']) out.push([tn, nx[1]]); if (nx
+              === null || nx[2] !== 'at') out.push([tn, null]); } pv = row[1]; pc = row[2]; } return out;
+            show:
+              in_header: false
+          - entity: climate.sundance_spa
+            name: Water above target
+            unit: °C
+            color: '#f44336'
+            curve: stepline
+            float_precision: 1
+            yaxis_id: temp
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const rank = {at: 0, below: 1, above: 1}; const rows =
+              st.map(s => { const a = s.a || {}; let v = a.current_temperature; let g = a.temperature; if
+              (typeof v !== 'number' || typeof g !== 'number') return null; return [(s.lu || s.lc) * 1000,
+              v, v > g ? 'above' : (v < g ? 'below' : 'at')]; }); const out = []; let pv = null; let pc =
+              null; for (let i = 0; i < st.length; i++) { const row = rows[i]; if (row === null) { pv =
+              null; pc = null; continue; } const t = Math.max(row[0], start.getTime()); const tn = (i + 1 <
+              st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 : end.getTime(); if (row[2] === 'above') {
+              if (pv !== null && rank[pc] <= rank['above']) out.push([t, pv]); out.push([t, row[1]]);
+              out.push([Math.max(tn - 1, t), row[1]]); const nx = (i + 1 < st.length) ? rows[i + 1] : null;
+              if (nx !== null && nx[2] !== 'above' && rank[nx[2]] < rank['above']) out.push([tn, nx[1]]); if
+              (nx === null || nx[2] !== 'above') out.push([tn, null]); } pv = row[1]; pc = row[2]; } return
+              out;
             show:
               in_header: false
           - entity: climate.sundance_spa
@@ -618,15 +674,14 @@ sections:
             data_generator: >-
               const r = await hass.callWS({type: 'history/history_during_period', start_time:
               start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa',
-              'binary_sensor.sundance_spa_heating_run'], minimal_response: false, no_attributes:
-              false, significant_changes_only: false}); const temps = (r['climate.sundance_spa'] ||
-              []).map(s => [(s.lu || s.lc) * 1000, (s.a || {}).current_temperature, (s.a ||
-              {}).hvac_action]); const runs = []; let on = null; for (const s of
-              (r['binary_sensor.sundance_spa_heating_run'] || [])) { const t = (s.lu || s.lc) *
-              1000; if (s.s === 'on' && on === null) on = t; else if (s.s !== 'on' && on !== null) {
-              runs.push([on, t]); on = null; } } if (on !== null) runs.push([on, end.getTime()]);
-              const out = []; for (const [a, b] of runs) { const from = a - 10000; const before =
-              temps.filter(x => x[0] <= from); if (before.length) out.push([from,
+              'binary_sensor.sundance_spa_heating_run'], minimal_response: false, no_attributes: false,
+              significant_changes_only: false}); const temps = (r['climate.sundance_spa'] || []).map(s =>
+              [(s.lu || s.lc) * 1000, (s.a || {}).current_temperature, (s.a || {}).hvac_action]); const runs
+              = []; let on = null; for (const s of (r['binary_sensor.sundance_spa_heating_run'] || [])) {
+              const t = (s.lu || s.lc) * 1000; if (s.s === 'on' && on === null) on = t; else if (s.s !==
+              'on' && on !== null) { runs.push([on, t]); on = null; } } if (on !== null) runs.push([on,
+              end.getTime()]); const out = []; for (const [a, b] of runs) { const from = a - 10000; const
+              before = temps.filter(x => x[0] <= from); if (before.length) out.push([from,
               before[before.length - 1][1]]); for (const x of temps) if (x[0] > from && x[0] <= b)
               out.push([x[0], x[1]]); const last = temps.filter(x => x[0] <= b); if (last.length)
               out.push([b, last[last.length - 1][1]]); out.push([b + 1, null]); } return out;
@@ -635,21 +690,20 @@ sections:
           - entity: climate.sundance_spa
             name: Target line
             unit: °C
-            color: '#2196f3'
+            color: '#ff9800'
             curve: stepline
             stroke_dash: 4
             float_precision: 1
             yaxis_id: temp
             data_generator: >-
               const r = await hass.callWS({type: 'history/history_during_period', start_time:
-              start.toISOString(), end_time: end.toISOString(), entity_ids:
-              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
-              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
-              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
-              st[i].lc) * 1000, start.getTime()); const v = (st[i].a || {}).temperature; const ok =
-              typeof v === 'number'; const tn = (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc)
-              * 1000 : end.getTime(); out.push([t, ok ? v : null]); if (ok) out.push([Math.max(tn -
-              1, t), v]); } return out;
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const out = []; for (let i = 0; i < st.length; i++) { const t
+              = Math.max((st[i].lu || st[i].lc) * 1000, start.getTime()); const v = (st[i].a ||
+              {}).temperature; const ok = typeof v === 'number'; const tn = (i + 1 < st.length) ? (st[i +
+              1].lu || st[i + 1].lc) * 1000 : end.getTime(); out.push([t, ok ? v : null]); if (ok)
+              out.push([Math.max(tn - 1, t), v]); } return out;
             show:
               in_header: false
         visibility:
@@ -660,8 +714,10 @@ sections:
           style: >-
             {%- set w = state_attr('climate.sundance_spa', 'current_temperature') | float(0) -%}{%-
             set g = state_attr('climate.sundance_spa', 'temperature') | float(0) -%}{%- set c =
-            '#f44336' if g > w else ('#ff9800' if g == w else '#2196f3') -%}#header__states >
-            *:nth-child(2) > *:first-child > *:first-child { color: {{ c }} !important; }
+            '#f44336' if w > g else ('#ff9800' if g == w else '#2196f3') -%}#header__states >
+            *:nth-child(1) > *:first-child > *:first-child { color: {{ c }} !important; }
+            #header__states > *:nth-child(2) > *:first-child > *:first-child {
+            color: #ff9800 !important; }
         update_delay: 7s
       - type: custom:apexcharts-card
         grid_options:
@@ -696,7 +752,32 @@ sections:
               format: dd/MM HH:mm
         series:
           - entity: climate.sundance_spa
-            name: Water line
+            name: Water below target
+            unit: °F
+            color: '#2196f3'
+            curve: stepline
+            float_precision: 0
+            yaxis_id: temp
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const rank = {at: 0, below: 1, above: 1}; const rows =
+              st.map(s => { const a = s.a || {}; let v = a.current_temperature; let g = a.temperature; if
+              (typeof v !== 'number' || typeof g !== 'number') return null; v = Math.round(v * 9 / 5 + 32);
+              g = Math.round(g * 9 / 5 + 32); return [(s.lu || s.lc) * 1000, v, v > g ? 'above' : (v < g ?
+              'below' : 'at')]; }); const out = []; let pv = null; let pc = null; for (let i = 0; i <
+              st.length; i++) { const row = rows[i]; if (row === null) { pv = null; pc = null; continue; }
+              const t = Math.max(row[0], start.getTime()); const tn = (i + 1 < st.length) ? (st[i + 1].lu ||
+              st[i + 1].lc) * 1000 : end.getTime(); if (row[2] === 'below') { if (pv !== null && rank[pc] <=
+              rank['below']) out.push([t, pv]); out.push([t, row[1]]); out.push([Math.max(tn - 1, t),
+              row[1]]); const nx = (i + 1 < st.length) ? rows[i + 1] : null; if (nx !== null && nx[2] !==
+              'below' && rank[nx[2]] < rank['below']) out.push([tn, nx[1]]); if (nx === null || nx[2] !==
+              'below') out.push([tn, null]); } pv = row[1]; pc = row[2]; } return out;
+            show:
+              in_header: false
+          - entity: climate.sundance_spa
+            name: Water at target
             unit: °F
             color: '#ff9800'
             curve: stepline
@@ -704,15 +785,45 @@ sections:
             yaxis_id: temp
             data_generator: >-
               const r = await hass.callWS({type: 'history/history_during_period', start_time:
-              start.toISOString(), end_time: end.toISOString(), entity_ids:
-              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
-              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
-              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
-              st[i].lc) * 1000, start.getTime()); const v0 = (st[i].a || {}).current_temperature;
-              const ok = typeof v0 === 'number'; const v = ok ? Math.round(v0 * 9 / 5 + 32) : null;
-              const tn = (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 :
-              end.getTime(); out.push([t, v]); if (ok) out.push([Math.max(tn - 1, t), v]); } return
-              out;
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const rank = {at: 0, below: 1, above: 1}; const rows =
+              st.map(s => { const a = s.a || {}; let v = a.current_temperature; let g = a.temperature; if
+              (typeof v !== 'number' || typeof g !== 'number') return null; v = Math.round(v * 9 / 5 + 32);
+              g = Math.round(g * 9 / 5 + 32); return [(s.lu || s.lc) * 1000, v, v > g ? 'above' : (v < g ?
+              'below' : 'at')]; }); const out = []; let pv = null; let pc = null; for (let i = 0; i <
+              st.length; i++) { const row = rows[i]; if (row === null) { pv = null; pc = null; continue; }
+              const t = Math.max(row[0], start.getTime()); const tn = (i + 1 < st.length) ? (st[i + 1].lu ||
+              st[i + 1].lc) * 1000 : end.getTime(); if (row[2] === 'at') { if (pv !== null && rank[pc] <=
+              rank['at']) out.push([t, pv]); out.push([t, row[1]]); out.push([Math.max(tn - 1, t), row[1]]);
+              const nx = (i + 1 < st.length) ? rows[i + 1] : null; if (nx !== null && nx[2] !== 'at' &&
+              rank[nx[2]] < rank['at']) out.push([tn, nx[1]]); if (nx === null || nx[2] !== 'at')
+              out.push([tn, null]); } pv = row[1]; pc = row[2]; } return out;
+            show:
+              in_header: false
+          - entity: climate.sundance_spa
+            name: Water above target
+            unit: °F
+            color: '#f44336'
+            curve: stepline
+            float_precision: 0
+            yaxis_id: temp
+            data_generator: >-
+              const r = await hass.callWS({type: 'history/history_during_period', start_time:
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const rank = {at: 0, below: 1, above: 1}; const rows =
+              st.map(s => { const a = s.a || {}; let v = a.current_temperature; let g = a.temperature; if
+              (typeof v !== 'number' || typeof g !== 'number') return null; v = Math.round(v * 9 / 5 + 32);
+              g = Math.round(g * 9 / 5 + 32); return [(s.lu || s.lc) * 1000, v, v > g ? 'above' : (v < g ?
+              'below' : 'at')]; }); const out = []; let pv = null; let pc = null; for (let i = 0; i <
+              st.length; i++) { const row = rows[i]; if (row === null) { pv = null; pc = null; continue; }
+              const t = Math.max(row[0], start.getTime()); const tn = (i + 1 < st.length) ? (st[i + 1].lu ||
+              st[i + 1].lc) * 1000 : end.getTime(); if (row[2] === 'above') { if (pv !== null && rank[pc] <=
+              rank['above']) out.push([t, pv]); out.push([t, row[1]]); out.push([Math.max(tn - 1, t),
+              row[1]]); const nx = (i + 1 < st.length) ? rows[i + 1] : null; if (nx !== null && nx[2] !==
+              'above' && rank[nx[2]] < rank['above']) out.push([tn, nx[1]]); if (nx === null || nx[2] !==
+              'above') out.push([tn, null]); } pv = row[1]; pc = row[2]; } return out;
             show:
               in_header: false
           - entity: climate.sundance_spa
@@ -726,39 +837,37 @@ sections:
             data_generator: >-
               const r = await hass.callWS({type: 'history/history_during_period', start_time:
               start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa',
-              'binary_sensor.sundance_spa_heating_run'], minimal_response: false, no_attributes:
-              false, significant_changes_only: false}); const temps = (r['climate.sundance_spa'] ||
-              []).map(s => [(s.lu || s.lc) * 1000, (s.a || {}).current_temperature, (s.a ||
-              {}).hvac_action]); const runs = []; let on = null; for (const s of
-              (r['binary_sensor.sundance_spa_heating_run'] || [])) { const t = (s.lu || s.lc) *
-              1000; if (s.s === 'on' && on === null) on = t; else if (s.s !== 'on' && on !== null) {
-              runs.push([on, t]); on = null; } } if (on !== null) runs.push([on, end.getTime()]);
-              const out = []; for (const [a, b] of runs) { const from = a - 10000; const before =
-              temps.filter(x => x[0] <= from); if (before.length) out.push([from,
+              'binary_sensor.sundance_spa_heating_run'], minimal_response: false, no_attributes: false,
+              significant_changes_only: false}); const temps = (r['climate.sundance_spa'] || []).map(s =>
+              [(s.lu || s.lc) * 1000, (s.a || {}).current_temperature, (s.a || {}).hvac_action]); const runs
+              = []; let on = null; for (const s of (r['binary_sensor.sundance_spa_heating_run'] || [])) {
+              const t = (s.lu || s.lc) * 1000; if (s.s === 'on' && on === null) on = t; else if (s.s !==
+              'on' && on !== null) { runs.push([on, t]); on = null; } } if (on !== null) runs.push([on,
+              end.getTime()]); const out = []; for (const [a, b] of runs) { const from = a - 10000; const
+              before = temps.filter(x => x[0] <= from); if (before.length) out.push([from,
               before[before.length - 1][1]]); for (const x of temps) if (x[0] > from && x[0] <= b)
               out.push([x[0], x[1]]); const last = temps.filter(x => x[0] <= b); if (last.length)
-              out.push([b, last[last.length - 1][1]]); out.push([b + 1, null]); } return out.map(p
-              => [p[0], p[1] === null ? null : Math.round(p[1] * 9 / 5 + 32)]);
+              out.push([b, last[last.length - 1][1]]); out.push([b + 1, null]); } return out.map(p => [p[0],
+              p[1] === null ? null : Math.round(p[1] * 9 / 5 + 32)]);
             show:
               in_header: false
           - entity: climate.sundance_spa
             name: Target line
             unit: °F
-            color: '#2196f3'
+            color: '#ff9800'
             curve: stepline
             stroke_dash: 4
             float_precision: 0
             yaxis_id: temp
             data_generator: >-
               const r = await hass.callWS({type: 'history/history_during_period', start_time:
-              start.toISOString(), end_time: end.toISOString(), entity_ids:
-              ['climate.sundance_spa'], minimal_response: false, no_attributes: false,
-              significant_changes_only: false}); const st = r['climate.sundance_spa'] || []; const
-              out = []; for (let i = 0; i < st.length; i++) { const t = Math.max((st[i].lu ||
-              st[i].lc) * 1000, start.getTime()); const v0 = (st[i].a || {}).temperature; const ok =
-              typeof v0 === 'number'; const v = ok ? Math.round(v0 * 9 / 5 + 32) : null; const tn =
-              (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 : end.getTime();
-              out.push([t, v]); if (ok) out.push([Math.max(tn - 1, t), v]); } return out;
+              start.toISOString(), end_time: end.toISOString(), entity_ids: ['climate.sundance_spa'],
+              minimal_response: false, no_attributes: false, significant_changes_only: false}); const st =
+              r['climate.sundance_spa'] || []; const out = []; for (let i = 0; i < st.length; i++) { const t
+              = Math.max((st[i].lu || st[i].lc) * 1000, start.getTime()); const v0 = (st[i].a ||
+              {}).temperature; const ok = typeof v0 === 'number'; const v = ok ? Math.round(v0 * 9 / 5 + 32)
+              : null; const tn = (i + 1 < st.length) ? (st[i + 1].lu || st[i + 1].lc) * 1000 :
+              end.getTime(); out.push([t, v]); if (ok) out.push([Math.max(tn - 1, t), v]); } return out;
             show:
               in_header: false
           - entity: sensor.spa_water_f
@@ -773,7 +882,7 @@ sections:
           - entity: sensor.spa_target_f
             name: Target
             unit: °F
-            color: '#2196f3'
+            color: '#ff9800'
             float_precision: 0
             yaxis_id: temp
             show:
@@ -788,8 +897,10 @@ sections:
             {%- set w = state_attr('climate.sundance_spa', 'current_temperature') | float(0) -%}{%-
             set g = state_attr('climate.sundance_spa', 'temperature') | float(0) -%}{%- set w = (w *
             9 / 5 + 32) | round(0) -%}{%- set g = (g * 9 / 5 + 32) | round(0) -%}{%- set c =
-            '#f44336' if g > w else ('#ff9800' if g == w else '#2196f3') -%}#header__states >
-            *:nth-child(2) > *:first-child > *:first-child { color: {{ c }} !important; }
+            '#f44336' if w > g else ('#ff9800' if g == w else '#2196f3') -%}#header__states >
+            *:nth-child(1) > *:first-child > *:first-child { color: {{ c }} !important; }
+            #header__states > *:nth-child(2) > *:first-child > *:first-child {
+            color: #ff9800 !important; }
         update_delay: 7s
       - type: custom:mushroom-template-card
         entity: sensor.spa_next_plan

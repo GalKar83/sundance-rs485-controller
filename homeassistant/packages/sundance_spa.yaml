@@ -3378,6 +3378,67 @@ automation:
         data:
           timestamp: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
     mode: single
+  - id: sundance_spa_spa_water_temperature_alert
+    alias: Spa - Water temperature alert
+    description: >-
+      Phone notice when the water is 1.5 °C or more below the target (the heater should have
+      started) or 2 °C or more above it (open the cover to release heat). It fires when the water
+      temperature itself crosses the limit, so changing the target (by hand or by a plan) does not
+      fire it, and at most once an hour. Sent through script.spa_notify, so in the spa quiet hours
+      (23:00-06:30 by default) it is held until they end; tapping it opens the Hot Tub page. Created
+      2026-11-17.
+    triggers:
+      - trigger: state
+        entity_id: climate.sundance_spa
+        attribute: current_temperature
+    variables:
+      tw: '{{ trigger.to_state.attributes.current_temperature | float(none) }}'
+      tg: '{{ trigger.to_state.attributes.temperature | float(none) }}'
+      fw: >-
+        {{ trigger.from_state.attributes.current_temperature | float(none) if trigger.from_state is
+        not none else none }}
+      fg: >-
+        {{ trigger.from_state.attributes.temperature | float(none) if trigger.from_state is not none
+        else none }}
+      kind: >-
+        {%- if tw is number and tg is number and fw is number and fg is number and tg == fg -%}{%-
+        if tw <= tg - 1.5 and fw > fg - 1.5 -%}below{%- elif tw >= tg + 2 and fw < fg + 2
+        -%}above{%- else -%}none{%- endif -%}{%- else -%}none{%- endif -%}
+    conditions:
+      - condition: template
+        value_template: '{{ kind != ''none'' }}'
+      - condition: template
+        value_template: >-
+          {{ this.attributes.last_triggered is none or (now() -
+          this.attributes.last_triggered).total_seconds() > 3600 }}
+    actions:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: '{{ kind == ''below'' }}'
+            sequence:
+              - action: script.spa_notify
+                data:
+                  title: Spa water temperature
+                  message: >-
+                    Water {{ tw }}°C is {{ (tg - tw) | round(1) }}°C below the target {{ tg }}°C ({{
+                    now().strftime('%H:%M') }}). The heater should have started: check the spa.
+                  tag: spa_water_temp
+                  url: /home-control/hot-tub
+          - conditions:
+              - condition: template
+                value_template: '{{ kind == ''above'' }}'
+            sequence:
+              - action: script.spa_notify
+                data:
+                  title: Spa water temperature
+                  message: >-
+                    Water {{ tw }}°C is {{ (tw - tg) | round(1) }}°C above the target {{ tg }}°C ({{
+                    now().strftime('%H:%M') }}). Consider opening the cover to release some heat.
+                  tag: spa_water_temp
+                  url: /home-control/hot-tub
+    mode: single
+    max_exceeded: silent
 script:
   spa_deliver_night_alerts_now:
     alias: Spa - Deliver held alerts now
