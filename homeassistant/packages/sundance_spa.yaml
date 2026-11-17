@@ -769,6 +769,10 @@ template:
         availability: '{{ states(''sensor.sundance_spa_energy_counter'') | is_number }}'
         default_entity_id: sensor.sundance_spa_spa_energy_counter_incl_extras
   - binary_sensor:
+      - name: Manual Circulation Active
+        unique_id: sundance_spa_manual_circulation_active
+        state: '{{ is_state(''switch.sundance_spa_circulation'', ''on'') }}'
+        default_entity_id: binary_sensor.sundance_spa_manual_circulation_active
       - name: Spa Unmapped Alert Bits
         unique_id: sundance_spa_spa_unmapped_alert_bits
         state: '{{ (states(''sensor.sundance_spa_raw_f10'') | float(0) | int | bitwise_and(47)) > 0 }}'
@@ -3464,6 +3468,33 @@ script:
           entity_id: input_text.spa_night_alerts
         data:
           value: ''
+  spa_light_toggle:
+    alias: Spa - Light toggle
+    description: >-
+      Tap on the icon of the Light tile on the Hot Tub page: Off switches the light to the first
+      mode of the panel cycle (High Speed Blend), any other mode switches it off. Tapping elsewhere
+      on the tile opens the more-info dialog and the dropdown on the tile still chooses a mode.
+      Created 2026-11-17.
+    mode: single
+    max_exceeded: silent
+    sequence:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: select.sundance_spa_light
+                state: 'Off'
+            sequence:
+              - action: select.select_option
+                target:
+                  entity_id: select.sundance_spa_light
+                data:
+                  option: High Speed Blend
+        default:
+          - action: select.select_option
+            target:
+              entity_id: select.sundance_spa_light
+            data:
+              option: 'Off'
   spa_notify:
     alias: Spa - Notify (quiet hours aware)
     description: >-

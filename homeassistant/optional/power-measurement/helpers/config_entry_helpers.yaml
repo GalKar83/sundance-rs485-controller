@@ -26,3 +26,29 @@
     percentile: 50
     precision: 0
     state_characteristic: average_step
+- domain: statistics
+  title: House Load Median 30 s (Spa Edge)
+  options:
+    entity_id: sensor.load_power
+    keep_last_sample: false
+    max_age:
+      hours: 0
+      minutes: 0
+      seconds: 30
+    name: House Load Median 30 s (Spa Edge)
+    percentile: 50
+    precision: 0
+    state_characteristic: median
+- domain: statistics
+  title: House Load Std Dev 30 s (Spa Edge)
+  options:
+    entity_id: sensor.load_power
+    keep_last_sample: false
+    max_age:
+      hours: 0
+      minutes: 0
+      seconds: 30
+    name: House Load Std Dev 30 s (Spa Edge)
+    percentile: 50
+    precision: 0
+    state_characteristic: standard_deviation

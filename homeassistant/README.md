@@ -11,7 +11,7 @@ to work; take what you want.
   [`optional/`](optional/power-measurement)). Paste it into a new
   automation with *Edit in YAML*.
 - [`scripts/`](scripts) — `spa_notify` (the quiet-hours notification queue), `spa_deliver_night_alerts_now` (sends the queue at once), the plan scripts
-  `spa_plan_add`, `spa_plan_delete` and `spa_target_step`, and `spa_audio_control` (the Spa Audio previous / play-pause / next buttons;
+  `spa_plan_add`, `spa_plan_delete`, `spa_target_step` and `spa_light_toggle` (tap on the icon of the Light tile: Off -> High Speed Blend, any mode -> Off), and `spa_audio_control` (the Spa Audio previous / play-pause / next buttons;
   see [Spa audio](#spa-audio-who-is-connected-what-is-playing)).
 - [`helpers/`](helpers) — the helpers the automations use: `input_boolean`, `input_number`,
   `input_text`, `input_datetime`, `input_select` and `counter` (create them in the UI with these

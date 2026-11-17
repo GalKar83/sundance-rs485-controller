@@ -1,0 +1,25 @@
+alias: Spa - Light toggle
+description: >-
+  Tap on the icon of the Light tile on the Hot Tub page: Off switches the light to the first mode of the panel cycle (High Speed
+  Blend), any other mode switches it off. Tapping elsewhere on the tile opens the more-info dialog and the dropdown on the tile still
+  chooses a mode. Created 2026-11-17.
+mode: single
+max_exceeded: silent
+sequence:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: select.sundance_spa_light
+            state: 'Off'
+        sequence:
+          - action: select.select_option
+            target:
+              entity_id: select.sundance_spa_light
+            data:
+              option: High Speed Blend
+    default:
+      - action: select.select_option
+        target:
+          entity_id: select.sundance_spa_light
+        data:
+          option: 'Off'

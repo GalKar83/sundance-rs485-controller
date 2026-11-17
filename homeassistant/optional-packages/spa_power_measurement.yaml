@@ -53,6 +53,24 @@ sensor:
       minutes: 10
     keep_last_sample: true
     precision: 0
+  - platform: statistics
+    name: House Load Median 30 s (Spa Edge)
+    unique_id: sundance_spa_house_load_median_30s
+    entity_id: sensor.spa_house_load
+    state_characteristic: median
+    max_age:
+      seconds: 30
+    keep_last_sample: false
+    precision: 0
+  - platform: statistics
+    name: House Load Std Dev 30 s (Spa Edge)
+    unique_id: sundance_spa_house_load_stddev_30s
+    entity_id: sensor.spa_house_load
+    state_characteristic: standard_deviation
+    max_age:
+      seconds: 30
+    keep_last_sample: false
+    precision: 0
 script:
   spa_power_measure_record:
     alias: 'Spa - Power measurement: record'
@@ -499,52 +517,67 @@ automation:
     alias: 'Spa - Power measurement: jet pump (after a soak)'
     description: >-
       Measures number.sundance_spa_power_jet_pump (one pump at high speed; both pumps are the same
-      model, Pump 2 has no low speed - owner 2026-10-29) against the setting. When the pumps start
-      after 10+ min idle with only jets on high (Primary Filter 'Running', no heater), house load
-      during the jets (sensor.house_load_energy_spa_calibration) minus the average of the 10 min
-      before and the 10 min after (sensor.house_load_mean_10_min_spa_calibration) = jet power; minus
-      the ClearRay setting when Jet 1 is on, divided by the number of jets. Plausible result
-      1000-2500 W. MEASUREMENT ONLY - never changes the setting; each soak is logged and appended to
-      input_text.spa_power_measure_jet_pump through script.spa_power_measure_record (weekly
-      summary).
+      model, Pump 2 has no low speed - owner 2026-10-29) against the setting. EDGE METHOD
+      (2026-11-17): it measures the two steps of the house load when the jets switch on and when
+      they switch off, with short 30 s windows (the median of the house power sensor,
+      sensor.house_load_median_30_s_spa_edge, and its standard deviation,
+      sensor.house_load_std_dev_30_s_spa_edge), so the house does not have to be quiet for 20
+      minutes: only for the 30 s on each side of two edges. Start edge: the window before the first
+      jet turns on against the window 35 s after the last jet change. End edge: the window before
+      the first jet turns off against the window 35 s after the last change. Each edge is a separate
+      estimate; the result counts only when the 4 windows are calm (standard deviation up to 120 W),
+      the two edges agree within 100 W per jet, and the heater did not change. Corrections: when Jet
+      1 starts with pump 1 already at low speed (a filter cycle) the step is high minus low, so the
+      Circulation setting is added back; the ClearRay setting is taken off when Jet 1 starts or
+      stops the pump from or to off. Plausible result 1000-2500 W per jet. MEASUREMENT ONLY - never
+      changes the setting; each soak is logged and appended to input_text.spa_power_measure_jet_pump
+      through script.spa_power_measure_record (weekly summary). The daily 1-minute Jet 2 cleanup is
+      measured too (one jet).
 
 
       History: created 2026-10-29 (first value 1630 W from the 29 Oct 08:06 soak). 2026-11-02
       (owner): measurement only; setting and ClearRay value read from number.sundance_spa_power_*.
       2026-11-06: results appended to the helper. 2026-11-07: non-numeric start value ignored.
-      Revised 2026-11-11 (owner): every soak that is skipped is now recorded with its reason (the 11
-      Nov 08:07 soak started only 8 min after the filter cycle ended and dropped with no trace); the
-      idle-before check moved after the jets are known to be on, so ordinary filter-cycle starts are
-      still not recorded.
+      2026-11-11 (owner): every skipped soak is recorded with its reason. Rewritten 2026-11-17
+      (owner): the old version started on the pumps going from off to on after 10 idle minutes and
+      compared with the 10 minute means before and after, so it missed every soak that began inside
+      a filter cycle (12 and 16 Nov) and dropped the 15 Nov soak (1622 W vs the 1630 W setting)
+      because the two means differed by 228 W against a 200 W limit.
     triggers:
       - trigger: state
-        entity_id: binary_sensor.sundance_spa_pumps_running
+        entity_id:
+          - switch.sundance_spa_jet_1
+          - switch.sundance_spa_jet_2
         from: 'off'
         to: 'on'
     conditions:
+      - condition: template
+        value_template: >-
+          {{ [states('switch.sundance_spa_jet_1'), states('switch.sundance_spa_jet_2')] |
+          select('eq', 'on') | list | count == 1 }}
+        note: Only the first jet of a soak starts a measurement.
       - condition: state
         entity_id: binary_sensor.sundance_spa_heater
         state: 'off'
     actions:
       - variables:
-          before: '{{ states(''sensor.house_load_mean_10_min_spa_calibration'') }}'
-          idle_min: >-
-            {{ ((trigger.to_state.last_changed - trigger.from_state.last_changed).total_seconds() /
-            60) | round(0) | int }}
+          t0: '{{ as_timestamp(now()) }}'
+          pre_s: '{{ states(''sensor.house_load_median_30_s_spa_edge'') }}'
+          sd_pre_s: '{{ states(''sensor.house_load_std_dev_30_s_spa_edge'') }}'
+          pumps_age: >-
+            {{ (now() -
+            states.binary_sensor.sundance_spa_pumps_running.last_changed).total_seconds() }}
+          circ_before: '{{ is_state(''binary_sensor.sundance_spa_pumps_running'', ''on'') and pumps_age > 8 }}'
+          pumps_unsettled: '{{ is_state(''binary_sensor.sundance_spa_pumps_running'', ''on'') and 8 < pumps_age < 40 }}'
+          heater_age: '{{ (now() - states.binary_sensor.sundance_spa_heater.last_changed).total_seconds() }}'
           old: '{{ states(''number.sundance_spa_power_jet_pump'') | float(1630) }}'
-      - delay:
-          seconds: 30
-      - variables:
-          j1: '{{ is_state(''switch.sundance_spa_jet_1'', ''on'') }}'
-          j2: '{{ is_state(''switch.sundance_spa_jet_2'', ''on'') }}'
-          e_s: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
-          t_s: '{{ as_timestamp(now()) }}'
-      - condition: template
-        value_template: '{{ (j1 or j2) and is_state(''sensor.sundance_spa_primary_filter'', ''Running'') }}'
-        note: 'Not a soak with jets on: an ordinary filter cycle, nothing to record.'
+          circ: '{{ states(''number.sundance_spa_power_circulation'') | float(370) }}'
+          cr: '{{ states(''number.sundance_spa_power_clearray'') | float(20) }}'
       - if:
           - condition: template
-            value_template: '{{ idle_min < 10 or not (is_number(before) and is_number(e_s)) }}'
+            value_template: >-
+              {{ not (is_number(pre_s) and is_number(sd_pre_s)) or pumps_unsettled or heater_age <
+              60 }}
         then:
           - action: script.spa_power_measure_record
             data:
@@ -552,70 +585,115 @@ automation:
               measured: ''
               old: '{{ old }}'
               message: >-
-                soak skipped: the pumps had been idle only {{ idle_min }} min before (10 needed for
-                a clean base) or the house load sensor was not available
-          - stop: idle before too short
+                soak skipped: the window before the jets was not usable (house load median {{ pre_s
+                }}, std dev {{ sd_pre_s }}, pumps changed {{ pumps_age | round(0) }} s ago, heater
+                changed {{ heater_age | round(0) }} s ago)
+          - stop: before window not usable
+      - repeat:
+          sequence:
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id:
+                    - switch.sundance_spa_jet_1
+                    - switch.sundance_spa_jet_2
+              timeout:
+                seconds: 35
+              continue_on_timeout: true
+          until:
+            - condition: template
+              value_template: '{{ wait.trigger is none or repeat.index >= 20 }}'
+      - variables:
+          post_s: '{{ states(''sensor.house_load_median_30_s_spa_edge'') }}'
+          sd_post_s: '{{ states(''sensor.house_load_std_dev_30_s_spa_edge'') }}'
+          j1: '{{ is_state(''switch.sundance_spa_jet_1'', ''on'') }}'
+          j2: '{{ is_state(''switch.sundance_spa_jet_2'', ''on'') }}'
+          jets: '{{ (1 if j1 else 0) + (1 if j2 else 0) }}'
+      - if:
+          - condition: template
+            value_template: >-
+              {{ jets == 0 or not (is_number(post_s) and is_number(sd_post_s)) or not
+              is_state('binary_sensor.sundance_spa_heater', 'off') }}
+        then:
+          - action: script.spa_power_measure_record
+            data:
+              kind: jet_pump
+              measured: ''
+              old: '{{ old }}'
+              message: >-
+                soak skipped: the jets stopped before the start edge settled, or the heater came on
+                (jets {{ jets }}, house load median {{ post_s }}, std dev {{ sd_post_s }})
+          - stop: start edge not usable
       - wait_for_trigger:
           - trigger: state
             entity_id:
               - switch.sundance_spa_jet_1
               - switch.sundance_spa_jet_2
-              - binary_sensor.sundance_spa_heater
+            to: 'off'
         timeout:
-          hours: 1
-        continue_on_timeout: true
-      - variables:
-          e_e: '{{ states(''sensor.house_load_energy_spa_calibration'') }}'
-          t_e: '{{ as_timestamp(now()) }}'
-      - if:
-          - condition: template
-            value_template: '{{ t_e | float - t_s | float < 300 or not is_number(e_e) }}'
-        then:
-          - action: script.spa_power_measure_record
-            data:
-              kind: jet_pump
-              measured: ''
-              old: '{{ old }}'
-              message: 'soak skipped: the jets changed or stopped within 5 min'
-          - stop: soak too short
-      - variables:
-          during: >-
-            {{ ((e_e | float - e_s | float) * 1000 * 3600 / (t_e | float - t_s | float)) | round(0)
-            }}
-      - wait_template: '{{ is_state(''binary_sensor.sundance_spa_pumps_running'', ''off'') }}'
-        timeout:
-          minutes: 30
+          hours: 2
         continue_on_timeout: false
-      - delay:
-          minutes: 10
+      - variables:
+          pre_e: '{{ states(''sensor.house_load_median_30_s_spa_edge'') }}'
+          sd_pre_e: '{{ states(''sensor.house_load_std_dev_30_s_spa_edge'') }}'
+          heater_changed: >-
+            {{ not is_state('binary_sensor.sundance_spa_heater', 'off') or
+            states.binary_sensor.sundance_spa_heater.last_changed.timestamp() > t0 - 60 }}
+      - repeat:
+          sequence:
+            - wait_for_trigger:
+                - trigger: state
+                  entity_id:
+                    - switch.sundance_spa_jet_1
+                    - switch.sundance_spa_jet_2
+              timeout:
+                seconds: 35
+              continue_on_timeout: true
+          until:
+            - condition: template
+              value_template: '{{ wait.trigger is none or repeat.index >= 20 }}'
+      - variables:
+          post_e: '{{ states(''sensor.house_load_median_30_s_spa_edge'') }}'
+          sd_post_e: '{{ states(''sensor.house_load_std_dev_30_s_spa_edge'') }}'
+          jets_end: >-
+            {{ [states('switch.sundance_spa_jet_1'), states('switch.sundance_spa_jet_2')] |
+            select('eq', 'on') | list | count }}
+          circ_after: '{{ is_state(''binary_sensor.sundance_spa_pumps_running'', ''on'') }}'
       - if:
           - condition: template
             value_template: >-
-              {{ not (is_state('binary_sensor.sundance_spa_pumps_running', 'off') and (now() -
-              states.binary_sensor.sundance_spa_pumps_running.last_changed).total_seconds() >= 595
-              and is_state('binary_sensor.sundance_spa_heater', 'off')) }}
+              {{ jets_end > 0 or heater_changed or not (is_number(pre_e) and is_number(sd_pre_e) and
+              is_number(post_e) and is_number(sd_post_e)) or not
+              is_state('binary_sensor.sundance_spa_heater', 'off') }}
         then:
           - action: script.spa_power_measure_record
             data:
               kind: jet_pump
               measured: ''
               old: '{{ old }}'
-              message: 'soak skipped: the pump or the heater started again during the 10 min after the soak'
-          - stop: disturbed after
+              message: >-
+                soak skipped: the end edge was not usable (jets still on {{ jets_end }}, heater
+                changed {{ heater_changed }}, house load before {{ pre_e }} W, after {{ post_e }} W)
+          - stop: end edge not usable
       - variables:
-          after: '{{ states(''sensor.house_load_mean_10_min_spa_calibration'') }}'
-          'n': '{{ (1 if j1 else 0) + (1 if j2 else 0) }}'
+          s_tot: >-
+            {{ (post_s | float - pre_s | float) + (circ if (circ_before and j1) else 0) - (cr if (j1
+            and not circ_before) else 0) }}
+          e_tot: >-
+            {{ (pre_e | float - post_e | float) + (circ if (circ_after and j1) else 0) - (cr if (j1
+            and not circ_after) else 0) }}
       - variables:
-          base: '{{ ((before | float + after | float) / 2) | round(0) }}'
-          measured: >-
-            {{ ((during | float - (before | float + after | float) / 2 -
-            (states('number.sundance_spa_power_clearray') | float(20) if j1 else 0)) / n | float) |
-            round(0) }}
+          ps: '{{ (s_tot | float / jets | float) | round(0) }}'
+          pe: '{{ (e_tot | float / jets | float) | round(0) }}'
+      - variables:
+          measured: '{{ ((ps | float + pe | float) / 2) | round(0) }}'
+          sd_max: >-
+            {{ [sd_pre_s | float(999), sd_post_s | float(999), sd_pre_e | float(999), sd_post_e |
+            float(999)] | max }}
       - if:
           - condition: template
             value_template: >-
-              {{ (before | float - after | float) | abs < 200 and 1000 <= measured | float <= 2500
-              }}
+              {{ sd_max <= 120 and (ps | float - pe | float) | abs <= 100 and 1000 <= ps | float <=
+              2500 and 1000 <= pe | float <= 2500 }}
         then:
           - action: script.spa_power_measure_record
             data:
@@ -623,9 +701,10 @@ automation:
               measured: '{{ measured }}'
               old: '{{ old }}'
               message: >-
-                jet pump measured {{ measured }} W ({{ n }} jet(s), house {{ during }} W, base {{
-                base }} W); setting {{ old | round(0) }} W, difference {{ ((measured | float - old)
-                / old * 100) | round(1) }}%
+                jet pump measured {{ measured }} W ({{ jets }} jet(s); start edge {{ ps }} W, end
+                edge {{ pe }} W; house {{ pre_s }} -> {{ post_s }} W, {{ pre_e }} -> {{ post_e }}
+                W); setting {{ old | round(0) }} W, difference {{ ((measured | float - old) / old *
+                100) | round(1) }}%
         else:
           - action: script.spa_power_measure_record
             data:
@@ -633,9 +712,11 @@ automation:
               measured: ''
               old: '{{ old }}'
               message: >-
-                soak skipped: before {{ before }} W, after {{ after }} W, during {{ during }} W,
-                measured {{ measured }} W
+                soak skipped: start edge {{ ps }} W, end edge {{ pe }} W per jet ({{ jets }}
+                jet(s)), largest std dev {{ sd_max | round(0) }} W; house {{ pre_s }} -> {{ post_s
+                }} W, {{ pre_e }} -> {{ post_e }} W
     mode: single
+    max_exceeded: silent
   - id: sundance_spa_spa_power_measurement_weekly_summary
     alias: 'Spa - Power measurement: weekly summary'
     description: >-

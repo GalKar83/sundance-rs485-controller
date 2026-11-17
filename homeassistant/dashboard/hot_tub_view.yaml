@@ -119,6 +119,11 @@ sections:
       - type: tile
         entity: switch.sundance_spa_jet_1
         name: Jet 1
+        tap_action:
+          action: more-info
+          entity: binary_sensor.sundance_spa_jet_1_active
+        icon_tap_action:
+          action: toggle
         grid_options:
           columns: 6
         visibility:
@@ -151,6 +156,11 @@ sections:
       - type: tile
         entity: switch.sundance_spa_jet_2
         name: Jet 2
+        tap_action:
+          action: more-info
+          entity: binary_sensor.sundance_spa_jet_2_active
+        icon_tap_action:
+          action: toggle
         grid_options:
           columns: 6
         visibility:
@@ -183,6 +193,11 @@ sections:
       - type: tile
         entity: switch.sundance_spa_circulation
         name: Manual
+        tap_action:
+          action: more-info
+          entity: binary_sensor.sundance_spa_manual_circulation_active
+        icon_tap_action:
+          action: toggle
         grid_options:
           columns: 6
         visibility:
@@ -234,6 +249,9 @@ sections:
         features_position: inline
         tap_action:
           action: more-info
+        icon_tap_action:
+          action: perform-action
+          perform_action: script.spa_light_toggle
         grid_options:
           columns: full
           rows: 1

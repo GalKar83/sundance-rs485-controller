@@ -13,12 +13,12 @@ automations read. Without a whole-house power sensor, skip this folder.
 | File | What it does |
 |---|---|
 | `automations/spa_power_measurement_circulation.yaml` | each night, the house load during the filter cycle minus the quiet hours after it = the circulation power; logged to the logbook with the difference from the setting. The night is skipped when the heater or a jet ran, or the quiet base was unstable |
-| `automations/spa_power_measurement_jet_pump.yaml` | after a jet run that started from 10 min of idle, the house load during the jets minus the 10-minute means before and after = the jet-pump power |
+| `automations/spa_power_measurement_jet_pump.yaml` | edge method: the step of the house load when the jets switch on and when they switch off (30 s median windows before and after each edge) = the jet-pump power; the two edges must agree, the windows must be calm, the circulation or ClearRay setting is corrected for; works also when the soak starts inside a filter cycle |
 | `automations/spa_power_measurement_weekly_summary.yaml` | Saturdays 08:00, a phone notice: per measurement how many valid results, the average measured power against the setting, the average difference in %, and how many were skipped |
 | `automations/spa_power_measurement_heater.yaml` | after each heater run, the house load with the heater on minus the load before and after = the heater power, logged and recorded the same way |
 | `scripts/spa_power_measure_record.yaml` | shared by the measurement automations: writes one line to the logbook and appends the result (or a skipped night/run with `x`) to the helper below |
 | `helpers/input_text.yaml` | `spa_power_measure_circulation` / `spa_power_measure_jet_pump` / `spa_power_measure_heater`: the last 10 results of each measurement (`minutes,measured_W,difference_%` or `minutes,x` for a skipped one), which the weekly summary reads |
-| `helpers/config_entry_helpers.yaml` | the whole-house energy integration and its 10-minute mean (statistics) |
+| `helpers/config_entry_helpers.yaml` | the whole-house energy integration, its 10-minute mean, and the two 30-second statistics (median and standard deviation of the house power) that the jet pump edge method reads |
 
 The two measurement automations write each result to the logbook (name *Spa power measurement*) and
 to the `input_text` helpers above. The Settings page also shows a *Power measurement · last 24 hours*

@@ -584,6 +584,12 @@
       int }}
     template_type: sensor
 - domain: template
+  title: Manual Circulation Active
+  options:
+    name: Manual Circulation Active
+    state: '{{ is_state(''switch.sundance_spa_circulation'', ''on'') }}'
+    template_type: binary_sensor
+- domain: template
   title: Spa Audio Person1 Connected
   options:
     name: Spa Audio Person1 Connected
