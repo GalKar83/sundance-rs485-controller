@@ -564,6 +564,32 @@ the value, 128 = Off) during the boot / nightly routine. **The alert byte tells 
 Filter Change at 0 and due the alert code is 1, with the reminder saved as Off it stays 0 (checked: Off, alert
 `None`). The component does not use this yet.
 
+<a id="alert-table"></a>### Alert / error messages: the Jacuzzi table against the 680 manuals
+
+| Message | Jacuzzi / Prolink code (`first ^ last = 38 ^ code`) | 680, 2018 (export manual 6530-681EE) | 680, 2020 (manuals 6530-681G and 6530-681EG) | Seen on the 680 |
+|---|---|---|---|---|
+| Change Filter | 1 (39) | `CHANGE FILTER` | `CHANGE FILTER` | **yes** (39) |
+| Change Water | 2 (36) | `CHANGE WATER` | `CHANGE WATER` | no |
+| Change ClearRay Bulb | 3 (37) | `CHANGE CLEARRAY BULB` | `CHANGE CLEARRAY BULB` | **yes** (37) |
+| Flow switch open | 11 (45) | `FL--1` | `FL--1` | no |
+| Flow switch closed | 12 (42) | `FL--2` | `FL--2` | no |
+| Flow switch erratic | Non Exist | `FL--3` | `FL--3` | no (code unknown) |
+| Temperature sensor | 13, 15, 16, 17, 18 (43, 41, 54, 55, 52); code 14 (40) is treated as invalid by the Prolink app | `SN--1` / `SN--2` | `SN--1` / `SN--2` | no |
+| Controller temperature too high | 19, 20 (53, 50) | Non Exist | Non Exist | - |
+| ProClarity Depth filter | 21 (51) | Non Exist | Non Exist | - |
+| Water too hot | 22, 23, 28, 29 (48, 49, 58, 59) | `OH` (a single message) | `T--OH` (water temperature) | no |
+| Hi-limit too hot | Non Exist | Non Exist | `H--OH` | no (code unknown) |
+| Watchdog | Non Exist | `(-- -- -- --)` | `(-- -- -- --)` | no (code unknown) |
+| Shorted flow switch at start-up | 24 (62) | Non Exist | Non Exist | - |
+| Shorted flow switch and freeze at start-up | 25 (63) | Non Exist | Non Exist | - |
+| Water 20 F below the set point | 26 (60) | `COOL` | `COOL` | no |
+| Freeze condition | 27 (61) | `ICE` | `ICE` | no |
+| Light sensor | 30, 31 (56, 57) | Non Exist | Non Exist | - |
+| Stereo | 32 (6) | Non Exist | Non Exist | - |
+| Codes 4 to 10 | invalid in the Prolink app | Non Exist | Non Exist | - |
+
+*Non Exist* means the message is not in that table or manual; it does not mean the code can not appear in the frame. Jacuzzi codes are from pyjacuzzi `docs/ProlinkMessageTypes.txt`; the 680 messages are from the panel-display sections (13.x) of the manuals. Only codes 1 and 3 are confirmed on a 680; the rest of the mapping is by analogy.
+
 ## 7. Topside button codes (0xCC)
 
 Real code = `byte5 ^ byte6` of the 0xCC frame. (The diagnostic log prints `code ^ 1` — keep that
