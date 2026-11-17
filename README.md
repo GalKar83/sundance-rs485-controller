@@ -180,10 +180,12 @@ for the component; it is the owner's complete setup.
   (Balboa protocol notes), and the hardware approach of
   [cribskip/esp8266_spa](https://github.com/cribskip/esp8266_spa) and
   [jrowny/ESPHomeSpa](https://github.com/jrowny/ESPHomeSpa).
-- Alert / error codes: the numbers and names of the fault codes (1 clean filters, 2 drain and refill the water, 3 replace the ClearRay
-  bulb, 11-32 flow switch, temperature sensor, water too hot, freeze, COOL, light sensor, stereo) and their explanation texts follow
-  [dhmsjs/pyjacuzzi](https://github.com/dhmsjs/pyjacuzzi) (Apache 2.0), file `docs/ProlinkMessageTypes.txt`, which documents the Jacuzzi
-  Prolink status message. Only codes 1 and 3 are confirmed on a 680; the rest is by analogy.
+- Alert / error codes: the numbers, names and explanation texts of the codes (1 clean filters, 2 drain and refill the water, 3 replace the
+  ClearRay bulb, 11/12 flow switch, 13-20 temperature sensors and controller temperature, 22-29 water too hot, shorted flow switch, COOL, ICE)
+  follow [dhmsjs/pyjacuzzi](https://github.com/dhmsjs/pyjacuzzi) (Apache 2.0), the section *Error Code Values* of
+  [`docs/ProlinkMessageTypes.txt`](https://github.com/dhmsjs/pyjacuzzi/blob/main/docs/ProlinkMessageTypes.txt), which documents the Jacuzzi
+  Prolink status message. Only codes 1 and 3 are
+  confirmed on a 680; the rest is by analogy.
 - **Licence and credit.** The upstream repository has no LICENSE file, so this fork is shared as a
   free hobby project, with all credit for the original work going to its author. If the original
   author (or anyone else whose work is included) asks for something to be changed or removed, it
@@ -319,7 +321,7 @@ Names are chosen so that related entities sort together (same first word).
 | *Item* Active (binary), In Use Session | Active = running now (In Use = Jet 2 or Jet 1 high); In Use Session = on once a use has lasted 10 min | computed; items: In Use, Jet 1, Jet 2, Heating Run, Primary Filter Active |
 | Communication | on/off | frames received |
 | Decoder Notice | `OK`, or the last thing the decoder could not handle (see below); back to `OK` after an hour | ESP |
-| Alert | The spa's own alert / error code, from the last byte of the status frame (§6): `None`, `Change Filter`, `Change Water`, `Change ClearRay Bulb`, a fault name (flow switch, temperature sensor, controller temperature, water too hot, freeze, COOL, light sensor, stereo) or `Unknown error (code N)`. Only codes 1 (filter) and 3 (ClearRay bulb) are confirmed on a 680; the fault names follow the Jacuzzi / Prolink error table and are by analogy. A code must hold for 8 frames and 3 s | status frame |
+| Alert | The spa's own alert / error code, from the last byte of the status frame (§6): `None`, `Change Filter`, `Change Water`, `Change ClearRay Bulb`, a fault name (flow switch, temperature sensor, controller temperature, water too hot, freeze, COOL) or `Unknown error (code N)`. Only codes 1 (filter) and 3 (ClearRay bulb) are confirmed on a 680; the fault names follow the Jacuzzi / Prolink error table and are by analogy. A code must hold for 8 frames and 3 s | status frame |
 
 **Primary Filter states** (in this order of precedence):
 `Purge` — the 2-minute sequence after power-up or a Service Lock unlock (Jet 1 low, then Jet 2):
