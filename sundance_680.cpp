@@ -444,12 +444,23 @@ void SundanceSpa::publish_counters_() {
     const int days = static_cast<uint8_t>(d[3] ^ 0xFA);
     this->fc_last_days_ = days;
     this->fc_zero_kind_ = 0;
+    this->fc_zero_since_ms_ = 0;
     snprintf(buf, sizeof(buf), "%d", days);
     publish_text_(this->filter_change_sensor_, buf);
     return;
   }
+  if (this->fc_zero_since_ms_ == 0)
+    this->fc_zero_since_ms_ = millis() | 1;  // |1: never 0 after the first time
   if (this->fc_zero_kind_ == 0 && this->fc_last_days_ == 1)
     this->fc_zero_kind_ = 2;  // counted down to 0: filter due
+  // Patch 41: the alert byte of the C4 frame tells Off from due without the FC menu (2026-11-16: due = code 1, Off = 0).
+  // Due: code 1 is enough. Off: code 0 only when f3 has read 0xFA for 60 s, so that the frame that shows the counter at
+  // 0 cannot be read before the alert byte follows. Any other alert code could hide the filter alert (one code at a
+  // time): then it stays unknown until the menu is read, as before.
+  if (this->fc_zero_kind_ == 0 && this->alert_code_ == 1)
+    this->fc_zero_kind_ = 2;
+  else if (this->fc_zero_kind_ == 0 && this->alert_code_ == 0 && millis() - this->fc_zero_since_ms_ > 60000)
+    this->fc_zero_kind_ = 1;
   if (this->fc_zero_kind_ == 1)
     publish_text_(this->filter_change_sensor_, "Off");
   else if (this->fc_zero_kind_ == 2)
@@ -1908,7 +1919,7 @@ void SundanceSpa::service_run_timers_() {
       low,
       this->heater_on_,
       jet2 || jet1_high,
-      low && (f1 & 0x20) != 0 && (f1 & 0x80) == 0 && !this->filter_cycle_ && !jet2,
+      low && (f1 & 0x20) != 0 && (f1 & 0x80) == 0 && !this->filter_cycle_ && !jet2 && !this->cleanup_,
       this->filter_cycle_,
   };
   sensor::Sensor *const sens[ACTIVITY_COUNT] = {this->jet1_run_sensor_, this->jet2_run_sensor_,

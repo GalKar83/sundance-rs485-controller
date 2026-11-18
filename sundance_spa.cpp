@@ -860,8 +860,8 @@ void SundanceSpa::publish_states_() {
     // User-defined states (2026-10-22/26): "Purge" = the 2-minute sequence after power-up or a Service
     // Lock unlock (Jet 1 low, then Jet 2; the controller keeps the manual-circulation bit set for all of
     // it although nobody pressed Circulation — verified 25 Oct outside and 26 Oct inside a filter
-    // cycle); "Running" = Jet 1 high or Jet 2 on; "Cleanup" = Jet 2 started by the controller itself
-    // (one minute after the first daily filter cycle starts); "Circulation (Manual)" = Jet 1 low started
+    // cycle); "Running" = Jet 1 high or Jet 2 on; "Cleanup" = the daily cleanup at spa noon (f14 bit7: about a
+    // minute of Jet 1 low, then Jet 2 started by the controller itself); "Circulation (Manual)" = Jet 1 low started
     // by hand; "Circulation (Auto)" = scheduled filtration; "Circulation (Heating)" = the spa runs the
     // pump for heat demand; otherwise "Off". Purge comes first so presses made meanwhile don't matter.
     this->debounce_(
@@ -870,6 +870,7 @@ void SundanceSpa::publish_states_() {
         : (this->pump_status_[0] != 0 || (this->pump_status_[1] != 0 && !this->jet2_auto_)) ? "Running"
         : this->pump_status_[1] != 0                                                      ? "Cleanup"
         : this->manual_circ_                                                              ? "Circulation (Manual)"
+        : this->cleanup_ && this->circ_on_                                                ? "Cleanup"
         : !this->circ_on_ || !this->circ_cmd_                                             ? "Off"
         : this->filter_cycle_                                                             ? "Circulation (Auto)"
                                                                                           : "Circulation (Heating)");
@@ -916,6 +917,9 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
 
   // f14 bit6 is set while the panel is in °F (verified 2026-10-23); f14 bit5 follows Jet 1 high.
   this->spa_fahrenheit_ = ((data[14] >> 6) & 1) != 0;
+  // f14 bit7 = the daily cleanup (2026-11-18: at spa noon whatever the filtration schedule; set from the pump start to the end
+  // of the Jet 2 minute, so it also covers the waiting minute that looks like plain circulation).
+  this->cleanup_ = ((data[14] >> 7) & 1) != 0;
   if (this->temp_format_text_sensor_ != nullptr) {
     const char *fmt = this->spa_fahrenheit_ ? "°F" : "°C";
     if (!this->temp_format_text_sensor_->has_state() || this->temp_format_text_sensor_->state != fmt)
@@ -1029,8 +1033,11 @@ void SundanceSpa::parse_status_update_(const std::vector<uint8_t> &frame) {
 }
 
 // Alert code of the spa: first ^ last byte of the C4 payload is 38 ^ code. Names follow the Jacuzzi / Prolink error
-// table (github.com/dhmsjs/pyjacuzzi, docs/ProlinkMessageTypes.txt, Apache-2.0); only 1 (filter) and 3 (ClearRay bulb) are confirmed on this spa, the rest is by analogy and
-// anything else is reported as an unknown error with its number.
+// table (github.com/dhmsjs/pyjacuzzi, docs/ProlinkMessageTypes.txt, Apache-2.0); only 1 (filter) and 3 (ClearRay bulb) are confirmed on this spa, the rest is by analogy.
+// Jacuzzi-only codes that the 680 manuals do not have (19, 20 controller temperature, 21 depth filter, 24, 25 shorted flow
+// switch, 30, 31 light sensor, 32 stereo) are left out on purpose: they and anything else are reported as an unknown
+// error with its number.
+
 void SundanceSpa::alert_text_(int code, char *buf, size_t n) {
   const char *t = nullptr;
   switch (code) {
@@ -1041,15 +1048,9 @@ void SundanceSpa::alert_text_(int code, char *buf, size_t n) {
     case 11: t = "Flow switch open (FL-1)"; break;
     case 12: t = "Flow switch closed (FL-2)"; break;
     case 13: case 15: case 16: case 17: case 18: t = "Temperature sensor fault (SN)"; break;
-    case 19: case 20: t = "Controller temperature too high"; break;
-    case 21: t = "Change depth filter"; break;
     case 22: case 23: case 28: case 29: t = "Water too hot - do not enter the water"; break;
-    case 24: t = "Shorted flow switch at start-up"; break;
-    case 25: t = "Shorted flow switch and freeze at start-up"; break;
     case 26: t = "Water 20 F below set point (COOL), heating"; break;
     case 27: t = "Potential freeze (ICE), pumps running"; break;
-    case 30: case 31: t = "Light sensor fault"; break;
-    case 32: t = "Stereo communication trouble"; break;
     default: break;
   }
   if (t != nullptr)
@@ -1080,6 +1081,7 @@ void SundanceSpa::update_alert_(const uint8_t *enc, size_t len) {
   alert_text_(code, buf, sizeof(buf));
   ESP_LOGI(TAG, "Alert code %d: %s", code, buf);
   this->alert_text_sensor_->publish_state(buf);
+  this->publish_counters_();  // the alert byte tells Filter Change Off from due (patch 41)
 }
 
 // Shows the unread last payload byte of C4 and CA next to the screen key, so the "tail = key XOR constant" idea can

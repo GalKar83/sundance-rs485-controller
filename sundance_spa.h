@@ -349,6 +349,8 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   // not yet seen on this spa). Published as text once the same code has held for a few seconds.
   text_sensor::TextSensor *alert_text_sensor_{nullptr};
   int alert_candidate_{-1};
+  bool cleanup_{false};           // f14 bit 7: the daily cleanup at spa noon (waiting minute + Jet 2 minute)
+  uint32_t fc_zero_since_ms_{0};  // since when f3 has read 0xFA (Filter Change 0 or Off); 0 = not at 0xFA
   uint32_t alert_candidate_ms_{0};
   int alert_candidate_n_{0};
   int alert_code_{-1};
