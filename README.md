@@ -517,7 +517,7 @@ Legend: ✅ confirmed against the panel (repeatable), 🟡 likely (few observati
 | f10.7 | set during the scheduled filtration cycle (whole cycle, also while the cleanup runs Jet 2) and during the power-up purge; clear when the pump runs for heat demand or manually | ✅ |
 | f10.5 | **ClearRay counter at 0** 🟡 (seen once): set during the scheduled filtration cycle from its start while the ClearRay days were 0, cleared at the moment the ClearRay counter was saved above 0; clear in the minute after the counter ran out while the pump was off. Not a message code, see the alert byte under Frame | 🟡 |
 | f10.0–3 | ? never set | ❓ |
-| f14.7 | **daily cleanup** (first filtration cycle of the day, from its start until Jet 2 stops); details under [f14](#f14) | 🟡 |
+| f14.7 | **daily cleanup** (at spa noon, 12:00, from the moment the pump starts until Jet 2 stops; not tied to the filtration schedule); details under [f14](#f14) | 🟡 |
 
 <a id="f14"></a>**f14.** Bits 0–5 are a second water temperature **V** XOR-ed with flags; bit 6 is °F; bit 7 is
 the daily-cleanup flag:
@@ -544,11 +544,14 @@ f14 = (V ^ (SL << 1) ^ (SVL << 2) ^ (pump << 5)) & 0x3F | (fahrenheit << 6) | (c
 - **bit 1 = Settings Lock**: SL confirmed 31 → 29, unlock 29 → 31 (2026-10-25, pump off).
 - **bit 2 = Service Lock**: SVL confirmed 31 → 27, unlock 27 → 63 (= 31 with the purge pump bit).
 - **bit 6 = °F**: 32 → 96 and back (2026-10-24).
-- **bit 7 = daily cleanup** 🟡 (2 days, 11 and 12 Nov 2026): set from the start of the first filtration
-  cycle of the day (12:00 here) and cleared at the moment Jet 2 stops, so it covers the minute of
-  waiting plus the minute of cleanup (f14 190/191 → 63 on 11 Nov, 189/190 → 62 on 12 Nov, with f1 32 → 96 →
-  100 → 96). It is not set in the other three cycles of the day. The 780 shows it in a few frames
-  during automatic circulation (DECODING.md §3.4), where the first cycle starts at 08:00.
+- **bit 7 = daily cleanup** 🟡 (3 days, 11, 12 and 18 Nov 2026): set at 12:00 spa time and cleared at the
+  moment Jet 2 stops, so it covers the minute of waiting plus the minute of cleanup (f14 190/191 → 63 on
+  11 Nov, 189/190 → 62 on 12 Nov, with f1 32 → 96 → 100 → 96). It is tied to spa noon, **not to the
+  filtration schedule**: on 11 and 12 Nov the first cycle also started at 12:00, so those days could not
+  tell the two apart, but on 18 Nov the first cycle was moved to 13:00 and the cleanup still came at
+  12:00 (f14 190/191 from 12:00:17, back to 31 at 12:02:17; pumps running 12:00:20–12:02:19, no filter
+  cycle; the 13:00 cycle started at 13:00:19). It was not seen in the other cycles of the day. The 780
+  does the same, with its first cycle at 08:00 and the cleanup at 12:00 (DECODING.md §3.4).
 
 V is now known, but it differs from the main water temperature by 0 to −3 °F, which is the same size
 as bits 0–2, so **the absolute lock state still cannot be read from f14 alone**. The component tracks
@@ -825,8 +828,9 @@ counter at the panel, the value is published without any ESP action.
   31 Oct 08:19, each started by a 34.0 °C reading that lasted only 1–3 s and heated to 35.5 °C in
   33–35 min.
 - **Scheduled filtration** (here 12:00, 4 cycles × 2 h → 12/18/00/06): pump low + f10 bit 7.
-- **Daily cleanup**: one minute after the **first** filtration cycle of the day starts (12:00 here),
-  Jet 2 runs for exactly 1 minute with no press (f1 96 → 100 → 96). The other cycles do not do it.
+- **Daily cleanup**: at 12:00 spa time (spa noon), whatever the filtration schedule (tested on 18 Nov 2026
+  with the first cycle moved to 13:00), Jet 2 runs for exactly 1 minute with no press, after about a
+  minute of waiting (f1 96 → 100 → 96). The filtration cycles themselves do not do it.
   The component shows Primary Filter = `Cleanup` for that minute.
 - **ClearRay UV indicator** on the topside is on whenever the Jet 1 pump runs — low or high, from the
   panel or from HA, inside or outside a filter cycle, and also with the water 2 °C above the set
