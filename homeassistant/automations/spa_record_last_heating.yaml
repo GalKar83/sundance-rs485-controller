@@ -13,15 +13,24 @@ description: >-
   cancelled by an automation reload at 08:50), min over the run + pre-run drop instead of the single
   reading at start, max instead of the reading at the end. Revised 2026-11-03: also updates
   input_number.spa_heat_rate (30% weight per run of 20+ min rising 1°+) for the calendar Ready-by
-  heating.
+  heating. Revised 2026-11-20 (owner): a heat call that is running when a scheduled filter cycle starts
+  used to be cut at the cycle start, because heating_run needs "no scheduled cycle" (28 min logged for a
+  34 min run on 18 Nov). Now a run starts when heating_run OR the heater
+  (binary_sensor.sundance_spa_heater) turns on while no run is open (the 30 s pre-run drop window is 150 s
+  when the heater started it, the heater comes about a minute after the pump), and it ends only when both
+  are off.
 triggers:
   - trigger: state
-    entity_id: binary_sensor.sundance_spa_heating_run
+    entity_id:
+      - binary_sensor.sundance_spa_heating_run
+      - binary_sensor.sundance_spa_heater
     from: 'off'
     to: 'on'
     id: start
   - trigger: state
-    entity_id: binary_sensor.sundance_spa_heating_run
+    entity_id:
+      - binary_sensor.sundance_spa_heating_run
+      - binary_sensor.sundance_spa_heater
     not_from: 'off'
     to: 'off'
     id: end
@@ -37,13 +46,15 @@ actions:
       - conditions:
           - condition: trigger
             id: start
+          - condition: template
+            value_template: '{{ not is_open }}'
         sequence:
           - variables:
               cur: '{{ state_attr(''climate.sundance_spa'', ''current_temperature'') | float(0) }}'
               since: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
               drop: '{{ states(''input_text.spa_temp_last_drop'').split('';'') }}'
               low: >-
-                {% if drop | count == 2 and since - drop[0] | float(0) <= 30 %}{{ [cur, drop[1] |
+                {% if drop | count == 2 and since - drop[0] | float(0) <= (150 if trigger.entity_id == 'binary_sensor.sundance_spa_heater' else 30) %}{{ [cur, drop[1] |
                 float(99)] | min }}{% else %}{{ cur }}{% endif %}
           - action: input_text.set_value
             target:
@@ -92,6 +103,11 @@ actions:
             id: end
           - condition: template
             value_template: '{{ is_open }}'
+          - condition: state
+            entity_id:
+              - binary_sensor.sundance_spa_heating_run
+              - binary_sensor.sundance_spa_heater
+            state: 'off'
         sequence:
           - variables:
               p: '{{ run.split('';'') }}'
