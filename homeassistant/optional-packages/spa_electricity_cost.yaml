@@ -1,0 +1,568 @@
+# Spa electricity cost (optional package)
+#
+# What it does: prices the spa's electricity use in your own currency with a flat price per kWh and - if you have solar
+# panels or a battery - values the part of the spa's power that does not come from the grid at your feed-in price (or a
+# battery price) instead of the purchase price. Read homeassistant/optional/electricity-cost/README.md first.
+#
+# Install: copy this file to <config>/packages/, make sure `homeassistant: packages: !include_dir_named packages` is
+# in configuration.yaml, edit the EDIT HERE block below (entity ids), restart Home Assistant, then set the prices in the
+# helpers (Settings > Devices & services > Helpers, "Spa Cost ..."). Nothing in this package changes the spa or its firmware.
+#
+# Results: sensor.spa_electricity_price (price per kWh now), sensor.spa_electricity_cost_rate (currency per hour),
+# sensor.spa_electricity_cost (running total) and its daily / weekly / monthly meters.
+#
+# Prices change only from a date: the prices in force are the helpers "Spa Cost Flat Price", "Feed-in Price" and
+# "Battery Price"; new ones are typed into the "Next" helpers with the date they start (from 00:00), then "Spa Cost
+# Schedule Price Change" is switched on. A date that already began is applied at once and the difference is corrected
+# back to the start of that date.
+
+input_boolean:
+  spa_cost_next_armed:
+    name: Spa Cost Schedule Price Change
+    icon: mdi:calendar-clock
+  spa_cost_battery_custom:
+    name: Spa Cost Separate Battery Price
+    icon: mdi:battery-charging
+
+input_datetime:
+  spa_cost_next_from:
+    name: Spa Cost Next Prices From
+    has_date: true
+    has_time: false
+    icon: mdi:calendar-start
+
+input_text:
+  spa_cost_currency:
+    name: Spa Cost Currency
+    min: 0
+    max: 5
+    icon: mdi:currency-usd
+  spa_cost_currency_code:
+    name: Spa Cost Currency Code
+    min: 0
+    max: 5
+    icon: mdi:alphabetical
+
+input_number:
+  spa_cost_flat_price:
+    name: Spa Cost Flat Price
+    min: 0
+    max: 100
+    step: 0.0001
+    mode: box
+    icon: mdi:cash
+  spa_cost_export_price:
+    name: Spa Cost Feed-in Price
+    min: 0
+    max: 100
+    step: 0.0001
+    mode: box
+    icon: mdi:solar-power
+  spa_cost_battery_price:
+    name: Spa Cost Battery Price
+    min: 0
+    max: 100
+    step: 0.0001
+    mode: box
+    icon: mdi:battery-charging
+  spa_cost_next_flat_price:
+    name: Spa Cost Next Flat Price
+    min: 0
+    max: 100
+    step: 0.0001
+    mode: box
+    icon: mdi:cash-clock
+  spa_cost_next_export_price:
+    name: Spa Cost Next Feed-in Price
+    min: 0
+    max: 100
+    step: 0.0001
+    mode: box
+    icon: mdi:cash-clock
+  spa_cost_next_battery_price:
+    name: Spa Cost Next Battery Price
+    min: 0
+    max: 100
+    step: 0.0001
+    mode: box
+    icon: mdi:cash-clock
+  spa_cost_catchup:
+    name: Spa Cost Catch-up Pending
+    min: -1000
+    max: 1000
+    step: 0.0001
+    mode: box
+    icon: mdi:cash-plus
+  spa_cost_gap_energy:
+    name: Spa Cost Gap Energy
+    min: -1
+    max: 1000000
+    step: 0.0001
+    mode: box
+    icon: mdi:transmission-tower-off
+  spa_cost_gap_start:
+    name: Spa Cost Gap Start
+    min: 0
+    max: 4000000000
+    step: 1
+    mode: box
+    icon: mdi:clock-start
+
+template:
+  - triggers:
+      - trigger: time_pattern
+        seconds: /10
+      - trigger: homeassistant
+        event: start
+    variables:
+      # ================================ EDIT HERE ================================
+      tariff:
+        # The spa's power in W (an estimate from the ESP). Required.
+        spa_power_entity: sensor.sundance_spa_electrical_power
+        # Grid power of the house in W (the meter). Leave '' if you have no solar / battery: everything is then
+        # priced at the purchase price. grid_import_positive: true when buying is positive and selling is negative.
+        grid_power_entity: sensor.meter_active_power
+        grid_import_positive: true
+        # Battery power in W. Leave '' if you have no battery. battery_discharge_positive: true when discharging
+        # is positive.
+        battery_power_entity: sensor.battery_power
+        battery_discharge_positive: true
+      # ============================== END EDIT HERE ==============================
+      price: '{{ states("input_number.spa_cost_flat_price") | float(0) }}'
+      s_kw: '{{ states(tariff.spa_power_entity) | float(0) / 1000 }}'
+      g_kw: >-
+        {% if tariff.grid_power_entity %}{{ states(tariff.grid_power_entity) | float(0) / 1000 * (1 if tariff.grid_import_positive else -1) }}{% else %}9999{% endif %}
+      b_kw: >-
+        {% if tariff.battery_power_entity %}{{ [states(tariff.battery_power_entity) | float(0) / 1000 * (1 if tariff.battery_discharge_positive else -1), 0] | max }}{% else %}0{% endif %}
+      grid_kw: '{{ ([g_kw, 0] | max) - ([g_kw - s_kw, 0] | max) }}'
+      own_kw: '{{ [s_kw - grid_kw, 0] | max }}'
+      battery_kw: '{{ [own_kw, b_kw] | min }}'
+      solar_kw: '{{ own_kw - battery_kw }}'
+      export_price: '{{ states("input_number.spa_cost_export_price") | float(0) }}'
+      battery_price: >-
+        {{ states('input_number.spa_cost_battery_price') | float(0) if is_state('input_boolean.spa_cost_battery_custom', 'on') else export_price }}
+      live_rate: '{{ (grid_kw * price + solar_kw * export_price + battery_kw * battery_price) | float(0) }}'
+      # Cost caught up after an ESP outage or a price change back in time (set by the automations below); one 10 s tick
+      # of the rate that equals it.
+      catchup: '{{ states("input_number.spa_cost_catchup") | float(0) }}'
+    sensor:
+      - name: Spa Electricity Price
+        unique_id: spa_electricity_price
+        icon: mdi:cash-clock
+        state: '{{ price | float(0) | round(4) }}'
+        attributes:
+          # The settings above, for the catch-up automations (one place to edit).
+          tariff: '{{ tariff }}'
+      - name: Spa Electricity Cost Rate
+        unique_id: spa_electricity_cost_rate
+        icon: mdi:cash-fast
+        # Your currency symbol per hour (the total, the meters and the graphs take it from here as the plain symbol).
+        unit_of_measurement: ₪/h
+        state_class: measurement
+        state: '{{ (live_rate + catchup * 360) | float(0) | round(5) }}'
+        attributes:
+          live_rate: '{{ live_rate | float(0) | round(5) }}'
+          catchup: '{{ catchup }}'
+          grid_kw: '{{ grid_kw | float(0) | round(3) }}'
+          solar_kw: '{{ solar_kw | float(0) | round(3) }}'
+          battery_kw: '{{ battery_kw | float(0) | round(3) }}'
+          price: '{{ price | float(0) }}'
+
+sensor:
+  - platform: integration
+    source: sensor.spa_electricity_cost_rate
+    name: Spa Electricity Cost
+    unique_id: spa_electricity_cost
+    unit_time: h
+    method: left
+    round: 4
+
+utility_meter:
+  spa_electricity_cost_daily:
+    source: sensor.spa_electricity_cost
+    name: Spa Electricity Cost Daily
+    cycle: daily
+  spa_electricity_cost_weekly:
+    source: sensor.spa_electricity_cost
+    name: Spa Electricity Cost Weekly
+    cycle: weekly
+  spa_electricity_cost_monthly:
+    source: sensor.spa_electricity_cost
+    name: Spa Electricity Cost Monthly
+    cycle: monthly
+
+script:
+  spa_cost_copy_prices:
+    alias: Spa - Cost copy prices
+    description: >-
+      direction apply: copies the Next prices into the prices in force. direction sync: copies the prices in force into
+      the Next helpers (used after a change and to cancel a scheduled one).
+    fields:
+      direction:
+        description: apply or sync
+    sequence:
+      - repeat:
+          for_each: ['flat_price', 'export_price', 'battery_price']
+          sequence:
+            - action: input_number.set_value
+              target:
+                entity_id: "{{ 'input_number.spa_cost_' ~ repeat.item if direction == 'apply' else 'input_number.spa_cost_next_' ~ repeat.item }}"
+              data:
+                value: "{{ states('input_number.spa_cost_next_' ~ repeat.item if direction == 'apply' else 'input_number.spa_cost_' ~ repeat.item) | float(0) }}"
+    mode: queued
+
+  spa_cost_retro_correction:
+    alias: Spa - Cost retro correction
+    description: >-
+      Called when new prices start from a date that has already begun. Recomputes the difference between the new and the
+      old prices for the spa energy since from_ts (5 minute steps for the last 9 days, hourly before, using the recorded
+      grid / battery power and the ESP energy counter) and adds it to the total as one tick of the rate sensor; the daily /
+      weekly / monthly meters get the part that belongs to their period. Past bars in the statistics graph keep their old
+      values: the correction shows in the period it was made.
+    fields:
+      from_ts:
+        description: timestamp of the start of the new prices
+      old:
+        description: the old prices {flat, export, battery}
+    variables:
+      t: '{{ state_attr("sensor.spa_electricity_price", "tariff") }}'
+      to_ts: '{{ as_timestamp(now()) }}'
+      per: '{{ "5minute" if from_ts > to_ts - 777600 else "hour" }}'
+      bsec: '{{ 300 if per == "5minute" else 3600 }}'
+    sequence:
+      - action: recorder.get_statistics
+        data:
+          statistic_ids: '{{ ["sensor.sundance_spa_energy_total", t.grid_power_entity, t.battery_power_entity] | select | list }}'
+          start_time: '{{ ((from_ts // bsec) * bsec) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
+          end_time: '{{ (((to_ts // bsec) + 1) * bsec) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
+          period: '{{ per }}'
+          types:
+            - mean
+            - change
+        response_variable: stats
+      - variables:
+          es: '{{ stats.statistics.get("sensor.sundance_spa_energy_total", []) }}'
+          gs: '{{ stats.statistics.get(t.grid_power_entity, []) if t.grid_power_entity else [] }}'
+          bs: '{{ stats.statistics.get(t.battery_power_entity, []) if t.battery_power_entity else [] }}'
+          result: >-
+            {%- set cust = is_state('input_boolean.spa_cost_battery_custom', 'on') -%}
+            {%- set flat_n = states('input_number.spa_cost_flat_price') | float(0) -%}
+            {%- set exp_n = states('input_number.spa_cost_export_price') | float(0) -%}
+            {%- set bat_n = states('input_number.spa_cost_battery_price') | float(0) if cust else exp_n -%}
+            {%- set bat_o = old.battery if cust else old.export -%}
+            {%- set day_ts = as_timestamp(today_at()) -%}
+            {%- set week_ts = as_timestamp(today_at() - timedelta(days=now().weekday())) -%}
+            {%- set month_ts = as_timestamp(today_at() - timedelta(days=now().day - 1)) -%}
+            {%- set ns = namespace(gm={}, bm={}, lg=none, lb=none, tot=0.0, day=0.0, week=0.0, month=0.0, n=0) -%}
+            {%- for x in gs %}{% set ns.gm = dict(ns.gm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
+            {%- for x in bs %}{% set ns.bm = dict(ns.bm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
+            {%- for x in es %}
+            {%- set b = as_timestamp(x.start) %}
+            {%- set ov = (([b + bsec, to_ts] | min) - ([b, from_ts] | max)) / bsec %}
+            {%- set key = (b | int) | string %}
+            {%- if key in ns.gm %}{% set ns.lg = ns.gm[key] %}{% endif %}
+            {%- if key in ns.bm %}{% set ns.lb = ns.bm[key] %}{% endif %}
+            {%- if ov > 0 and x.change is not none %}
+            {%- set dur = ov * bsec / 3600 %}
+            {%- set s = x.change / (bsec / 3600) %}
+            {%- set g = 9999 if (not t.grid_power_entity or ns.lg is none) else ns.lg / 1000 * (1 if t.grid_import_positive else -1) %}
+            {%- set bat = 0 if (not t.battery_power_entity or ns.lb is none) else ([ns.lb / 1000 * (1 if t.battery_discharge_positive else -1), 0] | max) %}
+            {%- set gk = ([g, 0] | max) - ([g - s, 0] | max) %}
+            {%- set own = [s - gk, 0] | max %}{% set bk = [own, bat] | min %}{% set sk = own - bk %}
+            {%- set delta = (gk * (flat_n - old.flat) + sk * (exp_n - old.export) + bk * (bat_n - bat_o)) * dur %}
+            {%- set ns.tot = ns.tot + delta %}{% set ns.n = ns.n + 1 %}
+            {%- if b >= day_ts %}{% set ns.day = ns.day + delta %}{% endif %}
+            {%- if b >= week_ts %}{% set ns.week = ns.week + delta %}{% endif %}
+            {%- if b >= month_ts %}{% set ns.month = ns.month + delta %}{% endif %}
+            {%- endif %}
+            {%- endfor %}
+            {{ {'tot': ns.tot | round(4), 'day': ns.day | round(4), 'week': ns.week | round(4), 'month': ns.month | round(4), 'bins': ns.n} }}
+      - condition: template
+        value_template: '{{ result.tot | abs >= 0.0001 }}'
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_catchup
+        data:
+          value: '{{ result.tot }}'
+      - wait_template: '{{ state_attr("sensor.spa_electricity_cost_rate", "catchup") | float(0) != 0 }}'
+        timeout: '00:00:25'
+        continue_on_timeout: true
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_catchup
+        data:
+          value: 0
+      # the rate sensor integrates the correction one tick later, and the meters follow rises of the total but ignore drops
+      - delay: '00:00:15'
+      - action: utility_meter.calibrate
+        target:
+          entity_id: sensor.spa_electricity_cost_daily
+        data:
+          value: '{{ (states("sensor.spa_electricity_cost_daily") | float(0) + result.day - ([result.tot, 0] | max)) | round(4) }}'
+      - action: utility_meter.calibrate
+        target:
+          entity_id: sensor.spa_electricity_cost_weekly
+        data:
+          value: '{{ (states("sensor.spa_electricity_cost_weekly") | float(0) + result.week - ([result.tot, 0] | max)) | round(4) }}'
+      - action: utility_meter.calibrate
+        target:
+          entity_id: sensor.spa_electricity_cost_monthly
+        data:
+          value: '{{ (states("sensor.spa_electricity_cost_monthly") | float(0) + result.month - ([result.tot, 0] | max)) | round(4) }}'
+      - action: logbook.log
+        data:
+          name: Spa electricity cost
+          message: >-
+            price change corrected back to {{ from_ts | timestamp_custom('%d/%m/%Y') }}: {{ result.tot }}
+            ({{ result.bins }} steps; today {{ result.day }}, this week {{ result.week }}, this month {{ result.month }})
+    mode: queued
+
+# The label of the cost option in the dashboard dropdown input_select.spa_history_metric follows the currency code:
+# 'Cost (ILS)' with the code ILS, plain 'Cost' when the code is empty. The option is added after the first one if it is not there.
+automation:
+  - id: spa_cost_history_label
+    alias: Spa - Cost history option label
+    description: >-
+      Keeps the cost option of input_select.spa_history_metric named 'Cost (CODE)' after the helper Spa Cost Currency Code,
+      or plain 'Cost' when the code is empty. Runs when the code changes and when Home Assistant starts.
+    triggers:
+      - trigger: state
+        entity_id: input_text.spa_cost_currency_code
+      - trigger: homeassistant
+        event: start
+    variables:
+      code: "{{ states('input_text.spa_cost_currency_code') | trim }}"
+      label: "{{ 'Cost (' ~ code ~ ')' if code != '' else 'Cost' }}"
+      was_cost: "{{ states('input_select.spa_history_metric').startswith('Cost') }}"
+    actions:
+      - action: input_select.set_options
+        target:
+          entity_id: input_select.spa_history_metric
+        data:
+          options: >-
+            {% set cur = state_attr('input_select.spa_history_metric', 'options') | list %}
+            {% if cur | select('match', '^Cost') | list | count > 0 %}{{ cur | map('regex_replace', '^Cost.*$', label) | list }}{% else %}{{ [cur[0], label] + cur[1:] }}{% endif %}
+      - if:
+          - condition: template
+            value_template: '{{ was_cost }}'
+        then:
+          - action: input_select.select_option
+            target:
+              entity_id: input_select.spa_history_metric
+            data:
+              option: '{{ label }}'
+    mode: queued
+
+  # ---- Catch-up after the ESP was offline (Wi-Fi outage) ----------------------------------------------------------------
+  # While the ESP is offline the spa's power is unknown, so the live cost stops. The ESP keeps counting its energy and
+  # keeps an hourly profile of the last 24 hours. When it is back, the energy of the gap (counter difference) is spread
+  # over the gap by that profile and priced with the grid / battery power Home Assistant recorded in the gap, in 5 minute
+  # steps, the same way as the live cost. The result is added to the total (as one tick of the rate sensor).
+  # EDIT HERE: the ESP entities below (energy counter in kWh, and the 24 hour profile inside the calculation).
+  - id: spa_cost_gap_start
+    alias: Spa - Cost gap start
+    description: >-
+      Remembers the last energy counter value and the time when the ESP goes offline, for the catch-up automation.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_energy_total
+        to: unavailable
+    conditions:
+      - condition: template
+        value_template: '{{ trigger.from_state is not none and trigger.from_state.state | is_number }}'
+    actions:
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_gap_energy
+        data:
+          value: '{{ trigger.from_state.state | float }}'
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_gap_start
+        data:
+          value: '{{ as_timestamp(now()) | int }}'
+    mode: queued
+
+  - id: spa_cost_gap_catchup
+    alias: Spa - Cost catch-up after outage
+    description: >-
+      When the ESP is back after an outage of 30 s to 22 h: prices the energy it counted while offline (counter difference,
+      spread over the gap by the ESP's hourly profile, with the grid / battery power recorded in the gap) and adds it to
+      the cost total. Writes a logbook entry with the result.
+    triggers:
+      - trigger: state
+        entity_id: sensor.sundance_spa_energy_total
+        from: unavailable
+    conditions:
+      - condition: template
+        value_template: '{{ states("input_number.spa_cost_gap_energy") | float(-1) >= 0 and states("sensor.sundance_spa_energy_total") | is_number }}'
+    variables:
+      t: '{{ state_attr("sensor.spa_electricity_price", "tariff") }}'
+      e0: '{{ states("input_number.spa_cost_gap_energy") | float(-1) }}'
+      start: '{{ states("input_number.spa_cost_gap_start") | float(0) }}'
+      # Started by the energy counter coming back: its value and time then. A manual run (Run actions) uses now.
+      end: '{{ as_timestamp(trigger.to_state.last_changed) if trigger.to_state is defined else as_timestamp(now()) }}'
+      de: '{{ (trigger.to_state.state if trigger.to_state is defined else states("sensor.sundance_spa_energy_total")) | float(0) - e0 }}'
+    actions:
+      # Take the gap out of the helpers at once, so a new outage during the wait below is not lost.
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_gap_energy
+        data:
+          value: -1
+      - condition: template
+        value_template: '{{ t is mapping and 0.0005 <= de <= 60 and 30 <= end - start <= 79200 }}'
+      # The ESP sends its profile again a few seconds after it reconnects.
+      - delay: '00:00:20'
+      - if:
+          - condition: template
+            value_template: '{{ [t.grid_power_entity, t.battery_power_entity] | select | list | count > 0 }}'
+        then:
+          - action: recorder.get_statistics
+            continue_on_error: true
+            data:
+              statistic_ids: '{{ [t.grid_power_entity, t.battery_power_entity] | select | list }}'
+              start_time: '{{ ((start // 300) * 300) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
+              end_time: '{{ (((end // 300) + 1) * 300) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
+              period: 5minute
+              types:
+                - mean
+            response_variable: stats
+      - variables:
+          gs: '{{ stats.statistics.get(t.grid_power_entity, []) if stats is defined and stats and t.grid_power_entity else [] }}'
+          bs: '{{ stats.statistics.get(t.battery_power_entity, []) if stats is defined and stats and t.battery_power_entity else [] }}'
+          result: >-
+            {%- set pr = states('input_number.spa_cost_flat_price') | float(0) -%}
+            {%- set export = states('input_number.spa_cost_export_price') | float(0) -%}
+            {%- set bprice = states('input_number.spa_cost_battery_price') | float(0) if is_state('input_boolean.spa_cost_battery_custom', 'on') else export -%}
+            {%- set pp = states('sensor.sundance_spa_energy_last_24_hours').split(';') -%}
+            {%- set pidx = pp[0] | int(0) -%}
+            {%- set vals = (pp[1].split(',') | map('float', 0) | list) if pp | length > 1 else [] -%}
+            {%- set ns = namespace(bins=[], raw=0.0, sum_ov=0.0, cost=0.0, gm={}, bm={}, lg=none, lb=none, grid=0.0, solar=0.0, bat=0.0) -%}
+            {%- for x in gs %}{% set ns.gm = dict(ns.gm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
+            {%- for x in bs %}{% set ns.bm = dict(ns.bm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
+            {%- set t0 = ((start // 300) * 300) | int -%}
+            {%- set n = (((end - t0) / 300) | round(0, 'ceil')) | int -%}
+            {%- for i in range(n) %}
+            {%- set b = t0 + i * 300 %}
+            {%- set ov = (([b + 300, end] | min) - ([b, start] | max)) / 300 %}
+            {%- if ov > 0 %}
+            {%- set j = ((b // 3600) | int) - (pidx - 23) %}
+            {%- set wh = vals[j] if (0 <= j < 24 and j < vals | length) else 0 %}
+            {%- set ns.bins = ns.bins + [[b, ov, wh / 12 * ov]] %}{% set ns.raw = ns.raw + wh / 12 * ov %}{% set ns.sum_ov = ns.sum_ov + ov %}
+            {%- endif %}
+            {%- endfor %}
+            {%- for x in ns.bins %}
+            {%- set b = x[0] %}{% set ov = x[1] %}
+            {%- set share = (x[2] / ns.raw) if ns.raw > 0 else (ov / ns.sum_ov) %}
+            {%- set dur = ov / 12 %}
+            {%- set s = (share * de / dur) if dur > 0 else 0 %}
+            {%- set key = (b | int) | string %}
+            {%- if key in ns.gm %}{% set ns.lg = ns.gm[key] %}{% endif %}
+            {%- if key in ns.bm %}{% set ns.lb = ns.bm[key] %}{% endif %}
+            {%- set g = 9999 if (not t.grid_power_entity or ns.lg is none) else ns.lg / 1000 * (1 if t.grid_import_positive else -1) %}
+            {%- set bat = 0 if (not t.battery_power_entity or ns.lb is none) else ([ns.lb / 1000 * (1 if t.battery_discharge_positive else -1), 0] | max) %}
+            {%- set gk = ([g, 0] | max) - ([g - s, 0] | max) %}
+            {%- set own = [s - gk, 0] | max %}{% set bk = [own, bat] | min %}{% set sk = own - bk %}
+            {%- set ns.cost = ns.cost + (gk * pr + sk * export + bk * bprice) * dur %}
+            {%- set ns.grid = ns.grid + gk * dur %}{% set ns.solar = ns.solar + sk * dur %}{% set ns.bat = ns.bat + bk * dur %}
+            {%- endfor %}
+            {{ {'cost': ns.cost | round(4), 'grid_kwh': ns.grid | round(4), 'solar_kwh': ns.solar | round(4), 'battery_kwh': ns.bat | round(4), 'bins': ns.bins | length} }}
+      - condition: template
+        value_template: '{{ result.cost > 0 }}'
+      - action: logbook.log
+        data:
+          name: Spa electricity cost
+          message: >-
+            caught up {{ result.cost }} for {{ de | round(3) }} kWh used while the ESP was offline
+            ({{ ((end - start) / 60) | round(1) }} min: grid {{ result.grid_kwh }}, solar {{ result.solar_kwh }}, battery {{ result.battery_kwh }} kWh)
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_catchup
+        data:
+          value: '{{ result.cost }}'
+      # The rate sensor adds it in its next 10 s tick and shows it in the attribute "catchup"; then the helper is cleared.
+      - wait_template: '{{ state_attr("sensor.spa_electricity_cost_rate", "catchup") | float(0) != 0 }}'
+        timeout: '00:00:25'
+        continue_on_timeout: true
+      - action: input_number.set_value
+        target:
+          entity_id: input_number.spa_cost_catchup
+        data:
+          value: 0
+    mode: queued
+
+  # ---- Prices change from a date ------------------------------------------------------------------------------------------
+  - id: spa_cost_apply_prices
+    alias: Spa - Cost apply scheduled prices
+    description: >-
+      When "Spa Cost Schedule Price Change" is on and the date in "Spa Cost Next Prices From" has come (checked at
+      midnight, when it is switched on and when Home Assistant starts), the Next prices become the prices in force. If the
+      date began more than 10 minutes ago, the difference is also corrected back to the start of that date.
+    triggers:
+      - trigger: time
+        at: '00:00:00'
+      - trigger: state
+        entity_id: input_boolean.spa_cost_next_armed
+        to: 'on'
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: state
+        entity_id: input_boolean.spa_cost_next_armed
+        state: 'on'
+      - condition: template
+        value_template: '{{ states("input_datetime.spa_cost_next_from") <= now().strftime("%Y-%m-%d") }}'
+    variables:
+      from_ts: '{{ as_timestamp(states("input_datetime.spa_cost_next_from") ~ "T00:00:00" ~ now().isoformat()[-6:]) }}'
+      old:
+        flat: '{{ states("input_number.spa_cost_flat_price") | float(0) }}'
+        export: '{{ states("input_number.spa_cost_export_price") | float(0) }}'
+        battery: '{{ states("input_number.spa_cost_battery_price") | float(0) }}'
+    actions:
+      - action: script.spa_cost_copy_prices
+        data:
+          direction: apply
+      - if:
+          - condition: template
+            value_template: '{{ as_timestamp(now()) - from_ts > 600 }}'
+        then:
+          - action: script.spa_cost_retro_correction
+            data:
+              from_ts: '{{ from_ts }}'
+              old: '{{ old }}'
+      - action: logbook.log
+        data:
+          name: Spa electricity cost
+          message: >-
+            new prices in force from {{ states('input_datetime.spa_cost_next_from') }}: purchase {{ states('input_number.spa_cost_flat_price') }}, feed-in {{ states('input_number.spa_cost_export_price') }}
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.spa_cost_next_armed
+    mode: queued
+
+  - id: spa_cost_sync_next_prices
+    alias: Spa - Cost sync next prices
+    description: >-
+      When no change is scheduled (the switch is off, also after a change was applied or cancelled, and at start),
+      the Next helpers are set to the prices in force and the date to now, so only what you change differs.
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.spa_cost_next_armed
+        to: 'off'
+      - trigger: homeassistant
+        event: start
+    conditions:
+      - condition: state
+        entity_id: input_boolean.spa_cost_next_armed
+        state: 'off'
+    actions:
+      - action: script.spa_cost_copy_prices
+        data:
+          direction: sync
+      - action: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.spa_cost_next_from
+        data:
+          date: '{{ now().strftime("%Y-%m-%d") }}'
+    mode: queued

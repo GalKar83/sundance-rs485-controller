@@ -41,6 +41,7 @@ They are in [`../optional-packages`](../optional-packages) (outside `packages`, 
 |---|---|---|
 | `spa_audio.yaml` | which phone is connected to the spa speaker, play / pause / next from the Hot Tub page; the Bluewave standby / playing power (added to the spa's power and energy) and its two sliders on the Settings page | the Bluetooth MAC address of the spa audio (and, on the Settings page, the Bluewave standby and playing watts); per phone the Companion app *Bluetooth connection* and *Media session* sensors and its notify service |
 | `spa_power_measurement.yaml` | compares the spa power estimate (circulation, jet pump, heater) with your whole-house load (measurement only, changes nothing) | the entity id of your whole-house power sensor (W) |
+| `spa_electricity_cost.yaml` | prices the spa's electricity (flat price, solar / battery valued at the feed-in price, price changes from a date, catch-up after an ESP outage); needs the sensors of your meter and battery (see [`../optional/electricity-cost/README.md`](../optional/electricity-cost/README.md)) |
 | `spa_panel_used_while_away.yaml` | a phone alert when someone presses a panel button while you are away | your `person.` entity |
 
 > **Many entities are for debugging.** The ESPHome device exposes many diagnostic / raw-value entities because the project is still in development; they are kept so that you can be asked for their output when a bug is found. You can hide or disable them (details: [main README §12](../../README.md#12-diagnostics-entities)).

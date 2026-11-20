@@ -28,6 +28,7 @@ to work; take what you want.
   previous / play-pause / next buttons. It needs the helpers `input_text.spa_audio_bluetooth_mac`, three template sensors, the
   script `spa_audio_control` and one row on the Hot Tub page; see [Spa audio](#spa-audio-who-is-connected-what-is-playing)
   (a subsection of §4).
+- [`optional/electricity-cost/`](optional/electricity-cost) — prices the spa's electricity in your own currency (flat price, solar / battery valued at the feed-in price, prices changing from a date, catch-up after the ESP was offline), with its own package, dashboard cards and README;
 - [`optional/power-measurement/`](optional/power-measurement) — measuring the spa's power against
   the whole-house consumption, with a weekly phone summary. **Only relevant if you have a
   whole-house power sensor**, and then the entity names will differ; its own README explains it.

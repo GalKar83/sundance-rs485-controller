@@ -1,0 +1,106 @@
+# Dashboard cards for the spa electricity cost (optional). Paste them into the Hot Tub dashboards.
+#
+# 1. Hot Tub Settings view: add this grid section (for example after "Power Values").
+# 2. Hot Tub view, section "Statistics": add the statistics-graph card below (for example after "Hot Tub Energy") and add
+#    the option "Cost" to the helper input_select.spa_history_metric; the package automation "Spa - Cost history option label" then names it
+#    "Cost (CODE)" after the helper Spa Cost Currency Code (plain "Cost" when the code is empty) (Settings > Devices & services > Helpers).
+# 3. Optional, Hot Tub view, section "Energy": the "Energy Cost" card with today / week / month.
+
+# ---- 1. Settings section ------------------------------------------------------------------------------------------
+settings_section:
+  type: grid
+  cards:
+    - {type: heading, heading: Electricity Cost, heading_style: title, icon: 'mdi:cash'}
+    - type: markdown
+      grid_options: {columns: full}
+      content: >-
+        Prices are what you pay per kWh, in your own currency, including tax. The cost of the spa is its power times
+        the purchase price. The part of the spa's power that does not come from the grid (solar or battery) is
+        priced at the feed-in price instead.
+    - {type: tile, entity: input_text.spa_cost_currency, name: Currency symbol, grid_options: {columns: 6}}
+    - {type: tile, entity: input_text.spa_cost_currency_code, name: Currency code, grid_options: {columns: 6}}
+    - type: 'custom:mushroom-template-card'
+      entity: sensor.spa_electricity_cost_rate
+      primary: Price in use
+      icon: "{%- set s = states('input_text.spa_cost_currency') | trim -%}{%- set k = states('input_text.spa_cost_currency_code') | trim | upper -%}{{ 'mdi:currency-ils' if s in ['₪'] or k in ['ILS', 'NIS'] else ('mdi:currency-usd' if s == '$' or k == 'USD' else ('mdi:currency-eur' if s == '€' or k == 'EUR' else ('mdi:currency-gbp' if s == '£' or k == 'GBP' else 'mdi:cash'))) }}"
+      icon_color: green
+      tap_action: {action: more-info}
+      grid_options: {columns: full, rows: 1}
+      # The price the spa's power actually costs now: the cost rate divided by the spa's power, with the share of each source.
+      secondary: >-
+        {%- set a = state_attr('sensor.spa_electricity_cost_rate', 'grid_kw') | float(0) -%}{%- set b = state_attr('sensor.spa_electricity_cost_rate', 'solar_kw') | float(0) -%}{%- set c = state_attr('sensor.spa_electricity_cost_rate', 'battery_kw') | float(0) -%}{%- set t = a + b + c -%}{%- if t > 0.001 -%}{{ '%.2f' % (state_attr('sensor.spa_electricity_cost_rate', 'live_rate') | float(0) / t) }} {{ states('input_text.spa_cost_currency') }} per kWh · {% set p = [] %}{% if a > 0 %}{% set p = p + ['grid ' ~ ((a / t * 100) | round(0) | int) ~ '%'] %}{% endif %}{% if b > 0 %}{% set p = p + ['solar ' ~ ((b / t * 100) | round(0) | int) ~ '%'] %}{% endif %}{% if c > 0 %}{% set p = p + ['battery ' ~ ((c / t * 100) | round(0) | int) ~ '%'] %}{% endif %}{{ p | join(' · ') }}{%- else -%}Spa idle{%- endif -%}
+    - {type: tile, entity: input_boolean.spa_cost_battery_custom, name: Separate battery price, grid_options: {columns: 6}}
+    - {type: heading, heading: Prices in force, heading_style: subtitle}
+    - type: 'custom:mushroom-template-card'
+      primary: Purchase price
+      secondary: "{{ states('input_number.spa_cost_flat_price') }} {{ states('input_text.spa_cost_currency') }} per kWh"
+      icon: 'mdi:cash'
+      icon_color: grey
+      tap_action: {action: none}
+      hold_action: {action: none}
+      icon_tap_action: {action: none}
+      grid_options: {columns: 6, rows: 1}
+    - type: 'custom:mushroom-template-card'
+      primary: Feed-in price
+      secondary: "{{ states('input_number.spa_cost_export_price') }} {{ states('input_text.spa_cost_currency') }} per kWh"
+      icon: 'mdi:cash'
+      icon_color: grey
+      tap_action: {action: none}
+      hold_action: {action: none}
+      icon_tap_action: {action: none}
+      grid_options: {columns: 6, rows: 1}
+    - type: 'custom:mushroom-template-card'
+      primary: Battery price
+      secondary: "{{ states('input_number.spa_cost_battery_price') }} {{ states('input_text.spa_cost_currency') }} per kWh"
+      icon: 'mdi:cash'
+      icon_color: grey
+      tap_action: {action: none}
+      hold_action: {action: none}
+      icon_tap_action: {action: none}
+      grid_options: {columns: 6, rows: 1}
+      visibility: [{condition: state, entity: input_boolean.spa_cost_battery_custom, state: 'on'}]
+    - type: markdown
+      grid_options: {columns: full}
+      content: >-
+        {%- if is_state('input_boolean.spa_cost_next_armed', 'on') -%}<small>Scheduled: new prices from {{ states('input_datetime.spa_cost_next_from') }}</small>{%- else -%}<small>No price change scheduled.</small>{%- endif -%}
+    - {type: heading, heading: Change prices, heading_style: subtitle}
+    - type: markdown
+      grid_options: {columns: full}
+      content: >-
+        <small>Type the new prices, pick the date they start (from 00:00), then switch on Schedule price change. A future date applies at midnight of that day. A date that already began applies now and the difference is also corrected back to the start of that date (totals and the day / week / month meters; past bars in the graph keep their old values). Switching it off cancels and resets these fields to the prices in force.</small>
+    - {type: tile, entity: input_number.spa_cost_next_flat_price, name: Next purchase price, grid_options: {columns: 6}}
+    - {type: tile, entity: input_number.spa_cost_next_export_price, name: Next feed-in price, grid_options: {columns: 6}}
+    - type: tile
+      entity: input_number.spa_cost_next_battery_price
+      name: Next battery price
+      grid_options: {columns: 6}
+      visibility: [{condition: state, entity: input_boolean.spa_cost_battery_custom, state: 'on'}]
+    - {type: tile, entity: input_datetime.spa_cost_next_from, name: New prices from (00:00), grid_options: {columns: 6}}
+    - {type: tile, entity: input_boolean.spa_cost_next_armed, name: Schedule price change, grid_options: {columns: 6}}
+
+# ---- 2. Statistics card (Hot Tub view) ------------------------------------------------------------------------------
+statistics_card:
+  type: statistics-graph
+  title: Electricity Cost
+  entities:
+    - {entity: sensor.spa_electricity_cost, name: Cost}
+  stat_types: [change]
+  chart_type: bar
+  energy_date_selection: true
+  hide_legend: true
+  grid_options: {columns: full}
+  visibility:
+    - condition: template
+      value_template: "{{ states('input_select.spa_history_metric').startswith('Cost') }}"
+
+# ---- 3. Energy Cost card (Hot Tub view, section "Energy") -------------------------------------------------------------
+energy_cost_card:
+  type: 'custom:mushroom-template-card'
+  entity: sensor.spa_electricity_cost_daily
+  primary: Energy Cost
+  secondary: "Today {{ states('sensor.spa_electricity_cost_daily') | float(0) | round(2) }} {{ states('input_text.spa_cost_currency') }} · Week {{ states('sensor.spa_electricity_cost_weekly') | float(0) | round(2) }} {{ states('input_text.spa_cost_currency') }} · Month {{ states('sensor.spa_electricity_cost_monthly') | float(0) | round(2) }} {{ states('input_text.spa_cost_currency') }}"
+  # the icon follows the currency symbol helper (shekel, dollar, euro, otherwise a banknote)
+  icon: "{%- set s = states('input_text.spa_cost_currency') | trim -%}{%- set k = states('input_text.spa_cost_currency_code') | trim | upper -%}{{ 'mdi:currency-ils' if s in ['₪'] or k in ['ILS', 'NIS'] else ('mdi:currency-usd' if s == '$' or k == 'USD' else ('mdi:currency-eur' if s == '€' or k == 'EUR' else ('mdi:currency-gbp' if s == '£' or k == 'GBP' else 'mdi:cash'))) }}"
+  icon_color: green
+  tap_action: {action: more-info}
+  grid_options: {columns: full, rows: 1}
