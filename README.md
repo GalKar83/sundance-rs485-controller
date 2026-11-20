@@ -1021,6 +1021,10 @@ What was added and verified on the test spa, in order:
 | 2 Nov | Pump 1 Running / Pump 2 Running; the six Power values as settings on the device; the Home Assistant side published in `homeassistant/` |
 | 3 Nov | **p29:** automatic clock sync from 30 s when a whole-minute move improves it; run time, energy, power counted in the ESP; no reboot on a lost API connection. **p30:** settings write from HA (heater mode, Primary Filter, service counters, °C/°F), diagnostic Panel Press buttons, Energy Last 24 Hours, Counters At Midnight. TEMP menu mapped (§9) |
 | 5–6 Nov | **p31 / p31b:** language kept in flash; Primary Filter cycles edit screen is code 14 under the key (the first guess, raw 0, failed); a successful write clears an earlier failure notice; language write and select removed after the ESP's presses were shown not to change the panel; provisional per-key language code model. Cycles 4 → 3 → 4 written from HA on p31b |
+| 8 Nov | **p32 / p33:** raw values for the f7 date and the tail of the status frame, and for the C4 / CA payloads (decoding aids) |
+| 16 Nov | **Alert sensor:** the spa's own alert / error code (last byte of the C4 frame) as text. **p40:** the ESP restarts itself after 5 minutes without Wi-Fi |
+| 18 Nov | **p41:** Filter Change `Off` or `Change Now` told apart by the alert byte. **p42:** the daily cleanup read from f14 bit 7 (`Cleanup`). **p43:** the alert table cut to the codes in the 680 manuals (other codes show `Unknown error (code N)`) |
+| 20 Nov | **p44:** Primary Filter built from the independent cleanup (f14 bit 7), cycle (f10 bit 7) and heater (f10 bit 6) flags: `Circulation (Pre-Heating)`, `(Post-Heating)`, `(Auto + Heating)`, `(Auto + Cleanup)`, `(Heating + Cleanup)`, `(Auto + Heating + Cleanup)`; the cleanup and the cycle bits compared in DECODING |
 
 ## Licence
 
