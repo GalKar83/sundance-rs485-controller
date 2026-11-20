@@ -618,7 +618,7 @@ sections:
       - type: tile
         entity: input_number.spa_power_bluewave_standby
         name: Bluewave Standby
-        color: grey
+        color: "#0082FC"
         grid_options:
           columns: 6
         visibility:
@@ -628,7 +628,7 @@ sections:
       - type: tile
         entity: input_number.spa_power_bluewave_playing
         name: Bluewave Playing
-        color: grey
+        color: "#0082FC"
         grid_options:
           columns: 6
         visibility:

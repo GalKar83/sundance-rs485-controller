@@ -431,8 +431,8 @@ sections:
           (state_attr('climate.sundance_spa', 'current_temperature') | float(99)) <=
           (state_attr('climate.sundance_spa', 'temperature') | float(0)) - 1 -%}{%- set f =
           states('sensor.sundance_spa_primary_filter') -%}{%- if
-          is_state('binary_sensor.sundance_spa_heater', 'on') -%}{{ 'Heating' if f == 'Off' else f ~
-          ' · Heating' }}{%- elif blocked -%}{{ '' if f == 'Off' else f ~ ' · ' }}Heating blocked
+          is_state('binary_sensor.sundance_spa_heater', 'on') -%}{{ 'Heating' if f == 'Off' else (f if 'Heating' in f else f ~
+          ' · Heating') }}{%- elif blocked -%}{{ '' if f == 'Off' else f ~ ' · ' }}Heating blocked
           ({{ m }} until {{ '17:00' if m == 'Eco' else '07:00' }}){%- else -%}{{ f }}{%- endif -%}
         icon: >-
           {%- set m = states('sensor.sundance_spa_heater_mode') -%}{%- set h = now().hour -%}{%- set
