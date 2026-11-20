@@ -350,6 +350,7 @@ class SundanceSpa : public Component, public uart::UARTDevice {
   text_sensor::TextSensor *alert_text_sensor_{nullptr};
   int alert_candidate_{-1};
   bool cleanup_{false};           // f14 bit 7: the daily cleanup at spa noon (waiting minute + Jet 2 minute)
+  bool heat_seen_{false};          // the heater has been on during this heat-demand pump run (Pre-/Post-Heating label)
   uint32_t fc_zero_since_ms_{0};  // since when f3 has read 0xFA (Filter Change 0 or Off); 0 = not at 0xFA
   uint32_t alert_candidate_ms_{0};
   int alert_candidate_n_{0};

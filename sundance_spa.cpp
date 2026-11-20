@@ -856,7 +856,7 @@ void SundanceSpa::publish_states_() {
   this->debounce_(this->heater_db_, this->heater_on_);
   if (this->circ_binary_sensor_)
     this->circ_binary_sensor_->publish_state(this->circ_on_);
-  if (this->circ_status_db_.sensor != nullptr)
+  if (this->circ_status_db_.sensor != nullptr) {
     // User-defined states (2026-10-22/26): "Purge" = the 2-minute sequence after power-up or a Service
     // Lock unlock (Jet 1 low, then Jet 2; the controller keeps the manual-circulation bit set for all of
     // it although nobody pressed Circulation — verified 25 Oct outside and 26 Oct inside a filter
@@ -864,16 +864,40 @@ void SundanceSpa::publish_states_() {
     // minute of Jet 1 low, then Jet 2 started by the controller itself); "Circulation (Manual)" = Jet 1 low started
     // by hand; "Circulation (Auto)" = scheduled filtration; "Circulation (Heating)" = the spa runs the
     // pump for heat demand; otherwise "Off". Purge comes first so presses made meanwhile don't matter.
-    this->debounce_(
-        this->circ_status_db_,
-        this->manual_circ_ && this->manual_auto_                                          ? "Purge"
-        : (this->pump_status_[0] != 0 || (this->pump_status_[1] != 0 && !this->jet2_auto_)) ? "Running"
-        : this->pump_status_[1] != 0                                                      ? "Cleanup"
-        : this->manual_circ_                                                              ? "Circulation (Manual)"
-        : this->cleanup_ && this->circ_on_                                                ? "Cleanup"
-        : !this->circ_on_ || !this->circ_cmd_                                             ? "Off"
-        : this->filter_cycle_                                                             ? "Circulation (Auto)"
-                                                                                          : "Circulation (Heating)");
+    // Patch 44 (2026-11-20): the text is built from three independent flags - cleanup (f14 bit7), scheduled
+    // cycle (f10 bit7) and heater (f10 bit6): "Circulation (Auto + Heating)", "Circulation (Auto + Cleanup)",
+    // "Circulation (Heating + Cleanup)", "Circulation (Auto + Heating + Cleanup)". Outside a cycle the heat-demand
+    // pump run is "Circulation (Pre-Heating)" until the heater has come on in this run, "Circulation (Heating)"
+    // while it is on and "Circulation (Post-Heating)" for the run-on after it turned off (heat_seen_).
+    const char *cleanup_text = this->filter_cycle_ ? (this->heater_on_ ? "Circulation (Auto + Heating + Cleanup)"
+                                                                       : "Circulation (Auto + Cleanup)")
+                                                   : (this->heater_on_ ? "Circulation (Heating + Cleanup)" : "Cleanup");
+    const char *circ_text;
+    bool heat_branch = false;
+    if (this->manual_circ_ && this->manual_auto_) {
+      circ_text = "Purge";
+    } else if (this->pump_status_[0] != 0 || (this->pump_status_[1] != 0 && !this->jet2_auto_)) {
+      circ_text = "Running";
+    } else if (this->pump_status_[1] != 0) {
+      circ_text = cleanup_text;
+    } else if (this->manual_circ_) {
+      circ_text = "Circulation (Manual)";
+    } else if (this->cleanup_ && this->circ_on_) {
+      circ_text = cleanup_text;
+    } else if (!this->circ_on_ || !this->circ_cmd_) {
+      circ_text = "Off";
+    } else if (this->filter_cycle_) {
+      circ_text = this->heater_on_ ? "Circulation (Auto + Heating)" : "Circulation (Auto)";
+    } else {
+      heat_branch = true;
+      circ_text = this->heater_on_ ? "Circulation (Heating)"
+                  : this->heat_seen_ ? "Circulation (Post-Heating)"
+                                     : "Circulation (Pre-Heating)";
+    }
+    // heat_seen_: the heater has been on during this heat-demand pump run (reset when the run is over).
+    this->heat_seen_ = heat_branch && (this->heat_seen_ || this->heater_on_);
+    this->debounce_(this->circ_status_db_, circ_text);
+  }
   // Any pump running, for any reason (Jet 1 low or high, Jet 2).
   const bool pumps_running = this->circ_on_ || this->pump_status_[0] != 0 || this->pump_status_[1] != 0;
   this->debounce_(this->pumps_running_db_, pumps_running);

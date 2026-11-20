@@ -304,7 +304,7 @@ Names are chosen so that related entities sort together (same first word).
 | Jet 2 (switch) | on/off | f1 bit2 |
 | Light (select) | Off, High Speed Blend, Low Speed Blend, Frozen Blend, Blue, Violet, Red, Amber, Green, Aqua, Near White | lights frame |
 | Light Status | same list | lights frame |
-| Primary Filter | Purge / Running / Cleanup / Circulation (Manual) / Circulation (Auto) / Circulation (Heating) / Off | f1, f2, f10 bit7, see below |
+| Primary Filter | Off / Purge / Running / Cleanup / Circulation (Manual) / Circulation (Auto) / Circulation (Pre-Heating) / (Heating) / (Post-Heating) / (Auto + Heating) / (Auto + Cleanup) / (Heating + Cleanup) / (Auto + Heating + Cleanup), see below | f1, f2, f10 bits 6-7, f14 bit7 |
 | Primary Filter Active (binary) | scheduled filtration cycle | f10 bit7 |
 | Pumps Running (binary) | any pump running | f1, f2 |
 | Pump 1 Running / Pump 2 Running (binary) | Pump 1 = Jet 1 pump at either speed (incl. circulation), Pump 2 = Jet 2 | f1, f2 |
@@ -330,6 +330,26 @@ Circulation; presses made meanwhile do not change the state. `Running` — Jet 1
 by someone. `Cleanup` — Jet 2 started by the controller itself (no press in the previous 5 s; the
 daily cleanup). `Circulation (Manual)` — Jet 1 low started by hand. `Circulation (Auto)` — scheduled
 filtration. `Circulation (Heating)` — the pump runs for heat demand. Otherwise `Off`.
+
+**Primary Filter states since 2026-11-20 (patch 44).** The text is built from independent flags: cleanup (f14 bit 7), scheduled cycle (f10 bit 7) and heater (f10 bit 6). `Purge`, `Running` and `Circulation (Manual)` keep their priority.
+
+| State | When | Seen |
+|---|---|---|
+| `Off` | no pump runs | yes |
+| `Purge` | 2-minute sequence after power-up or a Service Lock release | yes |
+| `Running` | Jet 1 high or Jet 2 on | yes |
+| `Circulation (Manual)` | circulation started by hand | yes |
+| `Circulation (Auto)` | scheduled filtration, no heating, no cleanup | yes |
+| `Cleanup` | daily cleanup at spa noon (2 minutes), no cycle, no heating | yes |
+| `Circulation (Pre-Heating)` | the pump runs for heat demand and the heater is not on yet in this run (about a minute before the element), no cycle | not yet |
+| `Circulation (Heating)` | heater on, no cycle | yes |
+| `Circulation (Post-Heating)` | the heater turned off and the pump still runs on (about a minute), no cycle | not yet |
+| `Circulation (Auto + Heating)` | heater on inside a scheduled cycle | not yet |
+| `Circulation (Auto + Cleanup)` | the daily cleanup falls on the start of a cycle | the bits yes (20 Nov 2026), the text not yet |
+| `Circulation (Heating + Cleanup)` | heater on during the cleanup, no cycle | no, derived from the independent bits |
+| `Circulation (Auto + Heating + Cleanup)` | cycle, heater and cleanup together | no, derived |
+
+Inside a cycle only the `Auto` forms exist (the pump already runs, so there is no separate minute before or after the heater). The cleanup flag lasts exactly 2 minutes with or without a cycle; without a cycle the pumps wind down after the first minute (f1 96 -> 4 -> 0), with a cycle they stay on (f1 96, f14 191 then 63).
 
 **2-second confirmation.** Primary Filter, ClearRay Bulb, Heater, Pumps Running, Pump 1 / Pump 2 Running, Circulation (Auto)
 and every Active/Session sensor are published only after the new state has held for 2 s (run times
