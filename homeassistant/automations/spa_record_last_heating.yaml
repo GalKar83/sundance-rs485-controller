@@ -13,14 +13,20 @@ description: >-
   cancelled by an automation reload at 08:50), min over the run + pre-run drop instead of the single
   reading at start, max instead of the reading at the end. Revised 2026-11-03: also updates
   input_number.spa_heat_rate (30% weight per run of 20+ min rising 1°+) for the calendar Ready-by
-  heating. Revised 2026-11-20 (owner): a heat call that is running when a scheduled filter cycle starts
-  used to be cut at the cycle start, because heating_run needs "no scheduled cycle" (28 min logged for a
-  34 min run on 18 Nov). Now a run starts when heating_run OR the heater
-  (binary_sensor.sundance_spa_heater) turns on while no run is open (the 30 s pre-run drop window is 150 s
-  when the heater started it, the heater comes about a minute after the pump), and it ends when the heater
-  turns off (the target is reached; the pump runs on for about a minute after that, which is not counted), or
-  when heating_run turns off while the heater is off (a heat call that never started the heater). The first
-  minute, pump on and heater not yet on, is counted: it is part of the time to reach the target.
+  heating. Revised 2026-11-20 (owner): a heat call that is running when a scheduled filter cycle
+  starts used to be cut at the cycle start, because heating_run needs "no scheduled cycle" (28 min
+  logged for a 34 min run on 18 Nov). Now a run starts when heating_run OR the heater
+  (binary_sensor.sundance_spa_heater) turns on while no run is open (the 30 s pre-run drop window is
+  150 s when the heater started it, the heater comes about a minute after the pump), and it ends
+  when the heater turns off (the target is reached; the pump runs on for about a minute after that,
+  which is not counted), or when heating_run turns off while the heater is off (a heat call that
+  never started the heater). The first minute, pump on and heater not yet on, is counted: it is part
+  of the time to reach the target. Revised 2026-11-20 (owner): the duration and start time shown in
+  input_text.spa_last_heating are now the time the heater was ON (heater turned on to heater turned
+  off), like the Heater Time counters; the run data got a 4th field (heater-on timestamp, 0 = not
+  yet on, a run without one falls back to the run start). The heat-rate learning for Ready-by still
+  uses the time from the run start (pump on) to the heater turning off, the time to reach the
+  target.
 triggers:
   - trigger: state
     entity_id:
@@ -43,7 +49,7 @@ triggers:
 actions:
   - variables:
       run: '{{ states(''input_text.spa_heating_run_data'') }}'
-      is_open: '{{ run.split('';'') | count == 3 }}'
+      is_open: '{{ run.split('';'') | count >= 3 }}'
   - choose:
       - conditions:
           - condition: trigger
@@ -56,13 +62,35 @@ actions:
               since: '{{ as_timestamp(trigger.to_state.last_changed) | int }}'
               drop: '{{ states(''input_text.spa_temp_last_drop'').split('';'') }}'
               low: >-
-                {% if drop | count == 2 and since - drop[0] | float(0) <= (150 if trigger.entity_id == 'binary_sensor.sundance_spa_heater' else 30) %}{{ [cur, drop[1] |
-                float(99)] | min }}{% else %}{{ cur }}{% endif %}
+                {% if drop | count == 2 and since - drop[0] | float(0) <= (150 if trigger.entity_id
+                == 'binary_sensor.sundance_spa_heater' else 30) %}{{ [cur, drop[1] | float(99)] |
+                min }}{% else %}{{ cur }}{% endif %}
           - action: input_text.set_value
             target:
               entity_id: input_text.spa_heating_run_data
             data:
-              value: '{{ since }};{{ low }};{{ cur }}'
+              value: >-
+                {{ since }};{{ low }};{{ cur }};{{ since if trigger.entity_id ==
+                'binary_sensor.sundance_spa_heater' else 0 }}
+      - conditions:
+          - condition: trigger
+            id: start
+          - condition: template
+            value_template: '{{ is_open }}'
+          - condition: template
+            value_template: >-
+              {{ trigger.entity_id == 'binary_sensor.sundance_spa_heater' and (run.split(';') |
+              count < 4 or run.split(';')[3] | int(0) == 0) }}
+        sequence:
+          - variables:
+              p: '{{ run.split('';'') }}'
+          - action: input_text.set_value
+            target:
+              entity_id: input_text.spa_heating_run_data
+            data:
+              value: >-
+                {{ p[0] }};{{ p[1] }};{{ p[2] }};{{ as_timestamp(trigger.to_state.last_changed) |
+                int }}
       - conditions:
           - condition: trigger
             id: temp
@@ -87,7 +115,7 @@ actions:
                     target:
                       entity_id: input_text.spa_heating_run_data
                     data:
-                      value: '{{ p[0] }};{{ mn }};{{ mx }}'
+                      value: '{{ p[0] }};{{ mn }};{{ mx }};{{ p[3] if p | count > 3 else 0 }}'
             else:
               - if:
                   - condition: template
@@ -111,10 +139,12 @@ actions:
         sequence:
           - variables:
               p: '{{ run.split('';'') }}'
+              el: '{{ p[3] | float(0) if p | count > 3 else 0 }}'
+              st: '{{ el if el > 0 else p[0] | float }}'
               summary: >-
                 {{ '%.1f' % (p[1] | float) }} → {{ '%.1f' % (p[2] | float) }} °C · {{
-                ((as_timestamp(now()) - p[0] | float) / 60) | round(0) | int }} min · {{ (p[0] |
-                int) | timestamp_custom('%d/%m %H:%M') }}
+                ((as_timestamp(now()) - st | float) / 60) | round(0) | int }} min · {{ (st | int) |
+                timestamp_custom('%d/%m %H:%M') }}
           - action: input_text.set_value
             target:
               entity_id: input_text.spa_last_heating
