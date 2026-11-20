@@ -3055,7 +3055,10 @@ automation:
       needs "no scheduled cycle" (28 min logged for a 34 min run on 18 Nov). Now a run starts when
       heating_run OR the heater (binary_sensor.sundance_spa_heater) turns on while no run is open
       (the 30 s pre-run drop window is 150 s when the heater started it, the heater comes about a
-      minute after the pump), and it ends only when both are off.
+      minute after the pump), and it ends when the heater turns off (the target is reached; the pump
+      runs on for about a minute after that, which is not counted), or when heating_run turns off
+      while the heater is off (a heat call that never started the heater). The first minute, pump on
+      and heater not yet on, is counted: it is part of the time to reach the target.
     triggers:
       - trigger: state
         entity_id:
@@ -3142,9 +3145,7 @@ automation:
               - condition: template
                 value_template: '{{ is_open }}'
               - condition: state
-                entity_id:
-                  - binary_sensor.sundance_spa_heating_run
-                  - binary_sensor.sundance_spa_heater
+                entity_id: binary_sensor.sundance_spa_heater
                 state: 'off'
             sequence:
               - variables:
