@@ -11,16 +11,19 @@ It only reads values. It does not change the spa, the firmware or any other enti
 Every 10 seconds:
 
 1. **Price.** The helper `Spa Cost Flat Price` (what you pay per kWh, including the tax you want counted).
-2. **Where the spa's power comes from.** With the spa's power `s`, the grid power `g` (positive = buying) and the
-   battery discharge `b`:
-   * from the grid: `max(g, 0) - max(g - s, 0)`
-   * from your own supply: `s` minus that, of which `min(own, b)` is the battery and the rest is solar.
+2. **Where the spa's power comes from.** Electric power is not tied to a source, so the spa takes its power from
+   the house supply **in proportion**. With the grid purchase `G` (the meter, positive = buying, 0 when selling), the
+   battery discharge `B` and the rest of the house load `P` (the panels: house load minus `G` minus `B`, 0 if
+   negative), the share of each source is `G` / (`G` + `B` + `P`), `B` / (...) and `P` / (...). Example: the house
+   buys 33 W and the battery gives 300 W: the spa is about 10 % grid and 90 % battery, not 100 % grid because its own
+   15 W happens to be below the 33 W of the meter. With no house load sensor the split is grid / battery only (the
+   panels when both are zero). With no grid sensor everything is priced at the purchase price.
 3. **Cost rate** (currency per hour) = grid kW x purchase price + solar kW x feed-in price + battery kW x battery price.
    The feed-in price is what you would have earned if the energy had been sold, so selling less is a cost.
    The battery is priced like your own generation (the feed-in price) unless you turn on the switch `Spa Cost Separate Battery Price` and set `Spa Cost Battery Price`, for example to include conversion losses.
 4. The rate is integrated into a running total, `sensor.spa_electricity_cost`, with daily, weekly and monthly meters.
 
-If you have no grid sensor, leave `grid_power_entity` empty: all of the spa's power is priced at the purchase price.
+If you have no grid sensor, leave `grid_power_entity` empty: all of the spa's power is priced at the purchase price. `load_power_entity` (the whole-house consumption in W) is optional; it sharpens the split when the panels feed the house at the same time.
 
 This is an **allocation model, not a bill**. Your utility bills by its own meter and rules (net metering, billing
 periods, fixed charges); the fixed and capacity charges are not included because they do not depend on the spa.

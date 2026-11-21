@@ -127,6 +127,10 @@ template:
         # is positive.
         battery_power_entity: sensor.battery_power
         battery_discharge_positive: true
+        # House consumption in W (optional). It tells how much of the supply comes from the panels directly; without
+        # it the spa's power is split between the grid and the battery only (panels when both are zero). Leave ''
+        # if you have none.
+        load_power_entity: sensor.load_power
       # ============================== END EDIT HERE ==============================
       price: '{{ states("input_number.spa_cost_flat_price") | float(0) }}'
       s_kw: '{{ states(tariff.spa_power_entity) | float(0) / 1000 }}'
@@ -134,10 +138,18 @@ template:
         {% if tariff.grid_power_entity %}{{ states(tariff.grid_power_entity) | float(0) / 1000 * (1 if tariff.grid_import_positive else -1) }}{% else %}9999{% endif %}
       b_kw: >-
         {% if tariff.battery_power_entity %}{{ [states(tariff.battery_power_entity) | float(0) / 1000 * (1 if tariff.battery_discharge_positive else -1), 0] | max }}{% else %}0{% endif %}
-      grid_kw: '{{ ([g_kw, 0] | max) - ([g_kw - s_kw, 0] | max) }}'
-      own_kw: '{{ [s_kw - grid_kw, 0] | max }}'
-      battery_kw: '{{ [own_kw, b_kw] | min }}'
-      solar_kw: '{{ own_kw - battery_kw }}'
+      # The spa takes its power from the house supply in proportion: grid purchase (g), battery discharge (b) and the
+      # rest of the house load (panels). Power is not tied to a source, so no source is served first.
+      l_kw: >-
+        {% if tariff.load_power_entity %}{{ states(tariff.load_power_entity) | float(0) / 1000 }}{% else %}0{% endif %}
+      g_pos: '{{ [g_kw, 0] | max }}'
+      p_kw: '{{ [l_kw - g_pos - b_kw, 0] | max }}'
+      t_kw: '{{ g_pos + b_kw + p_kw }}'
+      grid_kw: >-
+        {% if not tariff.grid_power_entity %}{{ s_kw }}{% elif t_kw > 0 %}{{ s_kw * g_pos / t_kw }}{% else %}0{% endif %}
+      battery_kw: >-
+        {% if tariff.grid_power_entity and t_kw > 0 %}{{ s_kw * b_kw / t_kw }}{% else %}0{% endif %}
+      solar_kw: '{{ s_kw - grid_kw - battery_kw }}'
       export_price: '{{ states("input_number.spa_cost_export_price") | float(0) }}'
       battery_price: >-
         {{ states('input_number.spa_cost_battery_price') | float(0) if is_state('input_boolean.spa_cost_battery_custom', 'on') else export_price }}
@@ -232,7 +244,7 @@ script:
     sequence:
       - action: recorder.get_statistics
         data:
-          statistic_ids: '{{ ["sensor.sundance_spa_energy_total", t.grid_power_entity, t.battery_power_entity] | select | list }}'
+          statistic_ids: '{{ ["sensor.sundance_spa_energy_total", t.grid_power_entity, t.battery_power_entity, t.load_power_entity] | select | list }}'
           start_time: '{{ ((from_ts // bsec) * bsec) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
           end_time: '{{ (((to_ts // bsec) + 1) * bsec) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
           period: '{{ per }}'
@@ -244,6 +256,7 @@ script:
           es: '{{ stats.statistics.get("sensor.sundance_spa_energy_total", []) }}'
           gs: '{{ stats.statistics.get(t.grid_power_entity, []) if t.grid_power_entity else [] }}'
           bs: '{{ stats.statistics.get(t.battery_power_entity, []) if t.battery_power_entity else [] }}'
+          ls: '{{ stats.statistics.get(t.load_power_entity, []) if t.load_power_entity else [] }}'
           result: >-
             {%- set cust = is_state('input_boolean.spa_cost_battery_custom', 'on') -%}
             {%- set flat_n = states('input_number.spa_cost_flat_price') | float(0) -%}
@@ -253,9 +266,10 @@ script:
             {%- set day_ts = as_timestamp(today_at()) -%}
             {%- set week_ts = as_timestamp(today_at() - timedelta(days=now().weekday())) -%}
             {%- set month_ts = as_timestamp(today_at() - timedelta(days=now().day - 1)) -%}
-            {%- set ns = namespace(gm={}, bm={}, lg=none, lb=none, tot=0.0, day=0.0, week=0.0, month=0.0, n=0) -%}
+            {%- set ns = namespace(gm={}, bm={}, lm={}, lg=none, lb=none, ll=none, tot=0.0, day=0.0, week=0.0, month=0.0, n=0) -%}
             {%- for x in gs %}{% set ns.gm = dict(ns.gm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
             {%- for x in bs %}{% set ns.bm = dict(ns.bm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
+            {%- for x in ls %}{% set ns.lm = dict(ns.lm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
             {%- for x in es %}
             {%- set b = as_timestamp(x.start) %}
             {%- set ov = (([b + bsec, to_ts] | min) - ([b, from_ts] | max)) / bsec %}
@@ -267,8 +281,11 @@ script:
             {%- set s = x.change / (bsec / 3600) %}
             {%- set g = 9999 if (not t.grid_power_entity or ns.lg is none) else ns.lg / 1000 * (1 if t.grid_import_positive else -1) %}
             {%- set bat = 0 if (not t.battery_power_entity or ns.lb is none) else ([ns.lb / 1000 * (1 if t.battery_discharge_positive else -1), 0] | max) %}
-            {%- set gk = ([g, 0] | max) - ([g - s, 0] | max) %}
-            {%- set own = [s - gk, 0] | max %}{% set bk = [own, bat] | min %}{% set sk = own - bk %}
+            {%- if key in ns.lm %}{% set ns.ll = ns.lm[key] %}{% endif %}
+            {%- set lo = (ns.ll / 1000) if ns.ll is not none else 0 %}
+            {%- set gp = [g, 0] | max %}{% set pl = [lo - gp - bat, 0] | max %}{% set tt = gp + bat + pl %}
+            {%- set gk = (s if not t.grid_power_entity else ((s * gp / tt) if tt > 0 else 0)) %}
+            {%- set bk = ((s * bat / tt) if (tt > 0 and t.grid_power_entity) else 0) %}{% set sk = s - gk - bk %}
             {%- set delta = (gk * (flat_n - old.flat) + sk * (exp_n - old.export) + bk * (bat_n - bat_o)) * dur %}
             {%- set ns.tot = ns.tot + delta %}{% set ns.n = ns.n + 1 %}
             {%- if b >= day_ts %}{% set ns.day = ns.day + delta %}{% endif %}
@@ -421,7 +438,7 @@ automation:
           - action: recorder.get_statistics
             continue_on_error: true
             data:
-              statistic_ids: '{{ [t.grid_power_entity, t.battery_power_entity] | select | list }}'
+              statistic_ids: '{{ [t.grid_power_entity, t.battery_power_entity, t.load_power_entity] | select | list }}'
               start_time: '{{ ((start // 300) * 300) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
               end_time: '{{ (((end // 300) + 1) * 300) | timestamp_custom("%Y-%m-%dT%H:%M:%S+00:00", false) }}'
               period: 5minute
@@ -431,6 +448,7 @@ automation:
       - variables:
           gs: '{{ stats.statistics.get(t.grid_power_entity, []) if stats is defined and stats and t.grid_power_entity else [] }}'
           bs: '{{ stats.statistics.get(t.battery_power_entity, []) if stats is defined and stats and t.battery_power_entity else [] }}'
+          ls: '{{ stats.statistics.get(t.load_power_entity, []) if stats is defined and stats and t.load_power_entity else [] }}'
           result: >-
             {%- set pr = states('input_number.spa_cost_flat_price') | float(0) -%}
             {%- set export = states('input_number.spa_cost_export_price') | float(0) -%}
@@ -438,9 +456,10 @@ automation:
             {%- set pp = states('sensor.sundance_spa_energy_last_24_hours').split(';') -%}
             {%- set pidx = pp[0] | int(0) -%}
             {%- set vals = (pp[1].split(',') | map('float', 0) | list) if pp | length > 1 else [] -%}
-            {%- set ns = namespace(bins=[], raw=0.0, sum_ov=0.0, cost=0.0, gm={}, bm={}, lg=none, lb=none, grid=0.0, solar=0.0, bat=0.0) -%}
+            {%- set ns = namespace(bins=[], raw=0.0, sum_ov=0.0, cost=0.0, gm={}, bm={}, lm={}, lg=none, lb=none, ll=none, grid=0.0, solar=0.0, bat=0.0) -%}
             {%- for x in gs %}{% set ns.gm = dict(ns.gm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
             {%- for x in bs %}{% set ns.bm = dict(ns.bm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
+            {%- for x in ls %}{% set ns.lm = dict(ns.lm, **{((as_timestamp(x.start)) | int) | string: x.mean}) %}{% endfor -%}
             {%- set t0 = ((start // 300) * 300) | int -%}
             {%- set n = (((end - t0) / 300) | round(0, 'ceil')) | int -%}
             {%- for i in range(n) %}
@@ -462,8 +481,11 @@ automation:
             {%- if key in ns.bm %}{% set ns.lb = ns.bm[key] %}{% endif %}
             {%- set g = 9999 if (not t.grid_power_entity or ns.lg is none) else ns.lg / 1000 * (1 if t.grid_import_positive else -1) %}
             {%- set bat = 0 if (not t.battery_power_entity or ns.lb is none) else ([ns.lb / 1000 * (1 if t.battery_discharge_positive else -1), 0] | max) %}
-            {%- set gk = ([g, 0] | max) - ([g - s, 0] | max) %}
-            {%- set own = [s - gk, 0] | max %}{% set bk = [own, bat] | min %}{% set sk = own - bk %}
+            {%- if key in ns.lm %}{% set ns.ll = ns.lm[key] %}{% endif %}
+            {%- set lo = (ns.ll / 1000) if ns.ll is not none else 0 %}
+            {%- set gp = [g, 0] | max %}{% set pl = [lo - gp - bat, 0] | max %}{% set tt = gp + bat + pl %}
+            {%- set gk = (s if not t.grid_power_entity else ((s * gp / tt) if tt > 0 else 0)) %}
+            {%- set bk = ((s * bat / tt) if (tt > 0 and t.grid_power_entity) else 0) %}{% set sk = s - gk - bk %}
             {%- set ns.cost = ns.cost + (gk * pr + sk * export + bk * bprice) * dur %}
             {%- set ns.grid = ns.grid + gk * dur %}{% set ns.solar = ns.solar + sk * dur %}{% set ns.bat = ns.bat + bk * dur %}
             {%- endfor %}
